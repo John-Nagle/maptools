@@ -63,7 +63,30 @@ def test1() :
     print("Impostor data", impostor_data)
     json_data = json.dumps(impostor_data, indent=4)
     print("JSON data:\n", json_data)
+   
+'''
+Scan a rectangular area of the map and output. Return JSON
+''' 
+def scan_map_rectangle(ll, ur) :
+    items = []
+    for x in range(ll[0], ur[0]+1) : 
+        for y in range(ll[1], ur[1]+1) :
+            try: 
+                coords = [x,y]
+                fields = fetch_region_info(coords)
+                impostor_data = build_impostor_struct(coords, fields)
+                items.append(impostor_data)
+            except KeyError as err :
+                print("Failed for [%i, %i]: %s" % x, y, err)
+    print("Done.")
+    return items
+    
 
 
 if __name__ == "__main__" :
-    test1()
+    ####test1()
+    ######jout = scan_map_rectangle([1130, 1046], [1139, 1054]) # Blake Sea
+    outfile = "blakeseaimpostors.json"
+    jout = scan_map_rectangle([1130, 1046], [1131, 1047])
+    with open(outfile, "w") as file:
+        file.write(json.dumps(jout, indent = 4))
