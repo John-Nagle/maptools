@@ -34,6 +34,7 @@ def build_impostor_struct(coords, fields) :
         "comment" : "Flat impostor for region '%s'" % fields["name"],
         "grid" : QUERY_GRID,
         "region_loc" : [coords[0]*REGION_SIZE, coords[1]*REGION_SIZE],
+        "region_size" : [REGION_SIZE, REGION_SIZE],
         "scale": [256.0, 256.0, 23.0],
         "impostor_lod" : 0,
         "estate_id" : 0,
