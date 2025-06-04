@@ -77,7 +77,7 @@ def scan_map_rectangle(ll, ur) :
                 impostor_data = build_impostor_struct(coords, fields)
                 items.append(impostor_data)
             except KeyError as err :
-                print("Failed for [%i, %i]: %s" % x, y, err)
+                print("Failed for [%i, %i]: %s" % (x, y, err))
     print("Done.")
     return items
     
@@ -85,8 +85,8 @@ def scan_map_rectangle(ll, ur) :
 
 if __name__ == "__main__" :
     ####test1()
-    ######jout = scan_map_rectangle([1130, 1046], [1139, 1054]) # Blake Sea
+    jout = scan_map_rectangle([1130, 1046], [1139, 1054]) # Blake Sea
     outfile = "blakeseaimpostors.json"
-    jout = scan_map_rectangle([1130, 1046], [1131, 1047])
+    ######jout = scan_map_rectangle([1130, 1046], [1131, 1047])
     with open(outfile, "w") as file:
         file.write(json.dumps(jout, indent = 4))
