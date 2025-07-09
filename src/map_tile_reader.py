@@ -23,6 +23,15 @@ def fetch_map_tile(lod, filename) :
         
 def construct_map_tile_filename(lod, coords) :
     return MAP_FILENAME % (lod, coords[0], coords[1])
+   
+''' 
+Are these coords valid for this LOD?
+
+Must be a multiple of a power of 2 of LOD-1
+'''
+def coords_valid_for_lod(lod, coords) :
+    scale = pow(2,lod-1)
+    return coords[0] % scale == 0 and coords[1] % scale == 0
 
 '''
 Scan a rectangular area of the map and output. Save images.
@@ -37,8 +46,9 @@ def download_map_rectangle(ll, ur, directory) :
             for lod in range(2,5) :
                 try: 
                     coords = [x,y]
+                    if not coords_valid_for_lod(lod, coords) :
+                        continue
                     filename = construct_map_tile_filename(lod, coords)
-                    print(" filename: " + filename)
                     img = fetch_map_tile(lod, filename)
                     path = directory + "/" + filename
                     with open(filename, "wb") as outfile :
