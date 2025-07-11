@@ -60,7 +60,24 @@ def download_map_rectangle_old(ll, ur, directory) :
     print("Done.")
     return items
     
-def download_map_rectangle(fullbox, directory) :
+def download_map_tile(box, lod, directory) :
+    """
+    Download relevant map tile
+    """
+    try: 
+        coords = [int(box.pos[0] / 256), int(box.pos[1] / 256)]
+        assert(coords_valid_for_lod(lod, coords))
+        filename = construct_map_tile_filename(lod, coords)
+        img = fetch_map_tile(lod, filename)
+        path = directory + "/" + filename
+        with open(filename, "wb") as outfile :
+            outfile.write(img)
+            print(" Wrote " + filename)
+    except KeyError as err :
+        print("Failed for [%i, %i]: %s" % (x, y, err))
+    print("Done.")  
+    
+def download_map_rectangles(fullbox, directory) :
     for lod in range (2,8) :
         scaling = int(pow(2,lod-1))
         # We want all boxes at this LOD which overlap fullbox
@@ -75,7 +92,7 @@ def download_map_rectangle(fullbox, directory) :
         for x in range (xstart, xend, boxsize) :
             for y in range (ystart, yend, boxsize) :
                 thisbox = RegionBox([x, y], [boxsize, boxsize])
-                print(thisbox.pos)
+                download_map_tile(thisbox, lod, directory)
         
     
 
@@ -86,5 +103,5 @@ if __name__ == "__main__" :
     boxur = RegionBox([1139*256, 1054*256], [256, 256])
     # encloses all
     fullbox = boxll.union(boxur)   
-    download_map_rectangle(fullbox, outdir)
+    download_map_rectangles(fullbox, outdir)
     ###### download_map_rectangle_old([1130, 1046], [1139, 1054], outdir) # Blake Sea
