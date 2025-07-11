@@ -86,8 +86,8 @@ def download_map_rectangles(fullbox, directory) :
         #   Round down to get starting position that may be partly off edge of fullbox
         xstart = int(int(fullbox.pos[0]) / boxsize) * boxsize
         ystart = int(int(fullbox.pos[1]) / boxsize) * boxsize
-        xend = int(fullbox.pos[0] + fullbox.size[0])
-        yend = int(fullbox.pos[1] + fullbox.size[1])
+        xend = int(fullbox.pos[0] + fullbox.size[0] + boxsize)
+        yend = int(fullbox.pos[1] + fullbox.size[1] + boxsize)
         print(xstart, xend, boxsize) 
         for x in range (xstart, xend, boxsize) :
             for y in range (ystart, yend, boxsize) :
