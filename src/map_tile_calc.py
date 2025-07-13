@@ -38,6 +38,12 @@ def tilecalc(coords, size) :
         raise ValueError("Size not a multiple of 256")
     tilesize = size / 256
     lod = lodcalc(tilesize)
+    if (x % size == 0 and y % size == 0) :
+        print("Tile is size-aligned.")
+    else :
+        xaligned = int(x/size)*size
+        yaligned = int(y/size)*size
+        print("Tile is not size-aligned. Aligned corner is at (%i,%i)." % (xaligned, yaligned))
         
 """
 Calculate LOD from size
