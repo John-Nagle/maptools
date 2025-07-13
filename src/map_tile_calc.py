@@ -11,16 +11,16 @@ def calculator() :
             print("Enter x,y: ", end = "")
             coordsline = input()
             fields = coordsline.split(",")
-            if (len(fields) == 2) :
-                coords = [int(fields[0]), int(fields[1])]
-                print("Enter size: ", end = "")
-                size = int(input())
-                tilecalc(coords, size)
-            else :
-                print("Invalid input: %s" % (coordsline))
+            if (len(fields) != 2) :
+                raise ValueError("Invalid input: %s" % (coordsline))
+            coords = [int(fields[0]), int(fields[1])]
+            print("Enter size: ", end = "")
+            size = int(input())
+            tilecalc(coords, size)
         except (KeyError, ValueError) as e :
-            print("Error: %s", e)
+            print("Error: %s" % e)
         except EOFError:
+            print("")
             break
     
 """
@@ -29,17 +29,15 @@ Basic tile math
 def tilecalc(coords, size) :
     x = coords[0]
     y = coords[1]
-    if (x % 256 == 0) and (y % 256 == 0) :
-        xtile = x / 256
-        ytile = y / 256
-        print("Tile X, Y: (%i,%i)" % (xtile, ytile))
-        if (size % 256 == 0) :
-            tilesize = size / 256
-            lod = lodcalc(tilesize)
-        else :
-            print("Size not a multiple of 256")
-    else :
-        print ("x or y not a multiple of 256")
+    if (x % 256 != 0) or (y % 256 != 0) :
+        raise ValueError("X or Y not a multiple of 256")
+    xtile = x / 256
+    ytile = y / 256
+    print("Tile X, Y: (%i,%i)" % (xtile, ytile))
+    if (size % 256 != 0) :
+        raise ValueError("Size not a multiple of 256")
+    tilesize = size / 256
+    lod = lodcalc(tilesize)
         
 """
 Calculate LOD from size
@@ -48,7 +46,7 @@ def lodcalc(size) :
     lod = math.floor(math.log2(size))
     print("LOD: %i" % lod)
     if (pow(2,lod) != size) :
-        print("Size %i is not a power of 2" % (size))
+        raise ValueError("Size %i is not a power of 2" % (size))
     lod
     
     
