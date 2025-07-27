@@ -37,7 +37,7 @@ def build_impostor_struct(coords, fields) :
         "region_size" : [REGION_SIZE, REGION_SIZE],
         "scale": [256.0, 256.0, 23.0],
         "impostor_lod" : 0,
-        "estate_id" : 0,
+        "viz_group" : 0,
         "mesh_uuid" : MESH_UUID,
         "elevation_offset" : 0.0,
         "water_height" : 20.0,
