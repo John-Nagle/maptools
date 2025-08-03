@@ -1,7 +1,8 @@
-use fastcgi as fcgi;
-use fcgi::{Request, Response, RecordType, Params};
+use vintage as fcgi;
+use fcgi::{Request, Response};
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::io::Write;
 use std::fs;
 use mysql::*;
 use mysql::prelude::*;
@@ -32,7 +33,7 @@ fn main() {
     );
     let pool = Pool::new(url).expect("Failed to connect to MySQL");
 
-    fcgi::run(|mut req: Request| {
+    fastcgi::run(|mut req: Request| {
         let params = req.params().clone();
         let headers = extract_headers(&params);
         let config = config.clone();
