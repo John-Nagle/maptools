@@ -1,20 +1,14 @@
-//! FCGI echo server
-//! 
-//! Follows example for "vintage"
-use vintage::{Response, ServerConfig};
+use std::collections::HashMap;
+use outer_cgi::IO;
 
-fn main() {
+fn handler(io: &mut dyn IO, env: HashMap<String, String>) -> anyhow::Result<i32> {
+    io.write_all(format!(r#"Content-type: text/plain; charset=utf-8
 
-    let config = ServerConfig::new()
-        .on_get(["/about"], |_req, _params| {
-            Response::html("<h1>Hello World</h1>")
-        });
+Hello World! Your request method was "{}"!
+"#, env.get("REQUEST_METHOD").unwrap()).as_bytes())?;
+    Ok(0)
+}
 
-    let handle = vintage::start(config, "localhost:0").unwrap();
-
-// This would block the current thread until the server thread exits
-// handle.join()
-
-// Graceful shutdown
-    handle.stop();
+pub fn main() {
+    outer_cgi::main(|_|{}, handler)
 }
