@@ -30,6 +30,9 @@ use std::io::{BufReader, BufWriter};
 ///
 /// This is from outer_cgi from crates.io.
 ///
+/// All this generic complexity is so we can test this thing
+/// using something other than stdin/stdout.
+///
 pub trait IO : BufRead + Write {
 }
 
@@ -67,27 +70,39 @@ impl<R: BufRead, W: Write> IO for DualIO<R, W> {
 
 
 /// Request to server.
+#[derive (Debug)]
 pub struct Request {
 }
 
 impl Request {
     /// New - reads a request from standard input.
     /// Can fail
-    pub fn new<R: Read>(io: &DualIO<BufReader<R>, Stdout>) -> Result<Request> {
-        todo!();
+    pub fn new() -> Result<Request> {
+        Ok(Request {
+
+        })
     }
 }
 
 /// Not the main program, but the main loop.
-pub fn main(handler: fn(request: &Request, env: &HashMap<String, String>) -> Result<i32>) -> Result<i32> {
+pub fn run<R: BufRead, W: Write>(io: DualIO<R,W>, handler: fn(io: &DualIO<R,W>, request: &Request, env: &HashMap<String, String>) -> Result<i32>) -> Result<i32> {
     let env = std::env::vars().map(|(k,v)| (k,v)).collect();
-    let dual_io = DualIO { i: BufReader::new(io::stdin()), o: io::stdout()};
     loop {
-        let request = Request::new(&dual_io)?;
-        handler(&request, &env)?;
+        let request = Request::new()?;
+        handler(&io, &request, &env)?;
     }
 }
 
+#[test]
+fn basic_io() {
+    fn do_req<R: BufRead, W: Write>(io: &DualIO<R,W>, request: &Request, env: &HashMap<String, String>) -> Result<i32> {
+        Ok(200)   
+    }
+    
+    let io = DualIO{i: BufReader::new(io::stdin()), o: io::stdout()};
+    let final_result = run(io, do_req);
+    println!("Final result: {:?}", final_result);
+}
 
 
 //////fn handler(request: Request, env: HashMap<String, String>) ->Result<i32> 

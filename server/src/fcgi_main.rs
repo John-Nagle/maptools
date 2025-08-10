@@ -1,3 +1,4 @@
+/*
 use vintage as fcgi;
 use fcgi::{Request, Response};
 use std::collections::HashMap;
@@ -59,3 +60,4 @@ fn main() {
         Ok(())
     }).expect("FCGI server failed");
 }
+*/
