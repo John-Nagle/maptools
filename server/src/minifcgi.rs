@@ -98,8 +98,12 @@ fn basic_io() {
     fn do_req<R: BufRead, W: Write>(io: &DualIO<R,W>, request: &Request, env: &HashMap<String, String>) -> Result<i32> {
         Ok(200)   
     }
-    
-    let io = DualIO{i: BufReader::new(io::stdin()), o: io::stdout()};
+    let test_data: Vec<u8> = "ABCDEF".as_bytes().to_vec();
+    //////let data: Vec<u8> = vec![1, 2, 3, 4, 5];
+    let cursor = std::io::Cursor::new(test_data);
+    //////let mut buf_reader = BufReader::new(cursor);
+    //////let io = DualIO{i: BufReader::new(io::stdin()), o: io::stdout()};
+    let io = DualIO{i: BufReader::new(cursor), o: io::stdout()};
     let final_result = run(io, do_req);
     println!("Final result: {:?}", final_result);
 }
