@@ -145,7 +145,7 @@ pub struct FcgiHeader {
 	version: u8,
 	/// Record type. Usually BeginRequest.
 	rec_type: FcgiRecType,
-	//  Request ID
+	/// Request ID
 	id: u16,
 	/// Length of content, in bytes.
 	content_length:  u16,
@@ -158,13 +158,16 @@ pub struct FcgiHeader {
 impl FcgiHeader {
     /// Convert 8 bytes to an FCGI header.
     fn new_from_bytes(b: &[u8;8]) -> Result<FcgiHeader, Error> {
+        let content_length = u16::from_be_bytes(<[u8;2]>::try_from(&b[4..6]).unwrap());
+        let padding_length = 8 - u8::try_from(content_length & 7).unwrap();  // padding needed to round up to next multiple of 8 ***CHECK THIS***
         Ok(
             FcgiHeader {
                 version: b[0],
                 rec_type: FcgiRecType::from_u8(b[1]).ok_or_else(|| anyhow!("Invalid FCGI record type: {}", b[1]))?,
                 id: u16::from_be_bytes(<[u8;2]>::try_from(&b[2..4]).unwrap()),
-                content_length: u16::from_be_bytes(<[u8;2]>::try_from(&b[4..6]).unwrap()),
-                padding_length: b[6],
+                content_length,
+                //  h.PaddingLength = uint8(-contentLength & 7)  -- go version
+                padding_length, 
                 reserved: b[7],
             }
         )     
