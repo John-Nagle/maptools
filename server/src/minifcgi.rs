@@ -16,11 +16,14 @@
 //  Animats
 //  August, 2025
 //
-use anyhow::{Result};
+use anyhow::{Result, Error, anyhow};
 use std::io;
 use std::collections::{HashMap};
 use std::io::{Read, Write, BufRead, Stdin, Stdout};
 use std::io::{BufReader, BufWriter};
+#[macro_use]
+use num_derive::{FromPrimitive}; // Derive the FromPrimitive trait
+use num_traits::{FromPrimitive};
 
 /// Wraps the stdin and stdout streams of a standard CGI invocation.
 ///
@@ -32,6 +35,8 @@ use std::io::{BufReader, BufWriter};
 ///
 /// All this generic complexity is so we can test this thing
 /// using something other than stdin/stdout.
+///
+/// Protocol: see https://cs.opensource.google/go/go/+/master:src/net/http/fcgi/fcgi.go
 ///
 pub trait IO : BufRead + Write {
 }
@@ -68,6 +73,103 @@ impl<R: BufRead, W: Write> Write for DualIO<R, W> {
 impl<R: BufRead, W: Write> IO for DualIO<R, W> {
 }
 
+/*
+The Go version
+
+// recType is a record type, as defined by
+// https://web.archive.org/web/20150420080736/http://www.fastcgi.com/drupal/node/6?q=node/22#S8
+type recType uint8
+
+const (
+	typeBeginRequest    recType = 1
+	typeAbortRequest    recType = 2
+	typeEndRequest      recType = 3
+	typeParams          recType = 4
+	typeStdin           recType = 5
+	typeStdout          recType = 6
+	typeStderr          recType = 7
+	typeData            recType = 8
+	typeGetValues       recType = 9
+	typeGetValuesResult recType = 10
+	typeUnknownType     recType = 11
+)
+
+// keep the connection between web-server and responder open after request
+const flagKeepConn = 1
+
+const (
+	maxWrite = 65535 // maximum record body
+	maxPad   = 255
+)
+
+const (
+	roleResponder = iota + 1 // only Responders are implemented.
+	roleAuthorizer
+	roleFilter
+)
+
+const (
+	statusRequestComplete = iota
+	statusCantMultiplex
+	statusOverloaded
+	statusUnknownRole
+)
+
+type header struct {
+	Version       uint8
+	Type          recType
+	Id            uint16
+	ContentLength uint16
+	PaddingLength uint8
+	Reserved      uint8
+}
+*/
+/// Type of FCGI record. Almost always BeginRequest.
+#[derive(Debug, FromPrimitive)]
+enum FcgiRecType {
+	BeginRequest = 1,
+	AbortRequest = 2,
+    EndRequest = 3,
+	Params = 4,
+	Stdin = 5,
+	Stdout = 6,
+	Stderr = 7,
+	Data = 8,
+	GetValues = 9,
+	GetValuesResult = 10,
+	UnknownType = 11,
+}
+
+/// FCGI header record
+pub struct FcgiHeader {
+	version: u8,
+	/// Record type. Usually BeginRequest.
+	rec_type: FcgiRecType,
+	//  Request ID
+	id: u16,
+	/// Length of content, in bytes.
+	content_length:  u16,
+	/// Padding. Read content_length + padding.
+	padding_length: u8,
+	/// For unlikely future extension.
+	reserved: u8,
+}
+
+impl FcgiHeader {
+    /// Convert 8 bytes to an FCGI header.
+    fn new_from_bytes(b: &[u8;8]) -> Result<FcgiHeader, Error> {
+        Ok(
+            FcgiHeader {
+                version: b[0],
+                rec_type: FcgiRecType::from_u8(b[1]).ok_or_else(|| anyhow!("Invalid FCGI record type: {}", b[1]))?,
+                id: u16::from_be_bytes(<[u8;2]>::try_from(&b[2..4]).unwrap()),
+                content_length: u16::from_be_bytes(<[u8;2]>::try_from(&b[4..6]).unwrap()),
+                padding_length: b[6],
+                reserved: b[7],
+            }
+        )     
+    }
+}
 
 /// Request to server.
 #[derive (Debug)]
