@@ -140,7 +140,7 @@ enum FcgiRecType {
 	UnknownType = 11,
 }
 
-/// FCGI header record
+/// FCGI header record, deserialized.
 pub struct FcgiHeader {
 	version: u8,
 	/// Record type. Usually BeginRequest.
@@ -156,7 +156,7 @@ pub struct FcgiHeader {
 }
 
 impl FcgiHeader {
-    /// Convert 8 bytes to an FCGI header.
+    /// Deserialize 8 bytes to an FCGI header.
     fn new_from_bytes(b: &[u8;8]) -> Result<FcgiHeader, Error> {
         let content_length = u16::from_be_bytes(<[u8;2]>::try_from(&b[4..6]).unwrap());
         let padding_length = 8 - u8::try_from(content_length & 7).unwrap();  // padding needed to round up to next multiple of 8 ***CHECK THIS***
@@ -190,17 +190,17 @@ impl Request {
 }
 
 /// Not the main program, but the main loop.
-pub fn run<R: BufRead, W: Write>(io: DualIO<R,W>, handler: fn(io: &DualIO<R,W>, request: &Request, env: &HashMap<String, String>) -> Result<i32>) -> Result<i32> {
+pub fn run<R: BufRead, W: Write>(io: DualIO<R,W>, handler: fn(out: &dyn Write, request: &Request, env: &HashMap<String, String>) -> Result<i32>) -> Result<i32> {
     let env = std::env::vars().map(|(k,v)| (k,v)).collect();
     loop {
         let request = Request::new()?;
-        handler(&io, &request, &env)?;
+        handler(&io.o, &request, &env)?;
     }
 }
 
 #[test]
 fn basic_io() {
-    fn do_req<R: BufRead, W: Write>(io: &DualIO<R,W>, request: &Request, env: &HashMap<String, String>) -> Result<i32> {
+    fn do_req<W: Write>(out: &dyn Write, request: &Request, env: &HashMap<String, String>) -> Result<i32> {
         Ok(200)   
     }
     let test_data: Vec<u8> = "ABCDEF".as_bytes().to_vec();
@@ -209,7 +209,7 @@ fn basic_io() {
     //////let mut buf_reader = BufReader::new(cursor);
     //////let io = DualIO{i: BufReader::new(io::stdin()), o: io::stdout()};
     let io = DualIO{i: BufReader::new(cursor), o: io::stdout()};
-    let final_result = run(io, do_req);
+    let final_result = run(io, do_req::<&Stdout>);
     println!("Final result: {:?}", final_result);
 }
 
