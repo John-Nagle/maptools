@@ -22,8 +22,8 @@ use std::collections::{HashMap};
 use std::io::{Read, Write, BufRead, Stdin, Stdout};
 use std::io::{BufReader, BufWriter};
 #[macro_use]
-use num_derive::{FromPrimitive}; // Derive the FromPrimitive trait
-use num_traits::{FromPrimitive};
+use num_derive::{FromPrimitive, ToPrimitive}; // Derive the FromPrimitive trait
+use num_traits::{FromPrimitive, ToPrimitive};
 
 /// Wraps the stdin and stdout streams of a standard CGI invocation.
 ///
@@ -127,7 +127,7 @@ type header struct {
 }
 */
 /// Type of FCGI record. Almost always BeginRequest.
-#[derive(Debug, FromPrimitive)]
+#[derive(Debug, FromPrimitive, ToPrimitive)]
 enum FcgiRecType {
 	BeginRequest = 1,
 	AbortRequest = 2,
@@ -174,6 +174,22 @@ impl FcgiHeader {
             }
         )     
     }
+    
+    /// Serialize
+    fn to_bytes(&self) -> [u8;8] {
+        let id_bytes = self.id.to_be_bytes();
+        let content_length_bytes = self.content_length.to_be_bytes();
+        [
+            self.version,   //  0
+            self.rec_type.to_u8().unwrap(), // 1
+            id_bytes[0],
+            id_bytes[1],
+            content_length_bytes[0],
+            content_length_bytes[1],
+            self.padding_length,// 7 provided but ignored
+            0                  // 8 reserved
+        ]
+    }
 }
 
 /// Request to server.
@@ -184,7 +200,7 @@ pub struct Request {
 impl Request {
     /// New - reads a request from standard input.
     /// Can fail
-    pub fn new() -> Result<Request> {
+    pub fn new(instream: &mut impl BufRead) -> Result<Request, Error> {
         Ok(Request {
 
         })
@@ -192,10 +208,10 @@ impl Request {
 }
 
 /// Not the main program, but the main loop.
-pub fn run(instream: impl BufRead, out: &dyn Write, handler: fn(out: &dyn Write, request: &Request, env: &HashMap<String, String>) -> Result<i32>) -> Result<i32> {
+pub fn run(instream: &mut impl BufRead, out: &dyn Write, handler: fn(out: &dyn Write, request: &Request, env: &HashMap<String, String>) -> Result<i32>) -> Result<i32> {
     let env = std::env::vars().map(|(k,v)| (k,v)).collect();
     loop {
-        let request = Request::new()?;
+        let request = Request::new(instream)?;
         handler(out, &request, &env)?;
     }
 }
@@ -205,11 +221,16 @@ fn basic_io() {
     fn do_req<W: Write>(out: &dyn Write, request: &Request, env: &HashMap<String, String>) -> Result<i32> {
         Ok(200)   
     }
-    let test_data: Vec<u8> = "ABCDEF".as_bytes().to_vec();
+    let test_header = FcgiHeader { version: 1, rec_type: FcgiRecType::BeginRequest, id: 101, content_length: 16, padding_length: 0, reserved: 0 };
+    let test_header_bytes = test_header.to_bytes();
+    let mut test_data = test_header_bytes.to_vec();
+    let test_content: Vec<u8> = "ABCDEFGHIJKLMNOP".as_bytes().to_vec();
+    assert_eq!(test_content.len(), test_header.content_length.into());
+    test_data.extend(test_content);
     let cursor = std::io::Cursor::new(test_data);
-    let instream = BufReader::new(cursor);
+    let mut instream = BufReader::new(cursor);
     let out = io::stdout();
-    let final_result = run(instream, &out, do_req::<&Stdout>);
+    let final_result = run(&mut instream, &out, do_req::<&Stdout>);
     println!("Final result: {:?}", final_result);
 }
 
