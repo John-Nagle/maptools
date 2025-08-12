@@ -38,6 +38,7 @@ use num_traits::{FromPrimitive};
 ///
 /// Protocol: see https://cs.opensource.google/go/go/+/master:src/net/http/fcgi/fcgi.go
 ///
+/* Get rid of trait IO
 pub trait IO : BufRead + Write {
 }
 
@@ -72,6 +73,7 @@ impl<R: BufRead, W: Write> Write for DualIO<R, W> {
 
 impl<R: BufRead, W: Write> IO for DualIO<R, W> {
 }
+*/
 
 /*
 The Go version
@@ -190,11 +192,11 @@ impl Request {
 }
 
 /// Not the main program, but the main loop.
-pub fn run<R: BufRead, W: Write>(io: DualIO<R,W>, handler: fn(out: &dyn Write, request: &Request, env: &HashMap<String, String>) -> Result<i32>) -> Result<i32> {
+pub fn run(instream: impl BufRead, out: &dyn Write, handler: fn(out: &dyn Write, request: &Request, env: &HashMap<String, String>) -> Result<i32>) -> Result<i32> {
     let env = std::env::vars().map(|(k,v)| (k,v)).collect();
     loop {
         let request = Request::new()?;
-        handler(&io.o, &request, &env)?;
+        handler(out, &request, &env)?;
     }
 }
 
@@ -204,12 +206,10 @@ fn basic_io() {
         Ok(200)   
     }
     let test_data: Vec<u8> = "ABCDEF".as_bytes().to_vec();
-    //////let data: Vec<u8> = vec![1, 2, 3, 4, 5];
     let cursor = std::io::Cursor::new(test_data);
-    //////let mut buf_reader = BufReader::new(cursor);
-    //////let io = DualIO{i: BufReader::new(io::stdin()), o: io::stdout()};
-    let io = DualIO{i: BufReader::new(cursor), o: io::stdout()};
-    let final_result = run(io, do_req::<&Stdout>);
+    let instream = BufReader::new(cursor);
+    let out = io::stdout();
+    let final_result = run(instream, &out, do_req::<&Stdout>);
     println!("Final result: {:?}", final_result);
 }
 
