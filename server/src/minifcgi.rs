@@ -235,6 +235,7 @@ fn basic_io() {
     let test_content: Vec<u8> = "ABCDEFGHIJKLMNOP".as_bytes().to_vec();
     assert_eq!(test_content.len(), test_header.content_length as usize);
     test_data.extend(test_content);
+    println!("Test data: {:?}", test_data);
     let cursor = std::io::Cursor::new(test_data);
     let mut instream = BufReader::new(cursor);
     let out = io::stdout();
