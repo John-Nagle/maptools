@@ -127,7 +127,7 @@ type header struct {
 }
 */
 /// Type of FCGI record. Almost always BeginRequest.
-#[derive(Debug, FromPrimitive, ToPrimitive)]
+#[derive(Debug, FromPrimitive, ToPrimitive, Clone, PartialEq)]
 enum FcgiRecType {
 	BeginRequest = 1,
 	AbortRequest = 2,
@@ -143,6 +143,7 @@ enum FcgiRecType {
 }
 
 /// FCGI header record, deserialized.
+#[derive(Debug, Clone)]
 pub struct FcgiHeader {
 	version: u8,
 	/// Record type. Usually BeginRequest.
@@ -158,6 +159,9 @@ pub struct FcgiHeader {
 }
 
 impl FcgiHeader {
+    /// Length of header
+    pub const FCGI_HEADER_LENGTH: usize = 8;
+
     /// Deserialize 8 bytes to an FCGI header.
     fn new_from_bytes(b: &[u8;8]) -> Result<FcgiHeader, Error> {
         let content_length = u16::from_be_bytes(<[u8;2]>::try_from(&b[4..6]).unwrap());
@@ -201,6 +205,10 @@ impl Request {
     /// New - reads a request from standard input.
     /// Can fail
     pub fn new(instream: &mut impl BufRead) -> Result<Request, Error> {
+        let mut header_bytes: [u8;FcgiHeader::FCGI_HEADER_LENGTH] = Default::default();
+        instream.read(&mut header_bytes)?;
+        let header = FcgiHeader::new_from_bytes(&header_bytes)?;
+        println!("Header: {:?}", header);
         Ok(Request {
 
         })
@@ -225,7 +233,7 @@ fn basic_io() {
     let test_header_bytes = test_header.to_bytes();
     let mut test_data = test_header_bytes.to_vec();
     let test_content: Vec<u8> = "ABCDEFGHIJKLMNOP".as_bytes().to_vec();
-    assert_eq!(test_content.len(), test_header.content_length.into());
+    assert_eq!(test_content.len(), test_header.content_length as usize);
     test_data.extend(test_content);
     let cursor = std::io::Cursor::new(test_data);
     let mut instream = BufReader::new(cursor);
