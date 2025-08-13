@@ -13,20 +13,20 @@
 //!        minifcgi::run(|_|{}, handler)
 //!    }
 //!
-//! What a request and response looks like:
-//! 
-//!     {FCGI_BEGIN_REQUEST,   1, {FCGI_RESPONDER, 0}}
-//!     {FCGI_PARAMS,          1, "\013\002SERVER_PORT80\013\016SER"}
-//!     {FCGI_PARAMS,          1, "VER_ADDR199.170.183.42 ... "}
-//!     {FCGI_PARAMS,          1, ""}
-//!     {FCGI_STDIN,           1, "quantity=100&item=3047936"}
-//!     {FCGI_STDIN,           1, ""}
-//! 
-//!         {FCGI_STDOUT,      1, "Content-type: text/html\r\n\r\n<html>\n<head> ... "}
-//!         {FCGI_STDOUT,      1, ""}
-//!         {FCGI_END_REQUEST, 1, {0, FCGI_REQUEST_COMPLETE}}
-//!
-//! Ref: https://www.mit.edu/~yandros/doc/specs/fcgi-spec.html
+// What a request and response looks like:
+// 
+//     {FCGI_BEGIN_REQUEST,   1, {FCGI_RESPONDER, 0}}
+//     {FCGI_PARAMS,          1, "\013\002SERVER_PORT80\013\016SER"}
+//     {FCGI_PARAMS,          1, "VER_ADDR199.170.183.42 ... "}
+//     {FCGI_PARAMS,          1, ""}
+//     {FCGI_STDIN,           1, "quantity=100&item=3047936"}
+//     {FCGI_STDIN,           1, ""}
+// 
+//         {FCGI_STDOUT,      1, "Content-type: text/html\r\n\r\n<html>\n<head> ... "}
+//         {FCGI_STDOUT,      1, ""}
+//         {FCGI_END_REQUEST, 1, {0, FCGI_REQUEST_COMPLETE}}
+//
+// Ref: https://www.mit.edu/~yandros/doc/specs/fcgi-spec.html
 //!
 //! Since this code is intended to support only Apache mod_fcgid, it
 //! does not currently support "multiplexing", where 
@@ -162,6 +162,7 @@ impl FcgiHeader {
 /// FcgiRecord -- one header and its data.
 ///
 /// Input is a stream of these.
+#[derive(Debug)]
 pub struct FcgiRecord {
     /// The header
     header: FcgiHeader,
@@ -175,17 +176,29 @@ impl FcgiRecord {
     pub fn new_from_stream(instream: &mut impl BufRead) -> Result<Option<Self>, Error> {
         // Read header
         let mut header_bytes: [u8;FcgiHeader::FCGI_HEADER_LENGTH] = Default::default();
-        instream.read(&mut header_bytes)?;
+        let cnt = instream.read(&mut header_bytes)?;
+        if cnt == 0 {
+            return Ok(None) // normal EOF return
+        }
+        if cnt != FcgiHeader::FCGI_HEADER_LENGTH {
+            return Err(anyhow!("FCGI header too short: {} bytes", cnt))
+        }
         let header = FcgiHeader::new_from_bytes(&header_bytes)?;
         println!("Header: {:?}", header);   // ***TEMP***
         // Read content
         //////let mut content_bytes: [u8;header.content_length] = Default::default();
         let mut content_bytes = vec![0;header.content_length as usize];
         if header.content_length > 0 {
-            instream.read(&mut content_bytes)?;
+            let cnt = instream.read(&mut content_bytes)?;
+            if cnt != content_bytes.len() {
+                return Err(anyhow!("FCGI content too short: {} bytes", cnt))
+            }
             if header.padding_length > 0 {
                 let mut padding_bytes = vec![0;header.padding_length as usize];
                 instream.read(&mut padding_bytes)?;
+                if cnt != padding_bytes.len() {
+                    return Err(anyhow!("FCGI padding too short: {} bytes", cnt))
+                }
             }
         }
         Ok(Some(Self {
@@ -208,7 +221,7 @@ pub struct Request {
 impl Request {
     /// New - reads a request from standard input.
     /// Can fail
-    pub fn new(instream: &mut impl BufRead) -> Result<Request, Error> {
+    pub fn oldnew(instream: &mut impl BufRead) -> Result<Request, Error> {
         let mut header_bytes: [u8;FcgiHeader::FCGI_HEADER_LENGTH] = Default::default();
         instream.read(&mut header_bytes)?;
         let header = FcgiHeader::new_from_bytes(&header_bytes)?;
@@ -217,14 +230,33 @@ impl Request {
 
         })
     }
+    
+    //  Usual new
+    pub fn new() -> Request {
+        Self {
+        }
+    }
+    
+    /// True if ready to execute request.
+    pub fn add_record(&mut self, rec: FcgiRecord) -> Result<bool, Error> {
+        Ok(false)   // ***TEMP***
+    }
 }
 
 /// Not the main program, but the main loop.
 pub fn run(instream: &mut impl BufRead, out: &dyn Write, handler: fn(out: &dyn Write, request: &Request, env: &HashMap<String, String>) -> Result<i32>) -> Result<i32> {
     let env = std::env::vars().map(|(k,v)| (k,v)).collect();
     loop {
-        let request = Request::new(instream)?;
-        handler(out, &request, &env)?;
+        let mut request = Request::new();
+        if let Some(rec) = FcgiRecord::new_from_stream(instream)? {     
+            if !request.add_record(rec)? {
+                continue
+            }
+            // We have enough records to handle the request.
+            handler(out, &request, &env)?;
+        } else {
+            return Ok(0);                  // normal EOF
+        }
     }
 }
 
