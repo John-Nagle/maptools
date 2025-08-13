@@ -10,7 +10,7 @@
 //! Normal usage:
 //!
 //!    pub fn main() {
-//!        minifcgi::main(|_|{}, handler)
+//!        minifcgi::run(|_|{}, handler)
 //!    }
 //!
 //! What a request and response looks like:
@@ -26,6 +26,7 @@
 //!         {FCGI_STDOUT,      1, ""}
 //!         {FCGI_END_REQUEST, 1, {0, FCGI_REQUEST_COMPLETE}}
 //!
+//! Ref: https://www.mit.edu/~yandros/doc/specs/fcgi-spec.html
 //!
 //! Since this code is intended to support only Apache mod_fcgid, it
 //! does not currently support "multiplexing", where 
@@ -39,8 +40,7 @@ use anyhow::{Result, Error, anyhow};
 use std::io;
 use std::collections::{HashMap};
 use std::io::{Read, Write, BufRead, Stdin, Stdout};
-use std::io::{BufReader, BufWriter};
-#[macro_use]
+use std::io::{BufReader};
 use num_derive::{FromPrimitive, ToPrimitive}; // Derive the FromPrimitive trait
 use num_traits::{FromPrimitive, ToPrimitive};
 
@@ -57,63 +57,7 @@ use num_traits::{FromPrimitive, ToPrimitive};
 ///
 /// Protocol: see https://cs.opensource.google/go/go/+/master:src/net/http/fcgi/fcgi.go
 ///
-/* Get rid of trait IO
-pub trait IO : BufRead + Write {
-}
-
-struct DualIO<R: BufRead, W: Write> {
-    i: R,
-    o: W,
-}
-
-impl<R: BufRead, W: Write> Read for DualIO<R, W> {
-    fn read(&mut self, buf: &mut[u8]) -> io::Result<usize> {
-        self.i.read(buf)
-    }
-}
-
-impl<R: BufRead, W: Write> BufRead for DualIO<R, W> {
-    fn fill_buf(&mut self) -> io::Result<&[u8]> {
-        self.i.fill_buf()
-    }
-    fn consume(&mut self, amount: usize) {
-        self.i.consume(amount)
-    }
-}
-
-impl<R: BufRead, W: Write> Write for DualIO<R, W> {
-    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-        self.o.write(bytes)
-    }
-    fn flush(&mut self) -> io::Result<()> {
-        self.o.flush()
-    }
-}
-
-impl<R: BufRead, W: Write> IO for DualIO<R, W> {
-}
-*/
-
 /*
-The Go version
-
-// recType is a record type, as defined by
-// https://web.archive.org/web/20150420080736/http://www.fastcgi.com/drupal/node/6?q=node/22#S8
-type recType uint8
-
-const (
-	typeBeginRequest    recType = 1
-	typeAbortRequest    recType = 2
-	typeEndRequest      recType = 3
-	typeParams          recType = 4
-	typeStdin           recType = 5
-	typeStdout          recType = 6
-	typeStderr          recType = 7
-	typeData            recType = 8
-	typeGetValues       recType = 9
-	typeGetValuesResult recType = 10
-	typeUnknownType     recType = 11
-)
 
 // keep the connection between web-server and responder open after request
 const flagKeepConn = 1
@@ -213,6 +157,47 @@ impl FcgiHeader {
             0                  // 8 reserved
         ]
     }
+}
+
+/// FcgiRecord -- one header and its data.
+///
+/// Input is a stream of these.
+pub struct FcgiRecord {
+    /// The header
+    header: FcgiHeader,
+    /// The content
+    content: Option<Vec<u8>>
+}
+
+impl FcgiRecord {
+    /// Read one record from stream.
+    /// If Option<Request> is none, EOF has been reached.
+    pub fn new_from_stream(instream: &mut impl BufRead) -> Result<Option<Self>, Error> {
+        // Read header
+        let mut header_bytes: [u8;FcgiHeader::FCGI_HEADER_LENGTH] = Default::default();
+        instream.read(&mut header_bytes)?;
+        let header = FcgiHeader::new_from_bytes(&header_bytes)?;
+        println!("Header: {:?}", header);   // ***TEMP***
+        // Read content
+        //////let mut content_bytes: [u8;header.content_length] = Default::default();
+        let mut content_bytes = vec![0;header.content_length as usize];
+        if header.content_length > 0 {
+            instream.read(&mut content_bytes)?;
+            if header.padding_length > 0 {
+                let mut padding_bytes = vec![0;header.padding_length as usize];
+                instream.read(&mut padding_bytes)?;
+            }
+        }
+        Ok(Some(Self {
+            header,
+            content: Some(content_bytes.to_vec()),
+        }))
+    }
+    
+    /// Take content for use elsewhere
+    pub fn take_content(&mut self) -> Option<Vec<u8>> {
+        self.content.take()
+    }   
 }
 
 /// Request to server.
