@@ -80,16 +80,8 @@ const (
 	statusUnknownRole
 )
 
-type header struct {
-	Version       uint8
-	Type          recType
-	Id            uint16
-	ContentLength uint16
-	PaddingLength uint8
-	Reserved      uint8
-}
 */
-/// Type of FCGI record. Almost always BeginRequest.
+/// Type of FCGI record. Almost always BeginRequest, Params, or Stdin.
 #[derive(Debug, FromPrimitive, ToPrimitive, Clone, PartialEq)]
 enum FcgiRecType {
 	BeginRequest = 1,
@@ -216,29 +208,38 @@ impl FcgiRecord {
 /// Request to server.
 #[derive (Debug)]
 pub struct Request {
+    /// The header
+    id: Option<u16>,
+    /// Parameter bytes. Need special decoding
+    param_bytes: Vec<u8>,
+    /// Standard input - the actual content, if any
+    standard_input: Vec<u8>,
 }
 
-impl Request {
-    /// New - reads a request from standard input.
-    /// Can fail
-    pub fn oldnew(instream: &mut impl BufRead) -> Result<Request, Error> {
-        let mut header_bytes: [u8;FcgiHeader::FCGI_HEADER_LENGTH] = Default::default();
-        instream.read(&mut header_bytes)?;
-        let header = FcgiHeader::new_from_bytes(&header_bytes)?;
-        println!("Header: {:?}", header);
-        Ok(Request {
-
-        })
-    }
-    
-    //  Usual new
+impl Request {    
+    ///  Usual new
     pub fn new() -> Request {
         Self {
+            id: None,
+            param_bytes: Vec::new(),
+            standard_input: Vec:: new(),
         }
     }
     
     /// True if ready to execute request.
     pub fn add_record(&mut self, rec: FcgiRecord) -> Result<bool, Error> {
+        //  Check that we're not in multiplex mode
+        if self.id.is_some() {
+            if self.id.unwrap() != rec.header.id {
+                return Err(anyhow!("FCGI record IDs differ. Multiplex mode not supported."))
+            } else {
+                self.id = Some(rec.header.id)
+            }
+        }
+        /// Fan out on type
+        //////match rec.header.rec_type {
+            // ***MORE***
+        //////}
         Ok(false)   // ***TEMP***
     }
 }
@@ -278,8 +279,3 @@ fn basic_io() {
     let final_result = run(&mut instream, &out, do_req::<&Stdout>);
     println!("Final result: {:?}", final_result);
 }
-
-
-//////fn handler(request: Request, env: HashMap<String, String>) ->Result<i32> 
-
-//////fn handler(io: &mut dyn IO, env: HashMap<String, String>) -> Result<i32> {
