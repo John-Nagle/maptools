@@ -168,29 +168,24 @@ impl FcgiRecord {
     pub fn new_from_stream(instream: &mut impl BufRead) -> Result<Option<Self>, Error> {
         // Read header
         let mut header_bytes: [u8;FcgiHeader::FCGI_HEADER_LENGTH] = Default::default();
-        let cnt = instream.read(&mut header_bytes)?;
-        if cnt == 0 {
-            return Ok(None) // normal EOF return
-        }
-        if cnt != FcgiHeader::FCGI_HEADER_LENGTH {
-            return Err(anyhow!("FCGI header too short: {} bytes", cnt))
+        match instream.read_exact(&mut header_bytes) {
+            Ok(_) => {} // read expected data
+             Err(e) => {
+                if e.kind() == std::io::ErrorKind::UnexpectedEof {
+                    return Ok(None) // Normal EOF exit - end of file at correct point
+                }
+                return Err(e.into())
+            }
         }
         let header = FcgiHeader::new_from_bytes(&header_bytes)?;
         println!("Header: {:?}", header);   // ***TEMP***
         // Read content
-        //////let mut content_bytes: [u8;header.content_length] = Default::default();
         let mut content_bytes = vec![0;header.content_length as usize];
         if header.content_length > 0 {
-            let cnt = instream.read(&mut content_bytes)?;
-            if cnt != content_bytes.len() {
-                return Err(anyhow!("FCGI content too short: {} bytes", cnt))
-            }
+            instream.read_exact(&mut content_bytes)?;
             if header.padding_length > 0 {
                 let mut padding_bytes = vec![0;header.padding_length as usize];
-                let cnt = instream.read(&mut padding_bytes)?;
-                if cnt != padding_bytes.len() {
-                    return Err(anyhow!("FCGI padding too short: {} bytes", cnt))
-                }
+                instream.read_exact(&mut padding_bytes)?;
             }
         }
         Ok(Some(Self {
