@@ -13,6 +13,25 @@
 //!        minifcgi::main(|_|{}, handler)
 //!    }
 //!
+//! What a request and response looks like:
+//! 
+//!     {FCGI_BEGIN_REQUEST,   1, {FCGI_RESPONDER, 0}}
+//!     {FCGI_PARAMS,          1, "\013\002SERVER_PORT80\013\016SER"}
+//!     {FCGI_PARAMS,          1, "VER_ADDR199.170.183.42 ... "}
+//!     {FCGI_PARAMS,          1, ""}
+//!     {FCGI_STDIN,           1, "quantity=100&item=3047936"}
+//!     {FCGI_STDIN,           1, ""}
+//! 
+//!         {FCGI_STDOUT,      1, "Content-type: text/html\r\n\r\n<html>\n<head> ... "}
+//!         {FCGI_STDOUT,      1, ""}
+//!         {FCGI_END_REQUEST, 1, {0, FCGI_REQUEST_COMPLETE}}
+//!
+//!
+//! Since this code is intended to support only Apache mod_fcgid, it
+//! does not currently support "multiplexing", where 
+//! multiple concurrent requests come into the same process.
+//! Apache fcgid uses multiple processes for that. Safer.
+//!
 //  Animats
 //  August, 2025
 //
