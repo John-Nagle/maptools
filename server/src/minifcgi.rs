@@ -128,7 +128,7 @@ impl FcgiHeader {
     /// Deserialize 8 bytes to an FCGI header.
     fn new_from_bytes(b: &[u8;8]) -> Result<FcgiHeader, Error> {
         let content_length = u16::from_be_bytes(<[u8;2]>::try_from(&b[4..6]).unwrap());
-        let padding_length = 8 - u8::try_from(content_length & 7).unwrap();  // padding needed to round up to next multiple of 8 ***CHECK THIS***
+        let padding_length = (8 - u8::try_from(content_length & 0x7).unwrap()) & 0x7;  // padding needed to round up to next multiple of 8 ***CHECK THIS***
         Ok(
             FcgiHeader {
                 version: b[0],
@@ -195,7 +195,7 @@ impl FcgiRecord {
             }
             if header.padding_length > 0 {
                 let mut padding_bytes = vec![0;header.padding_length as usize];
-                instream.read(&mut padding_bytes)?;
+                let cnt = instream.read(&mut padding_bytes)?;
                 if cnt != padding_bytes.len() {
                     return Err(anyhow!("FCGI padding too short: {} bytes", cnt))
                 }
