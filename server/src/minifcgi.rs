@@ -39,7 +39,7 @@
 use anyhow::{Result, Error, anyhow};
 use std::io;
 use std::collections::{HashMap};
-use std::io::{Read, Write, BufRead, Stdin, Stdout};
+use std::io::{Read, Write, BufRead};
 use std::io::{BufReader};
 use num_derive::{FromPrimitive, ToPrimitive}; // Derive the FromPrimitive trait
 use num_traits::{FromPrimitive, ToPrimitive};
@@ -122,8 +122,6 @@ pub struct FcgiHeader {
 	content_length:  u16,
 	/// Padding. Read content_length + padding.
 	padding_length: u8,
-	/// For unlikely future extension.
-	reserved: u8,
 }
 
 impl FcgiHeader {
@@ -142,7 +140,6 @@ impl FcgiHeader {
                 content_length,
                 //  h.PaddingLength = uint8(-contentLength & 7)  -- go version
                 padding_length, 
-                reserved: b[7],
             }
         )     
     }
@@ -257,15 +254,12 @@ impl Request {
             FcgiRecType::Params => {
                 // More param bytes
                 let content = rec.content.take().ok_or_else(|| anyhow!("No content. Should not happen."))?;
-                println!("Params content 1: {:?}", content);
                 self.param_bytes.extend_from_slice(&content);
-                println!("Params content 2: {:?}", self.param_bytes);
             }
             
             FcgiRecType::Stdin => {
                 //  A zero-length block means we have a complete request .       
                 if rec.header.content_length == 0 {
-                    println!("Params content 3: {:?}", self.param_bytes);
                     self.params = Some(build_params(&self.param_bytes)?);
                     //  Request now gets processed.
                     println!("Request: {:?}", self);    // ***TEMP***
@@ -286,22 +280,6 @@ impl Request {
         Ok(false)   // ***TEMP***
     }
 }
-/*
-/// Fetch next field.
-/// Encoding:
-/// - First byte is length.
-/// - If length > 127 ???
-// ***TEMP*** get decodeing iterator right.
-fn fetch_next_field<'a>(mut pos: impl Iterator<Item=&'a u8>) -> Option<String>{
-    if let Some(cnt) = pos.next() {
-        println!("cnt = {}", cnt);
-        let b: Vec<u8> = pos.take(*cnt as usize).copied().collect(); // next cnt bytes or bust
-        Some(String::from_utf8_lossy(&b).to_string())
-    } else {
-        return None
-    }
-}
-*/
 
 /// Fetch one encoded value.
 /// 0..127 is one byte.
@@ -374,6 +352,7 @@ pub fn run(instream: &mut impl BufRead, out: &dyn Write, handler: fn(out: &dyn W
             }
             // We have enough records to handle the request.
             handler(out, &request, &env)?;
+            request = Request::new();       // start next request empty
         } else {
             return Ok(0);                  // normal EOF
         }
@@ -382,11 +361,12 @@ pub fn run(instream: &mut impl BufRead, out: &dyn Write, handler: fn(out: &dyn W
 
 #[test]
 fn basic_io() {
+    use std::io::{Stdout};
     fn do_req<W: Write>(out: &dyn Write, request: &Request, env: &HashMap<String, String>) -> Result<i32> {
         Ok(200)   
     }
     //  BeginRequest
-    let test_header0 = FcgiHeader { version: 1, rec_type: FcgiRecType::BeginRequest, id: 101, content_length: 16, padding_length: 0, reserved: 0 };
+    let test_header0 = FcgiHeader { version: 1, rec_type: FcgiRecType::BeginRequest, id: 101, content_length: 16, padding_length: 0 };
     let test_header0_bytes = test_header0.to_bytes();
     let mut test_data = test_header0_bytes.to_vec();
     //  ***NOT A VALID BEGIN REQUEST***
@@ -394,7 +374,7 @@ fn basic_io() {
     assert_eq!(test_content0.len(), test_header0.content_length as usize);
     test_data.extend(test_content0);
     //  Params
-    let test_header1 = FcgiHeader { version: 1, rec_type: FcgiRecType::Params, id: 101, content_length: 10, padding_length: 0, reserved: 0 };
+    let test_header1 = FcgiHeader { version: 1, rec_type: FcgiRecType::Params, id: 101, content_length: 10, padding_length: 0 };
     let test_header1_bytes = test_header1.to_bytes();
     let test_content1: Vec<u8> = vec![3, 5, 'K' as u8, 'E' as u8, 'Y' as u8, 'V' as u8, 'A' as u8, 'L' as u8, 'U' as u8, 'E' as u8];
     assert_eq!(test_content1.len(), test_header1.content_length as usize);
@@ -403,7 +383,7 @@ fn basic_io() {
     test_data.extend(test_content1);  
     test_data.extend(padding1); //
     //  Stdin - empty content is an EOF
-    let test_header2 = FcgiHeader { version: 1, rec_type: FcgiRecType::Stdin, id: 101, content_length: 0, padding_length: 0, reserved: 0 };
+    let test_header2 = FcgiHeader { version: 1, rec_type: FcgiRecType::Stdin, id: 101, content_length: 0, padding_length: 0 };
     test_data.extend(test_header2.to_bytes());
     println!("Test data: {:?}", test_data);
     let cursor = std::io::Cursor::new(test_data);
