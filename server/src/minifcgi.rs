@@ -81,6 +81,17 @@ const (
 )
 
 */
+/// Type of transaction. Only Responder is implemented.
+#[derive(Debug, FromPrimitive, ToPrimitive, Clone, PartialEq)]
+enum FcgiRole {
+    /// Respond and execute commands
+    Responder = 1,
+    /// Authorization (unimplemented)
+    Authorizer = 2,
+    /// Filter (unimplemented)
+    Filter = 3,
+}
+
 /// Type of FCGI record. Almost always BeginRequest, Params, or Stdin.
 #[derive(Debug, FromPrimitive, ToPrimitive, Clone, PartialEq)]
 enum FcgiRecType {
@@ -170,7 +181,7 @@ impl FcgiRecord {
         let mut header_bytes: [u8;FcgiHeader::FCGI_HEADER_LENGTH] = Default::default();
         match instream.read_exact(&mut header_bytes) {
             Ok(_) => {} // read expected data
-             Err(e) => {
+            Err(e) => {
                 if e.kind() == std::io::ErrorKind::UnexpectedEof {
                     return Ok(None) // Normal EOF exit - end of file at correct point
                 }
@@ -207,6 +218,8 @@ pub struct Request {
     id: Option<u16>,
     /// Parameter bytes. Need special decoding
     param_bytes: Vec<u8>,
+    /// Params, as a key-value store
+    params: Option<HashMap<String, String>>,
     /// Standard input - the actual content, if any
     standard_input: Vec<u8>,
 }
@@ -218,11 +231,12 @@ impl Request {
             id: None,
             param_bytes: Vec::new(),
             standard_input: Vec:: new(),
+            params: None,
         }
     }
     
     /// True if ready to execute request.
-    pub fn add_record(&mut self, rec: FcgiRecord) -> Result<bool, Error> {
+    pub fn add_record(&mut self, mut rec: FcgiRecord) -> Result<bool, Error> {
         //  Check that we're not in multiplex mode
         if self.id.is_some() {
             if self.id.unwrap() != rec.header.id {
@@ -231,12 +245,46 @@ impl Request {
                 self.id = Some(rec.header.id)
             }
         }
-        /// Fan out on type
-        //////match rec.header.rec_type {
-            // ***MORE***
-        //////}
+        // Fan out on type.
+        match rec.header.rec_type {
+            FcgiRecType::BeginRequest => {
+                //  Content should be {FCGI_RESPONDER, 0}
+            }
+            
+            FcgiRecType::Params => {
+                // More param bytes
+                let content = rec.content.take().ok_or_else(|| anyhow!("No content. Should not happen."))?;
+                self.param_bytes.extend_from_slice(&content);
+            }
+            
+            FcgiRecType::Stdin => {
+                //  A zero-length block means we have a complete request .       
+                if rec.header.content_length == 0 {
+                    self.params = Some(build_params(&self.param_bytes)?);
+                    //  Request now gets processed.
+                    return Ok(true);        
+                }
+                let content = rec.content.take().ok_or_else(|| anyhow!("No content. Should not happen."))?;
+                //  Optimization to prevent unnecessary copy of content, which can be very large.
+                if self.standard_input.is_empty () {
+                    self.standard_input = content;
+                } else {
+                    self.standard_input.extend_from_slice(&content);
+                }
+            }
+            _ => {
+                return Err(anyhow!("FCGI record type {:?} unknown or unimplemented.", rec.header.rec_type))
+            }
+        }
         Ok(false)   // ***TEMP***
     }
+}
+
+/// Build key-value list from special format.
+pub fn build_params(b: &[u8]) -> Result<HashMap<String, String>, Error> {
+    // ***MORE***
+    let mut m = HashMap::new();
+    Ok(m)
 }
 
 /// Not the main program, but the main loop.
