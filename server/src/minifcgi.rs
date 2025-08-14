@@ -348,6 +348,10 @@ fn fetch_name_value_pair<'a>(mut pos: impl Iterator<Item=&'a u8>) -> Result<Opti
 pub fn build_params(b: &[u8]) -> Result<HashMap<String, String>, Error> {
     // ***MORE***
     let mut m = HashMap::new();
+    let mut pos = b.iter();
+    while let Some((k,v)) = fetch_name_value_pair(&mut pos)) {
+        m.insert(k,v)l
+    }
     Ok(m)
 }
 
