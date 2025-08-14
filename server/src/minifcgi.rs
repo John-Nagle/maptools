@@ -50,7 +50,9 @@ use num_traits::{FromPrimitive, ToPrimitive};
 ///
 /// [1]: https://tools.ietf.org/html/rfc3875
 ///
-/// This is from outer_cgi from crates.io.
+/// and the FastCGI specification:
+///
+/// https://www.mit.edu/~yandros/doc/specs/fcgi-spec.html
 ///
 /// All this generic complexity is so we can test this thing
 /// using something other than stdin/stdout.
@@ -278,6 +280,68 @@ impl Request {
         }
         Ok(false)   // ***TEMP***
     }
+}
+/*
+/// Fetch next field.
+/// Encoding:
+/// - First byte is length.
+/// - If length > 127 ???
+// ***TEMP*** get decodeing iterator right.
+fn fetch_next_field<'a>(mut pos: impl Iterator<Item=&'a u8>) -> Option<String>{
+    if let Some(cnt) = pos.next() {
+        println!("cnt = {}", cnt);
+        let b: Vec<u8> = pos.take(*cnt as usize).copied().collect(); // next cnt bytes or bust
+        Some(String::from_utf8_lossy(&b).to_string())
+    } else {
+        return None
+    }
+}
+*/
+
+/// Fetch one encoded value.
+/// 0..127 is one byte.
+/// If the first byte is larger than 127, fetch 3 more bytes and convert to a usize
+fn fetch_field_length<'a>(mut pos: impl Iterator<Item=&'a u8>) -> Result<Option<(usize)>, Error> {
+    if let Some(b0) = pos.next() {
+        if *b0 > 127 {
+            //  Fetch 3 more bytes
+            let b1 = pos.next().ok_or_else(|| anyhow!("EOF reading multi-byte param length"))?;
+            let b2 = pos.next().ok_or_else(|| anyhow!("EOF reading multi-byte param length"))?;
+            let b3 = pos.next().ok_or_else(|| anyhow!("EOF reading multi-byte param length"))?;
+            //  Compute length per spec
+            Ok(Some(
+                (((*b3 & 0x7f) as usize) << 24) + ((*b2 as usize) << 16) + ((*b1 as usize) << 8) + *b0 as usize
+            ))
+        } else {
+            Ok(Some(*b0 as usize))
+        }
+    } else {
+        Ok(None)    // EOF
+    }
+}
+
+/// Fetch field of requested length. Read N bytes, convert to UTF-8.
+fn fetch_field<'a>(cnt: usize, mut pos: impl Iterator<Item=&'a u8>) -> Result<String, Error> {
+    let mut b = Vec::with_capacity(cnt);
+    for _ in 0..cnt {
+        let ch = pos.next().ok_or_else(|| anyhow!("EOF reading param field"))?;
+        b.push(*ch);
+    }
+    Ok(String::from_utf8(b)?.to_string())
+}
+
+/// "FastCGI transmits a name-value pair as the length of the name, followed by the length of the value, followed by the name, followed by the value. 
+/// Lengths of 127 bytes and less can be encoded in one byte, while longer lengths are always encoded in four bytes" - FCGI spec
+fn fetch_name_value_pair<'a>(mut pos: impl Iterator<Item=&'a u8>) -> Result<Option<(String, String)>, Error> {
+    if let Some(kcnt) = fetch_field_length(&mut pos)? {
+        if let Some(vcnt) = fetch_field_length(&mut pos)? {
+            Ok(Some((fetch_field(kcnt, &mut pos)?, fetch_field(vcnt, &mut pos)?)))
+        } else {
+            Err(anyhow!("EOF reading length of param value field"))
+        }     
+    } else {
+        Ok(None) // EOF
+    }  
 }
 
 /// Build key-value list from special format.
