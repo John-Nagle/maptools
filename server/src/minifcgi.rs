@@ -257,12 +257,15 @@ impl Request {
             FcgiRecType::Params => {
                 // More param bytes
                 let content = rec.content.take().ok_or_else(|| anyhow!("No content. Should not happen."))?;
+                println!("Params content 1: {:?}", content);
                 self.param_bytes.extend_from_slice(&content);
+                println!("Params content 2: {:?}", self.param_bytes);
             }
             
             FcgiRecType::Stdin => {
                 //  A zero-length block means we have a complete request .       
                 if rec.header.content_length == 0 {
+                    println!("Params content 3: {:?}", self.param_bytes);
                     self.params = Some(build_params(&self.param_bytes)?);
                     //  Request now gets processed.
                     println!("Request: {:?}", self);    // ***TEMP***
@@ -351,6 +354,7 @@ fn fetch_name_value_pair<'a>(mut pos: impl Iterator<Item=&'a u8>) -> Result<Opti
 
 /// Build key-value list from special format.
 pub fn build_params(b: &[u8]) -> Result<HashMap<String, String>, Error> {
+    println!("Building params from {:?}", b);
     let mut m = HashMap::new();
     let mut pos = b.iter();
     while let Some((k,v)) = fetch_name_value_pair(&mut pos)? {
@@ -362,8 +366,8 @@ pub fn build_params(b: &[u8]) -> Result<HashMap<String, String>, Error> {
 /// Not the main program, but the main loop.
 pub fn run(instream: &mut impl BufRead, out: &dyn Write, handler: fn(out: &dyn Write, request: &Request, env: &HashMap<String, String>) -> Result<i32>) -> Result<i32> {
     let env = std::env::vars().map(|(k,v)| (k,v)).collect();
-    loop {
-        let mut request = Request::new();
+    let mut request = Request::new();
+    loop {     
         if let Some(rec) = FcgiRecord::new_from_stream(instream)? {     
             if !request.add_record(rec)? {
                 continue
@@ -392,12 +396,15 @@ fn basic_io() {
     //  Params
     let test_header1 = FcgiHeader { version: 1, rec_type: FcgiRecType::Params, id: 101, content_length: 10, padding_length: 0, reserved: 0 };
     let test_header1_bytes = test_header1.to_bytes();
-    let test_content1: Vec<u8> = vec![3, 'K' as u8, 'E' as u8, 'Y' as u8, 5, 'V' as u8, 'A' as u8, 'L' as u8, 'U' as u8, 'E' as u8];
+    let test_content1: Vec<u8> = vec![3, 5, 'K' as u8, 'E' as u8, 'Y' as u8, 'V' as u8, 'A' as u8, 'L' as u8, 'U' as u8, 'E' as u8];
     assert_eq!(test_content1.len(), test_header1.content_length as usize);
     let padding1: Vec<u8> = vec![0xff;6];
     test_data.extend(test_header1_bytes);
     test_data.extend(test_content1);  
-    test_data.extend(padding1); 
+    test_data.extend(padding1); //
+    //  Stdin - empty content is an EOF
+    let test_header2 = FcgiHeader { version: 1, rec_type: FcgiRecType::Stdin, id: 101, content_length: 0, padding_length: 0, reserved: 0 };
+    test_data.extend(test_header2.to_bytes());
     println!("Test data: {:?}", test_data);
     let cursor = std::io::Cursor::new(test_data);
     let mut instream = BufReader::new(cursor);
