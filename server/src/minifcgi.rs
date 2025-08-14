@@ -201,6 +201,7 @@ impl FcgiRecord {
                 instream.read_exact(&mut padding_bytes)?;
             }
         }
+        println!("Content: {:?}", content_bytes); // ***TEMP***
         Ok(Some(Self {
             header,
             content: Some(content_bytes.to_vec()),
@@ -321,13 +322,14 @@ fn fetch_field_length<'a>(mut pos: impl Iterator<Item=&'a u8>) -> Result<Option<
     }
 }
 
-/// Fetch field of requested length. Read N bytes, convert to UTF-8.
+/// Fetch FCGI param field of requested length. Read N bytes, convert to UTF-8. Error if bad UTF-8.
 fn fetch_field<'a>(cnt: usize, mut pos: impl Iterator<Item=&'a u8>) -> Result<String, Error> {
     let mut b = Vec::with_capacity(cnt);
     for _ in 0..cnt {
         let ch = pos.next().ok_or_else(|| anyhow!("EOF reading param field"))?;
         b.push(*ch);
     }
+    println!("Field: {:?}", b); // ***TEMP***
     Ok(String::from_utf8(b)?.to_string())
 }
 
@@ -335,7 +337,9 @@ fn fetch_field<'a>(cnt: usize, mut pos: impl Iterator<Item=&'a u8>) -> Result<St
 /// Lengths of 127 bytes and less can be encoded in one byte, while longer lengths are always encoded in four bytes" - FCGI spec
 fn fetch_name_value_pair<'a>(mut pos: impl Iterator<Item=&'a u8>) -> Result<Option<(String, String)>, Error> {
     if let Some(kcnt) = fetch_field_length(&mut pos)? {
+        println!("kcnt: {}", kcnt); // ***TEMP***
         if let Some(vcnt) = fetch_field_length(&mut pos)? {
+            println!("vcnt: {}", vcnt); // ***TEMP***
             Ok(Some((fetch_field(kcnt, &mut pos)?, fetch_field(vcnt, &mut pos)?)))
         } else {
             Err(anyhow!("EOF reading length of param value field"))
@@ -377,12 +381,23 @@ fn basic_io() {
     fn do_req<W: Write>(out: &dyn Write, request: &Request, env: &HashMap<String, String>) -> Result<i32> {
         Ok(200)   
     }
-    let test_header = FcgiHeader { version: 1, rec_type: FcgiRecType::BeginRequest, id: 101, content_length: 16, padding_length: 0, reserved: 0 };
-    let test_header_bytes = test_header.to_bytes();
-    let mut test_data = test_header_bytes.to_vec();
-    let test_content: Vec<u8> = "ABCDEFGHIJKLMNOP".as_bytes().to_vec();
-    assert_eq!(test_content.len(), test_header.content_length as usize);
-    test_data.extend(test_content);
+    //  BeginRequest
+    let test_header0 = FcgiHeader { version: 1, rec_type: FcgiRecType::BeginRequest, id: 101, content_length: 16, padding_length: 0, reserved: 0 };
+    let test_header0_bytes = test_header0.to_bytes();
+    let mut test_data = test_header0_bytes.to_vec();
+    //  ***NOT A VALID BEGIN REQUEST***
+    let test_content0: Vec<u8> = "ABCDEFGHIJKLMNOP".as_bytes().to_vec();
+    assert_eq!(test_content0.len(), test_header0.content_length as usize);
+    test_data.extend(test_content0);
+    //  Params
+    let test_header1 = FcgiHeader { version: 1, rec_type: FcgiRecType::Params, id: 101, content_length: 10, padding_length: 0, reserved: 0 };
+    let test_header1_bytes = test_header1.to_bytes();
+    let test_content1: Vec<u8> = vec![3, 'K' as u8, 'E' as u8, 'Y' as u8, 5, 'V' as u8, 'A' as u8, 'L' as u8, 'U' as u8, 'E' as u8];
+    assert_eq!(test_content1.len(), test_header1.content_length as usize);
+    let padding1: Vec<u8> = vec![0xff;6];
+    test_data.extend(test_header1_bytes);
+    test_data.extend(test_content1);  
+    test_data.extend(padding1); 
     println!("Test data: {:?}", test_data);
     let cursor = std::io::Cursor::new(test_data);
     let mut instream = BufReader::new(cursor);
