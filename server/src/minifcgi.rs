@@ -264,6 +264,7 @@ impl Request {
                 if rec.header.content_length == 0 {
                     self.params = Some(build_params(&self.param_bytes)?);
                     //  Request now gets processed.
+                    println!("Request: {:?}", self);    // ***TEMP***
                     return Ok(true);        
                 }
                 let content = rec.content.take().ok_or_else(|| anyhow!("No content. Should not happen."))?;
@@ -301,7 +302,7 @@ fn fetch_next_field<'a>(mut pos: impl Iterator<Item=&'a u8>) -> Option<String>{
 /// Fetch one encoded value.
 /// 0..127 is one byte.
 /// If the first byte is larger than 127, fetch 3 more bytes and convert to a usize
-fn fetch_field_length<'a>(mut pos: impl Iterator<Item=&'a u8>) -> Result<Option<(usize)>, Error> {
+fn fetch_field_length<'a>(mut pos: impl Iterator<Item=&'a u8>) -> Result<Option<usize>, Error> {
     if let Some(b0) = pos.next() {
         if *b0 > 127 {
             //  Fetch 3 more bytes
@@ -346,11 +347,10 @@ fn fetch_name_value_pair<'a>(mut pos: impl Iterator<Item=&'a u8>) -> Result<Opti
 
 /// Build key-value list from special format.
 pub fn build_params(b: &[u8]) -> Result<HashMap<String, String>, Error> {
-    // ***MORE***
     let mut m = HashMap::new();
     let mut pos = b.iter();
-    while let Some((k,v)) = fetch_name_value_pair(&mut pos)) {
-        m.insert(k,v)l
+    while let Some((k,v)) = fetch_name_value_pair(&mut pos)? {
+        m.insert(k,v);
     }
     Ok(m)
 }
