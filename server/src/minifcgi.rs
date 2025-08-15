@@ -206,7 +206,7 @@ impl FcgiRecord {
             }
         }
         let header = FcgiHeader::new_from_bytes(&header_bytes)?;
-        println!("Header: {:?}", header); // ***TEMP***
+        eprintln!("Header: {:?}", header); // ***TEMP***
         // Read content
         let mut content_bytes = vec![0; header.content_length as usize];
         if header.content_length > 0 {
@@ -216,7 +216,7 @@ impl FcgiRecord {
                 instream.read_exact(&mut padding_bytes)?;
             }
         }
-        println!("Content: {:?}", content_bytes); // ***TEMP***
+        eprintln!("Content: {:?}", content_bytes); // ***TEMP***
         Ok(Some(Self {
             header,
             content: Some(content_bytes.to_vec()),
@@ -261,9 +261,9 @@ impl Request {
                 return Err(anyhow!(
                     "FCGI record IDs differ. Multiplex mode not supported."
                 ));
-            } else {
-                self.id = Some(rec.header.id)
             }
+        } else {
+            self.id = Some(rec.header.id)
         }
         // Fan out on type.
         match rec.header.rec_type {
@@ -285,7 +285,7 @@ impl Request {
                 if rec.header.content_length == 0 {
                     self.params = Some(Self::build_params(&self.param_bytes)?);
                     //  Request now gets processed.
-                    println!("Request: {:?}", self); // ***TEMP***
+                    eprintln!("Request: {:?}", self); // ***TEMP***
                     return Ok(true);
                 }
                 let content = rec
@@ -351,7 +351,7 @@ impl Request {
                 .ok_or_else(|| anyhow!("EOF reading param field"))?;
             b.push(*ch);
         }
-        println!("Field: {:?}", b); // ***TEMP***
+        eprintln!("Field: {:?}", b); // ***TEMP***
         Ok(String::from_utf8(b)?.to_string())
     }
 
@@ -361,9 +361,7 @@ impl Request {
         mut pos: impl Iterator<Item = &'a u8>,
     ) -> Result<Option<(String, String)>, Error> {
         if let Some(kcnt) = Self::fetch_field_length(&mut pos)? {
-            println!("kcnt: {}", kcnt); // ***TEMP***
             if let Some(vcnt) = Self::fetch_field_length(&mut pos)? {
-                println!("vcnt: {}", vcnt); // ***TEMP***
                 Ok(Some((
                     Self::fetch_field(kcnt, &mut pos)?,
                     Self::fetch_field(vcnt, &mut pos)?,
@@ -378,7 +376,7 @@ impl Request {
 
     /// Build key-value list from special format.
     pub fn build_params(b: &[u8]) -> Result<HashMap<String, String>, Error> {
-        println!("Building params from {:?}", b);
+        eprintln!("Building params from {:?}", b);
         let mut m = HashMap::new();
         let mut pos = b.iter();
         while let Some((k, v)) = Self::fetch_name_value_pair(&mut pos)? {
@@ -433,21 +431,6 @@ impl Response {
         // End of transaction record.
         Self::write_response_record(out, request, FcgiRecType::EndRequest, &[0, FcgiStatus::RequestComplete.to_u8().unwrap()])     
     }
-
-    /// ***WRONG*** has to send new style headers, just like the input side.
-    pub fn old_write_response(out: &mut dyn Write, _request: &Request, header_fields: &[String], b: &[u8]) -> Result<(), Error> {
-        const NL: &[u8] = &[b'\n'];
-        //  Write header fields.
-        for field in header_fields {
-            out.write(field.as_bytes())?;
-            out.write(NL)?;
-        }
-        //  Blank line to indicate end of header
-        out.write(NL)?;
-        //  Output data
-        out.write(b)?;
-        Ok(())
-    }
     
     /// Build the most common response headers.
     pub fn normal_response(content_type: &str, status: usize, msg: &str) -> Vec<String> {
@@ -485,10 +468,14 @@ fn basic_io() {
     use std::io::{BufReader, Write};
     //  Our "handler"
     fn do_req<W: Write>(
-        _out: &mut dyn Write,
-        _request: &Request,
-        _env: &HashMap<String, String>,
+        out: &mut dyn Write,
+        request: &Request,
+        env: &HashMap<String, String>,
     ) -> Result<i32> {
+        /// Dummy up a response
+        let normal_response = Response::normal_response("text/plain", 200, "OK");  
+        let b = format!("Env: {:?}\nParams: {:?}", env, request.params).into_bytes();
+        Response::write_response(out, request, normal_response.as_slice(), &b)?;
         Ok(200)
     }
     //  BeginRequest
