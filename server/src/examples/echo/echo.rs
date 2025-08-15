@@ -1,4 +1,13 @@
-use outer_cgi::IO;
+//! FCGI echo server. 
+//! For test use.
+use std::io::Write;
+use std::collections::HashMap;
+use std::io::BufReader;
+use crate::minifcgi;
+use minifcgi::{Request, Response};
+use anyhow::{Error};
+
+/*
 use std::collections::HashMap;
 
 fn handler(io: &mut dyn IO, env: HashMap<String, String>) -> anyhow::Result<i32> {
@@ -16,7 +25,17 @@ Hello World! Your request method was "{}"!
     )?;
     Ok(0)
 }
+*/
+
+/// Handler. actually handles the FCGI request.
+fn handler(out: &dyn Write, request: &Request, env: &HashMap<String, String>) -> Result<i32, Error> {
+    //  ***MORE***
+    Ok(0)
+}
 
 pub fn main() {
-    outer_cgi::main(|_| {}, handler)
+    let mut inio = std::io::stdin();
+    let outio = std::io::stdout();
+    let mut instream = BufReader::new(inio);
+    minifcgi::run(instream, outio, handler);
 }
