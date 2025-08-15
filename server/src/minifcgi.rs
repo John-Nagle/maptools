@@ -206,7 +206,7 @@ impl FcgiRecord {
             }
         }
         let header = FcgiHeader::new_from_bytes(&header_bytes)?;
-        eprintln!("Header: {:?}", header); // ***TEMP***
+        //////eprintln!("Header: {:?}", header); // ***TEMP***
         // Read content
         let mut content_bytes = vec![0; header.content_length as usize];
         if header.content_length > 0 {
@@ -216,7 +216,7 @@ impl FcgiRecord {
                 instream.read_exact(&mut padding_bytes)?;
             }
         }
-        eprintln!("Content: {:?}", content_bytes); // ***TEMP***
+        //////eprintln!("Content: {:?}", content_bytes); // ***TEMP***
         Ok(Some(Self {
             header,
             content: Some(content_bytes.to_vec()),
@@ -285,7 +285,7 @@ impl Request {
                 if rec.header.content_length == 0 {
                     self.params = Some(Self::build_params(&self.param_bytes)?);
                     //  Request now gets processed.
-                    eprintln!("Request: {:?}", self); // ***TEMP***
+                    //////eprintln!("Request: {:?}", self); // ***TEMP***
                     return Ok(true);
                 }
                 let content = rec
@@ -351,7 +351,6 @@ impl Request {
                 .ok_or_else(|| anyhow!("EOF reading param field"))?;
             b.push(*ch);
         }
-        eprintln!("Field: {:?}", b); // ***TEMP***
         Ok(String::from_utf8(b)?.to_string())
     }
 
@@ -376,7 +375,6 @@ impl Request {
 
     /// Build key-value list from special format.
     pub fn build_params(b: &[u8]) -> Result<HashMap<String, String>, Error> {
-        eprintln!("Building params from {:?}", b);
         let mut m = HashMap::new();
         let mut pos = b.iter();
         while let Some((k, v)) = Self::fetch_name_value_pair(&mut pos)? {
@@ -443,15 +441,60 @@ impl Response {
     }
 }
 
+/// Read and run one transaction
+fn run_one(
+    instream: &mut impl BufRead,
+    out: &mut dyn Write,
+    request: &mut Request,
+    handler: fn(out: &mut dyn Write, request: &Request, env: &HashMap<String, String>) -> Result<(), Error>,
+    env: &HashMap<String, String>,
+) -> Result<bool, Error> {
+    loop {
+        if let Some(rec) = FcgiRecord::new_from_stream(instream)? {
+            if !request.add_record(rec)? {
+                continue;
+            }
+            // We have enough records to handle the request.
+            handler(out, &request, &env)?;
+            break;
+        } else {
+            return Ok(true); // normal EOF
+        }
+    }
+    Ok(false)
+}
+
 /// Not the main program, but the main loop.
 pub fn run(
     instream: &mut impl BufRead,
     out: &mut dyn Write,
-    handler: fn(out: &mut dyn Write, request: &Request, env: &HashMap<String, String>) -> Result<i32>,
+    handler: fn(out: &mut dyn Write, request: &Request, env: &HashMap<String, String>) -> Result<(), Error>,
 ) -> Result<i32> {
     let env = std::env::vars().map(|(k, v)| (k, v)).collect();
     let mut request = Request::new();
     loop {
+        match run_one(instream, out, &mut request, handler, &env) {
+            Ok(done) => {
+                if done {
+                    //  Normal end of this task.
+                    break;
+                }
+            }
+            Err(e) => {
+                //  Error occured. Try to get it back to the caller.
+                let msg = format!("FCGI error: {:?}", e);
+                if request.id.is_some() {
+                    //  We have enough info to reply with an error
+                    let error_response = Response::normal_response("text", 500, msg.as_str());
+                    Response::write_response(out, &request, error_response.as_slice(), &[])?;
+                    break;
+                }
+            }         
+        }
+    }
+    Ok(0)
+}
+/*
         if let Some(rec) = FcgiRecord::new_from_stream(instream)? {
             if !request.add_record(rec)? {
                 continue;
@@ -462,8 +505,7 @@ pub fn run(
         } else {
             return Ok(0); // normal EOF
         }
-    }
-}
+*/
 
 #[test]
 fn basic_io() {
@@ -473,12 +515,12 @@ fn basic_io() {
         out: &mut dyn Write,
         request: &Request,
         env: &HashMap<String, String>,
-    ) -> Result<i32> {
-        /// Dummy up a response
+    ) -> Result<(), Error> {
+        // Dummy up a response
         let normal_response = Response::normal_response("text/plain", 200, "OK");  
         let b = format!("Env: {:?}\nParams: {:?}", env, request.params).into_bytes();
         Response::write_response(out, request, normal_response.as_slice(), &b)?;
-        Ok(200)
+        Ok(())
     }
     //  BeginRequest
     let test_header0 = FcgiHeader {

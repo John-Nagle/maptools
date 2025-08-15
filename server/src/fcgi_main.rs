@@ -68,9 +68,9 @@ use minifcgi;
 use minifcgi::{Request, Response};
 use anyhow::{Error};
 /// Handler. actually handles the FCGI request.
-fn handler(out: &mut dyn Write, request: &Request, env: &HashMap<String, String>) -> Result<i32, Error> {
+fn handler(out: &mut dyn Write, request: &Request, env: &HashMap<String, String>) -> Result<(), Error> {
     //  ***MORE***
-    Ok(0)
+    Ok(())
 }
 
 pub fn main() {

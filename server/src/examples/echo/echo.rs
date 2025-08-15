@@ -28,12 +28,12 @@ Hello World! Your request method was "{}"!
 */
 
 /// Handler. actually handles the FCGI request.
-fn handler(out: &mut dyn Write, request: &Request, env: &HashMap<String, String>) -> Result<i32, Error> {
+fn handler(out: &mut dyn Write, request: &Request, env: &HashMap<String, String>) -> Result<(), Error> {
     let normal_response = Response::normal_response("text/plain", 200, "OK");  
     //  Return something useful.
     let b = format!("Env: {:?}\nParams: {:?}", env, request.params).into_bytes();
     Response::write_response(out, request, normal_response.as_slice(), &b)?;
-    Ok(0)
+    Ok(())
 }
 
 pub fn main() {
