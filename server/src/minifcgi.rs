@@ -382,6 +382,26 @@ impl Request {
     }
 }
 
+/// Response -- sends back a response to a request.
+pub struct Response {
+}
+
+impl Response {
+    pub fn write_response(out: &dyn Write, request: &Request, header_fields: &[&str], b: &[u8]) -> Result<(), Error> {
+        const NL: &[u8] = &[b'\n'];
+        //  Write header fields.
+        for field in header_fields {
+            out.write(field.as_bytes())?;
+            out.write(NL)?;
+        }
+        //  Blank line to indicate end of header
+        out.write(NL)?;
+        //  Output data
+        out.write(b)?;
+        Ok(())
+    }
+}
+
 /// Not the main program, but the main loop.
 pub fn run(
     instream: &mut impl BufRead,
