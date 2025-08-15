@@ -231,7 +231,7 @@ pub struct Request {
     /// Parameter bytes. Need special decoding
     param_bytes: Vec<u8>,
     /// Params, as a key-value store
-    params: Option<HashMap<String, String>>,
+    pub params: Option<HashMap<String, String>>,
     /// Standard input - the actual content, if any
     standard_input: Vec<u8>,
 }
@@ -387,7 +387,7 @@ pub struct Response {
 }
 
 impl Response {
-    pub fn write_response(out: &mut dyn Write, request: &Request, header_fields: &[&str], b: &[u8]) -> Result<(), Error> {
+    pub fn write_response(out: &mut dyn Write, request: &Request, header_fields: &[String], b: &[u8]) -> Result<(), Error> {
         const NL: &[u8] = &[b'\n'];
         //  Write header fields.
         for field in header_fields {
@@ -413,8 +413,8 @@ impl Response {
 /// Not the main program, but the main loop.
 pub fn run(
     instream: &mut impl BufRead,
-    out: &dyn Write,
-    handler: fn(out: &dyn Write, request: &Request, env: &HashMap<String, String>) -> Result<i32>,
+    out: &mut dyn Write,
+    handler: fn(out: &mut dyn Write, request: &Request, env: &HashMap<String, String>) -> Result<i32>,
 ) -> Result<i32> {
     let env = std::env::vars().map(|(k, v)| (k, v)).collect();
     let mut request = Request::new();
@@ -436,7 +436,7 @@ pub fn run(
 fn basic_io() {
     use std::io::Stdout;
     fn do_req<W: Write>(
-        out: &dyn Write,
+        out: &mut dyn Write,
         request: &Request,
         env: &HashMap<String, String>,
     ) -> Result<i32> {
@@ -486,7 +486,7 @@ fn basic_io() {
     println!("Test data: {:?}", test_data);
     let cursor = std::io::Cursor::new(test_data);
     let mut instream = BufReader::new(cursor);
-    let out = io::stdout();
-    let final_result = run(&mut instream, &out, do_req::<&Stdout>);
+    let mut out = io::stdout();
+    let final_result = run(&mut instream, &mut out, do_req::<&mut dyn Write>);
     println!("Final result: {:?}", final_result);
 }

@@ -28,8 +28,12 @@ Hello World! Your request method was "{}"!
 */
 
 /// Handler. actually handles the FCGI request.
-fn handler(out: &dyn Write, request: &Request, env: &HashMap<String, String>) -> Result<i32, Error> {
-    //  ***MORE***
+fn handler(out: &mut dyn Write, request: &Request, env: &HashMap<String, String>) -> Result<i32, Error> {
+    let normal_response = Response::normal_response("text/plain", 200, "OK");  
+    //////let header_fields: Vec<&str> = normal_response.into_iter().map(|s| s.as_str()).collect();
+    //  Return something useful.
+    let b = format!("Env: {:?}\nParams: {:?}", env, request.params).into_bytes();
+    Response::write_response(out, request, normal_response.as_slice(), &b)?;
     Ok(0)
 }
 
@@ -37,5 +41,5 @@ pub fn main() {
     let mut inio = std::io::stdin();
     let mut outio = std::io::stdout();
     let mut instream = BufReader::new(inio);
-    minifcgi::run(&mut instream, &mut outio, handler);
+    minifcgi::run(&mut instream, &mut outio, handler).expect("Run failed");
 }
