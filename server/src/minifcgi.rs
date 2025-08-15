@@ -276,7 +276,7 @@ impl Request {
                 let content = rec
                     .content
                     .take()
-                    .ok_or_else(|| anyhow!("No content. Should not happen."))?;
+                    .ok_or_else(|| anyhow!("No conte	nt. Should not happen."))?;
                 self.param_bytes.extend_from_slice(&content);
             }
 
@@ -395,10 +395,10 @@ impl Response {
     fn write_response_record(out: &mut dyn Write, request: &Request, rec_type: FcgiRecType, b: &[u8]) -> Result<(), Error> {
         assert!(b.len() < u16::MAX.into());
         let header = FcgiHeader {
-        version: 1,
-        rec_type,
-        id: request.id.expect("No request ID"),
-        content_length: b.len() as u16,
+            version: 1,
+            rec_type,
+            id: request.id.expect("No request ID"),
+            content_length: b.len() as u16,
         };
         //  Write header
         out.write(&header.to_bytes())?;
@@ -429,7 +429,9 @@ impl Response {
         //  End of data record.
         Self::write_response_record(out, request, FcgiRecType::Stdout, &[])?;
         // End of transaction record.
-        Self::write_response_record(out, request, FcgiRecType::EndRequest, &[0, FcgiStatus::RequestComplete.to_u8().unwrap()])     
+        Self::write_response_record(out, request, FcgiRecType::EndRequest, &[0, FcgiStatus::RequestComplete.to_u8().unwrap()])?; 
+        out.flush();
+        Ok(())
     }
     
     /// Build the most common response headers.
