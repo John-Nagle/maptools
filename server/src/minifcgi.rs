@@ -40,9 +40,10 @@ use anyhow::{Error, Result, anyhow};
 use num_derive::{FromPrimitive, ToPrimitive}; // Derive the FromPrimitive trait
 use num_traits::{FromPrimitive, ToPrimitive};
 use std::collections::HashMap;
-use std::io;
-use std::io::BufReader;
-use std::io::{BufRead, Read, Write};
+//////use std::io;
+use std::io::{BufRead, Write};
+//////use std::io::BufReader;
+
 
 /// Wraps the stdin and stdout streams of a standard CGI invocation.
 ///
@@ -157,6 +158,7 @@ impl FcgiHeader {
     }
 
     /// Serialize
+    #[allow(dead_code)] // used in test mode
     fn to_bytes(&self) -> [u8; 8] {
         let id_bytes = self.id.to_be_bytes();
         let content_length_bytes = self.content_length.to_be_bytes();
@@ -387,7 +389,7 @@ pub struct Response {
 }
 
 impl Response {
-    pub fn write_response(out: &mut dyn Write, request: &Request, header_fields: &[String], b: &[u8]) -> Result<(), Error> {
+    pub fn write_response(out: &mut dyn Write, _request: &Request, header_fields: &[String], b: &[u8]) -> Result<(), Error> {
         const NL: &[u8] = &[b'\n'];
         //  Write header fields.
         for field in header_fields {
@@ -434,11 +436,12 @@ pub fn run(
 
 #[test]
 fn basic_io() {
-    use std::io::Stdout;
+    use std::io::{BufReader, Write};
+    //  Our "handler"
     fn do_req<W: Write>(
-        out: &mut dyn Write,
-        request: &Request,
-        env: &HashMap<String, String>,
+        _out: &mut dyn Write,
+        _request: &Request,
+        _env: &HashMap<String, String>,
     ) -> Result<i32> {
         Ok(200)
     }
@@ -486,7 +489,7 @@ fn basic_io() {
     println!("Test data: {:?}", test_data);
     let cursor = std::io::Cursor::new(test_data);
     let mut instream = BufReader::new(cursor);
-    let mut out = io::stdout();
+    let mut out = std::io::stdout();
     let final_result = run(&mut instream, &mut out, do_req::<&mut dyn Write>);
     println!("Final result: {:?}", final_result);
 }

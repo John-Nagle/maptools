@@ -74,7 +74,7 @@ fn handler(out: &mut dyn Write, request: &Request, env: &HashMap<String, String>
 }
 
 pub fn main() {
-    let mut inio = std::io::stdin();
+    let inio = std::io::stdin();
     let mut outio = std::io::stdout();
     let mut instream = BufReader::new(inio);
     minifcgi::run(&mut instream, &mut outio, handler);
