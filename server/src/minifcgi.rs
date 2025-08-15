@@ -400,6 +400,14 @@ impl Response {
         out.write(b)?;
         Ok(())
     }
+    
+    /// Build the most common response headers.
+    pub fn normal_response(content_type: &str, status: usize, msg: &str) -> Vec<String> {
+        vec![
+            format!("Status: {} {}", status, msg),
+            format!("Content-type: {}", content_type)
+        ]
+    }
 }
 
 /// Not the main program, but the main loop.
