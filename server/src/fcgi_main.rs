@@ -64,7 +64,7 @@ fn main() {
 use std::io::Write;
 use std::collections::HashMap;
 use std::io::BufReader;
-mod minifcgi;
+use minifcgi;
 use minifcgi::{Request, Response};
 use anyhow::{Error};
 /// Handler. actually handles the FCGI request.

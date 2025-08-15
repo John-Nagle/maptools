@@ -3,7 +3,7 @@
 use std::io::Write;
 use std::collections::HashMap;
 use std::io::BufReader;
-use crate::minifcgi;
+use minifcgi;
 use minifcgi::{Request, Response};
 use anyhow::{Error};
 
@@ -35,7 +35,7 @@ fn handler(out: &dyn Write, request: &Request, env: &HashMap<String, String>) ->
 
 pub fn main() {
     let mut inio = std::io::stdin();
-    let outio = std::io::stdout();
+    let mut outio = std::io::stdout();
     let mut instream = BufReader::new(inio);
-    minifcgi::run(instream, outio, handler);
+    minifcgi::run(&mut instream, &mut outio, handler);
 }

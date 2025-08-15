@@ -14,6 +14,10 @@ proc-macro = false     # Set to `true` for a proc-macro library.
 harness = true         # Use libtest harness.
 required-features = [] # Features required to build this target (N/A for lib).
 
+[lib]
+name = "minifcgi"
+path = "src/lib.rs"
+
 [[example]]
 name = "echo"
 path = "src/examples/echo/echo.rs"
