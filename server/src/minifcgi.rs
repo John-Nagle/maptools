@@ -387,7 +387,7 @@ pub struct Response {
 }
 
 impl Response {
-    pub fn write_response(out: &dyn Write, request: &Request, header_fields: &[&str], b: &[u8]) -> Result<(), Error> {
+    pub fn write_response(out: &mut dyn Write, request: &Request, header_fields: &[&str], b: &[u8]) -> Result<(), Error> {
         const NL: &[u8] = &[b'\n'];
         //  Write header fields.
         for field in header_fields {
