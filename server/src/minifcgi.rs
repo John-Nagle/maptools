@@ -134,8 +134,6 @@ pub struct FcgiHeader {
     id: u16,
     /// Length of content, in bytes.
     content_length: u16,
-    /// Padding. Read content_length + padding.
-    padding_length: u8,
 }
 
 impl FcgiHeader {
@@ -145,7 +143,7 @@ impl FcgiHeader {
     /// Deserialize 8 bytes to an FCGI header.
     fn new_from_bytes(b: &[u8; 8]) -> Result<FcgiHeader, Error> {
         let content_length = u16::from_be_bytes(<[u8; 2]>::try_from(&b[4..6]).unwrap());
-        let padding_length = (8 - u8::try_from(content_length & 0x7).unwrap()) & 0x7; // padding needed to round up to next multiple of 8 ***CHECK THIS***
+        //////let padding_length = (8 - u8::try_from(content_length & 0x7).unwrap()) & 0x7; // padding needed to round up to next multiple of 8 ***CHECK THIS***
         Ok(FcgiHeader {
             version: b[0],
             rec_type: FcgiRecType::from_u8(b[1])
@@ -153,7 +151,7 @@ impl FcgiHeader {
             id: u16::from_be_bytes(<[u8; 2]>::try_from(&b[2..4]).unwrap()),
             content_length,
             //  h.PaddingLength = uint8(-contentLength & 7)  -- go version
-            padding_length,
+            //////padding_length,
         })
     }
 
@@ -169,10 +167,16 @@ impl FcgiHeader {
             id_bytes[1],
             content_length_bytes[0],
             content_length_bytes[1],
-            self.padding_length, // 7 provided but ignored
+            self.calc_padding_length(), // 7 provided but ignored
             0,                   // 8 reserved
         ]
     }
+    
+    /// padding needed to round up to next multiple of 8 
+    fn calc_padding_length(&self) -> u8 {
+        (8 - u8::try_from(self.content_length & 0x7).unwrap()) & 0x7 
+    }
+        
 }
 
 /// FcgiRecord -- one header and its data.
@@ -207,8 +211,8 @@ impl FcgiRecord {
         let mut content_bytes = vec![0; header.content_length as usize];
         if header.content_length > 0 {
             instream.read_exact(&mut content_bytes)?;
-            if header.padding_length > 0 {
-                let mut padding_bytes = vec![0; header.padding_length as usize];
+            if header.calc_padding_length() > 0 {
+                let mut padding_bytes = vec![0; header.calc_padding_length() as usize];
                 instream.read_exact(&mut padding_bytes)?;
             }
         }
@@ -389,7 +393,46 @@ pub struct Response {
 }
 
 impl Response {
-    pub fn write_response(out: &mut dyn Write, _request: &Request, header_fields: &[String], b: &[u8]) -> Result<(), Error> {
+    /// Write one response record.
+    fn write_response_record(out: &mut dyn Write, request: &Request, rec_type: FcgiRecType, b: &[u8]) -> Result<(), Error> {
+        assert!(b.len() < u16::MAX.into());
+        let header = FcgiHeader {
+        version: 1,
+        rec_type,
+        id: request.id.expect("No request ID"),
+        content_length: b.len() as u16,
+        };
+        //  Write header
+        out.write(&header.to_bytes())?;
+        //  Write data 
+        if b.len() > 0 {
+            out.write(b)?; 
+        }
+        Ok(())
+    }
+    
+    
+    /// Write entire response.
+    ///    {FCGI_STDOUT,      1, "Content-type: text/html\r\n\r\n<html>\n<head> ... "}
+    ///    {FCGI_STDOUT,      1, ""}
+    ///    {FCGI_END_REQUEST, 1, {0, FCGI_REQUEST_COMPLETE}}
+    pub fn write_response(out: &mut dyn Write, request: &Request, header_fields: &[String], b: &[u8]) -> Result<(), Error> {
+        //  Send header fields
+        //  ***MORE***
+        //  Only send this much data at once to avoid clogging pipe.
+        //  The connection to the parent process is two pipes in opposite directions and deadlock is possible.
+        const CHUNK_SIZE: usize = 2048;
+        for i in (0..b.len()).step_by(CHUNK_SIZE) {
+            Self::write_response_record(out, request, FcgiRecType::Stdout, &b[i..(i + CHUNK_SIZE).min(b.len())])?;
+        }
+        //  End of data record.
+        Self::write_response_record(out, request, FcgiRecType::Stdout, &[])?;
+        // End of transaction record.
+        Self::write_response_record(out, request, FcgiRecType::EndRequest, &[])     
+    }
+
+    /// ***WRONG*** has to send new style headers, just like the input side.
+    pub fn old_write_response(out: &mut dyn Write, _request: &Request, header_fields: &[String], b: &[u8]) -> Result<(), Error> {
         const NL: &[u8] = &[b'\n'];
         //  Write header fields.
         for field in header_fields {
@@ -451,7 +494,6 @@ fn basic_io() {
         rec_type: FcgiRecType::BeginRequest,
         id: 101,
         content_length: 16,
-        padding_length: 0,
     };
     let test_header0_bytes = test_header0.to_bytes();
     let mut test_data = test_header0_bytes.to_vec();
@@ -465,7 +507,6 @@ fn basic_io() {
         rec_type: FcgiRecType::Params,
         id: 101,
         content_length: 10,
-        padding_length: 0,
     };
     let test_header1_bytes = test_header1.to_bytes();
     let test_content1: Vec<u8> = vec![
@@ -483,7 +524,6 @@ fn basic_io() {
         rec_type: FcgiRecType::Stdin,
         id: 101,
         content_length: 0,
-        padding_length: 0,
     };
     test_data.extend(test_header2.to_bytes());
     println!("Test data: {:?}", test_data);
