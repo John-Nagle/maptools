@@ -6,6 +6,7 @@ use std::io::BufReader;
 use minifcgi;
 use minifcgi::{Request, Response};
 use anyhow::{Error};
+use log::LevelFilter;
 
 /*
 use std::collections::HashMap;
@@ -27,6 +28,22 @@ Hello World! Your request method was "{}"!
 }
 */
 
+/// Debug logging
+fn logger() {
+    //  Log file is openly visible as a web page.
+    //  Only for debug tests.
+    const LOG_FILE_NAME: &str = "logs/echolog.txt";
+    let _ = simplelog::CombinedLogger::init(vec![
+            simplelog::WriteLogger::new(
+                LevelFilter::Info,
+                simplelog::Config::default(),
+                std::fs::File::create(LOG_FILE_NAME).expect("Unable to create log file"),
+            ),
+        ]);
+    log::warn!("Logging to {:?}", LOG_FILE_NAME); // where the log is going
+}
+
+
 /// Handler. actually handles the FCGI request.
 fn handler(out: &mut dyn Write, request: &Request, env: &HashMap<String, String>) -> Result<(), Error> {
     let http_response = Response::http_response("text/plain", 200, "OK");  
@@ -37,6 +54,7 @@ fn handler(out: &mut dyn Write, request: &Request, env: &HashMap<String, String>
 }
 
 pub fn main() {
+    logger();   // start logging
     let mut outio = std::io::stdout();
     /*  DUMMY
         outio.write_all(

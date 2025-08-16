@@ -144,15 +144,15 @@ impl FcgiHeader {
     fn new_from_bytes(b: &[u8; 8]) -> Result<FcgiHeader, Error> {
         let content_length = u16::from_be_bytes(<[u8; 2]>::try_from(&b[4..6]).unwrap());
         //////let padding_length = (8 - u8::try_from(content_length & 0x7).unwrap()) & 0x7; // padding needed to round up to next multiple of 8 ***CHECK THIS***
-        Ok(FcgiHeader {
+        let header = FcgiHeader {
             version: b[0],
             rec_type: FcgiRecType::from_u8(b[1])
                 .ok_or_else(|| anyhow!("Invalid FCGI record type: {}", b[1]))?,
             id: u16::from_be_bytes(<[u8; 2]>::try_from(&b[2..4]).unwrap()),
             content_length,
-            //  h.PaddingLength = uint8(-contentLength & 7)  -- go version
-            //////padding_length,
-        })
+        };
+        log::info!("FCGI header: {:?}", header);
+        Ok(header)
     }
 
     /// Serialize
@@ -246,7 +246,7 @@ impl Request {
     ///  Usual new
     pub fn new() -> Request {
         Self {
-            id: None,
+            id: Some(999), //////  None,
             param_bytes: Vec::new(),
             standard_input: Vec::new(),
             params: None,

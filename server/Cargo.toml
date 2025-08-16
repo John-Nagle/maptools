@@ -43,4 +43,8 @@ shellexpand = "3.1"
 num-traits = "0.2"
 num-derive = "0.4"
 
+#   Debug logging
+simplelog = "0.12"
+log = "0.4"
+
 
