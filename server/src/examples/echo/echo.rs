@@ -29,10 +29,10 @@ Hello World! Your request method was "{}"!
 
 /// Handler. actually handles the FCGI request.
 fn handler(out: &mut dyn Write, request: &Request, env: &HashMap<String, String>) -> Result<(), Error> {
-    let normal_response = Response::normal_response("text/plain", 200, "OK");  
+    let http_response = Response::http_response("text/plain", 200, "OK");  
     //  Return something useful.
     let b = format!("Env: {:?}\nParams: {:?}", env, request.params).into_bytes();
-    Response::write_response(out, request, normal_response.as_slice(), &b)?;
+    Response::write_response(out, request, http_response.as_slice(), &b)?;
     Ok(())
 }
 

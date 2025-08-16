@@ -301,7 +301,7 @@ impl Request {
             }
             _ => {
                 return Err(anyhow!(
-                    "FCGI record type {:?} unknown or unimplemented.",
+                    "FCGI responder record type {:?} unknown or unimplemented.",
                     rec.header.rec_type
                 ));
             }
@@ -320,13 +320,13 @@ impl Request {
                 //  Fetch 3 more bytes
                 let b1 = pos
                     .next()
-                    .ok_or_else(|| anyhow!("EOF reading multi-byte param length"))?;
+                    .ok_or_else(|| anyhow!("FCGI responder: EOF reading multi-byte param length"))?;
                 let b2 = pos
                     .next()
-                    .ok_or_else(|| anyhow!("EOF reading multi-byte param length"))?;
+                    .ok_or_else(|| anyhow!("FCGI responder: EOF reading multi-byte param length"))?;
                 let b3 = pos
                     .next()
-                    .ok_or_else(|| anyhow!("EOF reading multi-byte param length"))?;
+                    .ok_or_else(|| anyhow!("FCGI responder: EOF reading multi-byte param length"))?;
                 //  Compute length per spec
                 Ok(Some(
                     (((*b3 & 0x7f) as usize) << 24)
@@ -348,7 +348,7 @@ impl Request {
         for _ in 0..cnt {
             let ch = pos
                 .next()
-                .ok_or_else(|| anyhow!("EOF reading param field"))?;
+                .ok_or_else(|| anyhow!("FCGI responder: EOF reading param field"))?;
             b.push(*ch);
         }
         Ok(String::from_utf8(b)?.to_string())
@@ -366,7 +366,7 @@ impl Request {
                     Self::fetch_field(vcnt, &mut pos)?,
                 )))
             } else {
-                Err(anyhow!("EOF reading length of param value field"))
+                Err(anyhow!("FCGI responder: EOF reading length of param value field"))
             }
         } else {
             Ok(None) // EOF
@@ -433,7 +433,7 @@ impl Response {
     }
     
     /// Build the most common response headers.
-    pub fn normal_response(content_type: &str, status: usize, msg: &str) -> Vec<String> {
+    pub fn http_response(content_type: &str, status: usize, msg: &str) -> Vec<String> {
         vec![
             format!("Status: {} {}", status, msg),
             format!("Content-type: {}", content_type)
@@ -441,7 +441,8 @@ impl Response {
     }
 }
 
-/// Read and run one transaction
+/// Read and run one transaction.
+/// Errors here result in a 500 error.
 fn run_one(
     instream: &mut impl BufRead,
     out: &mut dyn Write,
@@ -482,30 +483,21 @@ pub fn run(
             }
             Err(e) => {
                 //  Error occured. Try to get it back to the caller.
-                let msg = format!("FCGI error: {:?}", e);
+                let msg = format!("FCGI responder error: {:?}", e);
                 if request.id.is_some() {
                     //  We have enough info to reply with an error
-                    let error_response = Response::normal_response("text", 500, msg.as_str());
+                    let error_response = Response::http_response("text", 500, msg.as_str());
                     Response::write_response(out, &request, error_response.as_slice(), &[])?;
                     break;
+                } else {
+                    //  Failed so early we can't reply with an error.
+                    panic!("FCGI responder failed before first record parsed: {}", msg);
                 }
             }         
         }
     }
     Ok(0)
 }
-/*
-        if let Some(rec) = FcgiRecord::new_from_stream(instream)? {
-            if !request.add_record(rec)? {
-                continue;
-            }
-            // We have enough records to handle the request.
-            handler(out, &request, &env)?;
-            request = Request::new(); // start next request empty
-        } else {
-            return Ok(0); // normal EOF
-        }
-*/
 
 #[test]
 fn basic_io() {
@@ -517,9 +509,9 @@ fn basic_io() {
         env: &HashMap<String, String>,
     ) -> Result<(), Error> {
         // Dummy up a response
-        let normal_response = Response::normal_response("text/plain", 200, "OK");  
+        let http_response = Response::http_response("text/plain", 200, "OK");  
         let b = format!("Env: {:?}\nParams: {:?}", env, request.params).into_bytes();
-        Response::write_response(out, request, normal_response.as_slice(), &b)?;
+        Response::write_response(out, request, http_response.as_slice(), &b)?;
         Ok(())
     }
     //  BeginRequest
