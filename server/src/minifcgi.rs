@@ -415,6 +415,7 @@ impl Response {
     pub fn write_response(out: &mut dyn Write, request: &Request, header_fields: &[String], b: &[u8]) -> Result<(), Error> {
         //  Send header fields
         let header_fields_group = header_fields.join("\r\n");
+        log::info!("Response header: {}", header_fields_group);
         Self::write_response_record(out, request, FcgiRecType::Stdout, &header_fields_group.as_bytes())?;
         //  End of HTTP header record.
         Self::write_response_record(out, request, FcgiRecType::Stdout, &[])?;
@@ -484,6 +485,7 @@ pub fn run(
             Err(e) => {
                 //  Error occured. Try to get it back to the caller.
                 let msg = format!("FCGI responder error: {:?}", e);
+                log::error!("{}",msg);
                 if request.id.is_some() {
                     //  We have enough info to reply with an error
                     let error_response = Response::http_response("text", 500, msg.as_str());
