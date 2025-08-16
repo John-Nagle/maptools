@@ -414,7 +414,7 @@ impl Response {
     ///    {FCGI_END_REQUEST, 1, {0, FCGI_REQUEST_COMPLETE}}
     pub fn write_response(out: &mut dyn Write, request: &Request, header_fields: &[String], b: &[u8]) -> Result<(), Error> {
         //  Send header fields
-        let header_fields_group = header_fields.join("\n");
+        let header_fields_group = header_fields.join("\r\n");
         Self::write_response_record(out, request, FcgiRecType::Stdout, &header_fields_group.as_bytes())?;
         //  End of HTTP header record.
         Self::write_response_record(out, request, FcgiRecType::Stdout, &[])?;
@@ -428,7 +428,7 @@ impl Response {
         Self::write_response_record(out, request, FcgiRecType::Stdout, &[])?;
         // End of transaction record.
         Self::write_response_record(out, request, FcgiRecType::EndRequest, &[0, FcgiStatus::RequestComplete.to_u8().unwrap()])?; 
-        out.flush();
+        out.flush()?;
         Ok(())
     }
     
@@ -436,7 +436,7 @@ impl Response {
     pub fn http_response(content_type: &str, status: usize, msg: &str) -> Vec<String> {
         vec![
             format!("Status: {} {}", status, msg),
-            format!("Content-type: {}", content_type)
+            format!("Content-Type: {}; charset=utf-8", content_type),
         ]
     }
 }

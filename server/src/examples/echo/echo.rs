@@ -37,8 +37,21 @@ fn handler(out: &mut dyn Write, request: &Request, env: &HashMap<String, String>
 }
 
 pub fn main() {
-    let inio = std::io::stdin();
     let mut outio = std::io::stdout();
+    /*  DUMMY
+        outio.write_all(
+        format!(
+            r#"Content-type: text/plain; charset=utf-8
+
+Hello World!
+"#
+        )
+        .as_bytes(),
+    ).expect("Dummy response");
+    */
+    //
+    //////eprintln!("Starting FCGI"); // ***TEMP***
+    let inio = std::io::stdin();
     let mut instream = BufReader::new(inio);
     minifcgi::run(&mut instream, &mut outio, handler).expect("Run failed");
 }
