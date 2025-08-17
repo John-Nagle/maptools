@@ -90,7 +90,9 @@ pub fn main() {
             panic!("Can't open");
         }
     };
-    let mut instream = std::io::BufReader::new(socket); 
+    let outsocket = socket.try_clone().expect("Unable to clone socket");
+    let mut instream = std::io::BufReader::new(socket);
+    let mut outio = std::io::BufWriter::new(outsocket); 
     //////let inio = std::io::stdin();
     //////inio.set_raw_mode().unwrap();
     //////let mut instream = BufReader::new(inio);

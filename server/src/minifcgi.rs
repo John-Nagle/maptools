@@ -400,6 +400,7 @@ impl Response {
             id: request.id.expect("No request ID"),
             content_length: b.len() as u16,
         };
+        log::debug!("Writing response record: {:?}", header);
         //  Write header
         out.write(&header.to_bytes())?;
         //  Write data 
