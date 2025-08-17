@@ -212,9 +212,12 @@ impl FcgiRecord {
         // Read content
         let mut content_bytes = vec![0; header.content_length as usize];
         if header.content_length > 0 {
+            log::debug!("About to read {} content bytes", content_bytes.len());
             instream.read_exact(&mut content_bytes)?;
-            if header.calc_padding_length() > 0 {
-                let mut padding_bytes = vec![0; header.calc_padding_length() as usize];
+            let padding_length = header.calc_padding_length();
+            if padding_length > 0 {
+                let mut padding_bytes = vec![0; padding_length as usize];
+                log::debug!("About to read {} padding bytes", padding_bytes.len());
                 instream.read_exact(&mut padding_bytes)?;
             }
         }
@@ -278,7 +281,7 @@ impl Request {
                 let content = rec
                     .content
                     .take()
-                    .ok_or_else(|| anyhow!("No conte	nt. Should not happen."))?;
+                    .ok_or_else(|| anyhow!("No params content. Should not happen."))?;
                 self.param_bytes.extend_from_slice(&content);
             }
 
