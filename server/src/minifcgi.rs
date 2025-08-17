@@ -134,6 +134,8 @@ pub struct FcgiHeader {
     id: u16,
     /// Length of content, in bytes.
     content_length: u16,
+    /// Length of padding, in bytes
+    padding_length: u8,
 }
 
 impl FcgiHeader {
@@ -150,9 +152,10 @@ impl FcgiHeader {
                 .ok_or_else(|| anyhow!("Invalid FCGI record type: {}", b[1]))?,
             id: u16::from_be_bytes(<[u8; 2]>::try_from(&b[2..4]).unwrap()),
             content_length,
+            padding_length: b[7],
         };
-        if b[7] != header.calc_padding_length() {
-            log::error!("Received padding length {}, calculated padding length {}", b[7], header.calc_padding_length());
+        if header.padding_length != Self::calc_padding_length(content_length) {
+            log::error!("Received padding length {}, calculated padding length {}", header.padding_length, Self::calc_padding_length(content_length));
         }
         log::info!("FCGI header: {:?}", header);
         Ok(header)
@@ -169,14 +172,14 @@ impl FcgiHeader {
             id_bytes[1],
             content_length_bytes[0],
             content_length_bytes[1],
-            self.calc_padding_length(), // 7 provided but ignored
-            0,                   // 8 reserved
+            self.padding_length,                      // padding is optional, per spec
+            0,                          // 8 reserved
         ]
     }
     
     /// padding needed to round up to next multiple of 8 
-    fn calc_padding_length(&self) -> u8 {
-        (8 - u8::try_from(self.content_length & 0x7).unwrap()) & 0x7 
+    fn calc_padding_length(content_length: u16) -> u8 {
+        (8 - u8::try_from(content_length & 0x7).unwrap()) & 0x7 
     }
         
 }
@@ -216,7 +219,7 @@ impl FcgiRecord {
         if header.content_length > 0 {
             log::debug!("About to read {} content bytes", content_bytes.len());
             instream.read_exact(&mut content_bytes)?;
-            let padding_length = header.calc_padding_length();
+            let padding_length = header.padding_length;
             if padding_length > 0 {
                 let mut padding_bytes = vec![0; padding_length as usize];
                 log::debug!("About to read {} padding bytes", padding_bytes.len());
@@ -404,6 +407,7 @@ impl Response {
             rec_type,
             id: request.id.expect("No request ID"),
             content_length: b.len() as u16,
+            padding_length: FcgiHeader::calc_padding_length(b.len() as u16), // padding is optional and we don't do it because Apache doesn't send it.
         };
         log::debug!("Writing response record: {:?}", header);
         //  Write header
@@ -411,6 +415,11 @@ impl Response {
         //  Write data 
         if b.len() > 0 {
             out.write(b)?; 
+        }
+        //  Write padding
+        if header.padding_length > 0 {
+            let padding_bytes = vec![0; header.padding_length as usize];
+            out.write(&padding_bytes)?;
         }
         Ok(())
     }
