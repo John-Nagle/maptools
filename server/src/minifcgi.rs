@@ -549,6 +549,7 @@ fn basic_io() {
         rec_type: FcgiRecType::BeginRequest,
         id: 101,
         content_length: 16,
+        padding_length: 0,
     };
     let test_header0_bytes = test_header0.to_bytes();
     let mut test_data = test_header0_bytes.to_vec();
@@ -562,6 +563,7 @@ fn basic_io() {
         rec_type: FcgiRecType::Params,
         id: 101,
         content_length: 10,
+        padding_length: 0,
     };
     let test_header1_bytes = test_header1.to_bytes();
     let test_content1: Vec<u8> = vec![
@@ -579,6 +581,7 @@ fn basic_io() {
         rec_type: FcgiRecType::Stdin,
         id: 101,
         content_length: 0,
+        padding_length: 0,
     };
     test_data.extend(test_header2.to_bytes());
     println!("Test data: {:?}", test_data);
