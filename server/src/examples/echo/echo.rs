@@ -50,6 +50,7 @@ fn handler(out: &mut dyn Write, request: &Request, env: &HashMap<String, String>
     let http_response = Response::http_response("text/plain", 200, "OK");  
     //  Return something useful.
     let b = format!("Env: {:?}\nParams: {:?}", env, request.params).into_bytes();
+    //////let b: &[u8] = Default::default(); // ***TEMP***
     Response::write_response(out, request, http_response.as_slice(), &b)?;
     Ok(())
 }

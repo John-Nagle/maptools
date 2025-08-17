@@ -484,6 +484,7 @@ fn run_one(
                 continue;
             }
             // We have enough records to handle the request.
+            return Err(anyhow!("Error test"));  // ***TEMP TEST***
             handler(out, &request, &env)?;
             break;
         } else {
