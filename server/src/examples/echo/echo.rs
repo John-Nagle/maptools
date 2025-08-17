@@ -56,11 +56,8 @@ fn handler(out: &mut dyn Write, request: &Request, env: &HashMap<String, String>
 
 pub fn main() {
     logger();   // start logging
-    let mut outio = std::io::stdout();
-
     log::warn!("stdin points to {}", std::fs::read_link("/proc/self/fd/0").unwrap().display());
     log::warn!("Environment: {:?}", std::env::vars());
-    use std::os::unix::net::UnixListener;
     //////let stdin = std::io::stdin();
     //////drop(stdin);
     

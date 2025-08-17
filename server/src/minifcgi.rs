@@ -151,12 +151,14 @@ impl FcgiHeader {
             id: u16::from_be_bytes(<[u8; 2]>::try_from(&b[2..4]).unwrap()),
             content_length,
         };
+        if b[7] != header.calc_padding_length() {
+            log::error!("Received padding length {}, calculated padding length {}", b[7], header.calc_padding_length());
+        }
         log::info!("FCGI header: {:?}", header);
         Ok(header)
     }
 
-    /// Serialize
-    #[allow(dead_code)] // used in test mode
+    /// Serialize an FCGI header to 8 bytes.
     fn to_bytes(&self) -> [u8; 8] {
         let id_bytes = self.id.to_be_bytes();
         let content_length_bytes = self.content_length.to_be_bytes();
