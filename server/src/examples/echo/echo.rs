@@ -5,6 +5,7 @@ use std::collections::HashMap;
 //////use std::io::BufReader;
 use minifcgi;
 use minifcgi::{Request, Response};
+use minifcgi::{init_fcgi};
 use anyhow::{Error};
 use log::LevelFilter;
 
@@ -62,8 +63,9 @@ pub fn main() {
     use std::os::unix::net::UnixListener;
     //////let stdin = std::io::stdin();
     //////drop(stdin);
-/*
-    let listener = match UnixListener::bind("/proc/self/fd/0") {
+    
+    //////let listener = match UnixListener::bind("/proc/self/fd/0") {
+    let listener = match init_fcgi() {
         Ok(listener) => {
             log::info!("Bound to listener: {:?}", listener);
             listener
@@ -73,14 +75,16 @@ pub fn main() {
             panic!("Can't open");
         }
     };
-*/
+
     //////let listener = stdin;
+/*
     use std::os::fd::FromRawFd;
     let mut listener = None;
     unsafe { // ***AARGH***
         listener = Some(UnixListener::from_raw_fd(0));
     };
     let listener = listener.unwrap();
+*/
     let socket = match listener.accept() {
         Ok((socket, addr)) => {
             log::info!("Got a client: {addr:?}");

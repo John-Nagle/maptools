@@ -47,4 +47,8 @@ num-derive = "0.4"
 simplelog = "0.12"
 log = "0.4"
 
+#   FCGI socket problems
+nix = { version = "0.30", features = ["socket"] }
+
+
 
