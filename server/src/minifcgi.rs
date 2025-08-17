@@ -399,15 +399,25 @@ pub struct Response {
 }
 
 impl Response {
+    /// Padding responses is optional, per spec. 
+    /// mod_fcgid isn't padding its messages to us.
+    const PAD_RESPONSES: bool = false;
+
     /// Write one response record.
     fn write_response_record(out: &mut dyn Write, request: &Request, rec_type: FcgiRecType, b: &[u8]) -> Result<(), Error> {
         assert!(b.len() < u16::MAX.into());
+        let padding_length = if Self::PAD_RESPONSES {
+            //  Rounds up to 8 bytes
+            FcgiHeader::calc_padding_length(b.len() as u16)
+        } else {
+            0
+        };
         let header = FcgiHeader {
             version: 1,
             rec_type,
             id: request.id.expect("No request ID"),
             content_length: b.len() as u16,
-            padding_length: FcgiHeader::calc_padding_length(b.len() as u16), // padding is optional and we don't do it because Apache doesn't send it.
+            padding_length,
         };
         log::debug!("Writing response record: {:?}", header);
         //  Write header
