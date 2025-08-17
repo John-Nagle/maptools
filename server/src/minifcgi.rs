@@ -294,8 +294,8 @@ impl Request {
                 //  A zero-length block means we have a complete request .
                 if rec.header.content_length == 0 {
                     self.params = Some(Self::build_params(&self.param_bytes)?);
+                    log::debug!("Params: {:?}", self.params);
                     //  Request now gets processed.
-                    //////eprintln!("Request: {:?}", self); // ***TEMP***
                     return Ok(true);
                 }
                 let content = rec
