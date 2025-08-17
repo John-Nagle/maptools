@@ -196,6 +196,7 @@ impl FcgiRecord {
     pub fn new_from_stream(instream: &mut impl BufRead) -> Result<Option<Self>, Error> {
         // Read header
         let mut header_bytes: [u8; FcgiHeader::FCGI_HEADER_LENGTH] = Default::default();
+        log::debug!("About to read {} header bytes.", header_bytes.len());
         match instream.read_exact(&mut header_bytes) {
             Ok(_) => {} // read expected data
             Err(e) => {
@@ -206,6 +207,7 @@ impl FcgiRecord {
             }
         }
         let header = FcgiHeader::new_from_bytes(&header_bytes)?;
+        log::debug!("header: {:?}", header);
         //////eprintln!("Header: {:?}", header); // ***TEMP***
         // Read content
         let mut content_bytes = vec![0; header.content_length as usize];
@@ -246,7 +248,7 @@ impl Request {
     ///  Usual new
     pub fn new() -> Request {
         Self {
-            id: Some(999), //////  None,
+            id: None,
             param_bytes: Vec::new(),
             standard_input: Vec::new(),
             params: None,
