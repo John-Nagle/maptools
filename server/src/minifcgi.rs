@@ -419,7 +419,7 @@ impl Response {
             content_length: b.len() as u16,
             padding_length,
         };
-        log::debug!("Writing response record: {:?}", header);
+        log::debug!("Writing response record: {:?} Data: {:?}", header, String::from_utf8_lossy(&b[0..b.len().min(200)].to_vec()));
         //  Write header
         out.write(&header.to_bytes())?;
         //  Write data 
@@ -445,7 +445,7 @@ impl Response {
         log::info!("Response header: {}", header_fields_group);
         Self::write_response_record(out, request, FcgiRecType::Stdout, &header_fields_group.as_bytes())?;
         //  End of HTTP header record.
-        Self::write_response_record(out, request, FcgiRecType::Stdout, &[])?;
+        Self::write_response_record(out, request, FcgiRecType::Stdout, "\n".as_bytes())?;
         //  Only send this much data at once to avoid clogging pipe.
         //  The connection to the parent process is two pipes in opposite directions and deadlock is possible.
         const CHUNK_SIZE: usize = 2048;
@@ -484,7 +484,7 @@ fn run_one(
                 continue;
             }
             // We have enough records to handle the request.
-            return Err(anyhow!("Error test"));  // ***TEMP TEST***
+            //////return Err(anyhow!("Error test"));  // ***TEMP TEST***
             handler(out, &request, &env)?;
             break;
         } else {
