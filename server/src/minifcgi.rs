@@ -40,9 +40,7 @@ use anyhow::{Error, Result, anyhow};
 use num_derive::{FromPrimitive, ToPrimitive}; // Derive the FromPrimitive trait
 use num_traits::{FromPrimitive, ToPrimitive};
 use std::collections::HashMap;
-//////use std::io;
 use std::io::{BufRead, Write};
-//////use std::io::BufReader;
 
 
 /// Wraps the stdin and stdout streams of a standard CGI invocation.
@@ -60,30 +58,7 @@ use std::io::{BufRead, Write};
 ///
 /// Protocol: see https://cs.opensource.google/go/go/+/master:src/net/http/fcgi/fcgi.go
 ///
-/*
 
-// keep the connection between web-server and responder open after request
-const flagKeepConn = 1
-
-const (
-    maxWrite = 65535 // maximum record body
-    maxPad   = 255
-)
-
-const (
-    roleResponder = iota + 1 // only Responders are implemented.
-    roleAuthorizer
-    roleFilter
-)
-
-const (
-    statusRequestComplete = iota
-    statusCantMultiplex
-    statusOverloaded
-    statusUnknownRole
-)
-
-*/
 /// Type of transaction. Only Responder is implemented.
 #[derive(Debug, FromPrimitive, ToPrimitive, Clone, PartialEq)]
 enum FcgiRole {
@@ -145,7 +120,6 @@ impl FcgiHeader {
     /// Deserialize 8 bytes to an FCGI header.
     fn new_from_bytes(b: &[u8; 8]) -> Result<FcgiHeader, Error> {
         let content_length = u16::from_be_bytes(<[u8; 2]>::try_from(&b[4..6]).unwrap());
-        //////let padding_length = (8 - u8::try_from(content_length & 0x7).unwrap()) & 0x7; // padding needed to round up to next multiple of 8 ***CHECK THIS***
         let header = FcgiHeader {
             version: b[0],
             rec_type: FcgiRecType::from_u8(b[1])
@@ -213,7 +187,6 @@ impl FcgiRecord {
         }
         let header = FcgiHeader::new_from_bytes(&header_bytes)?;
         log::debug!("header: {:?}", header);
-        //////eprintln!("Header: {:?}", header); // ***TEMP***
         // Read content
         let mut content_bytes = vec![0; header.content_length as usize];
         if header.content_length > 0 {
@@ -226,7 +199,6 @@ impl FcgiRecord {
                 instream.read_exact(&mut padding_bytes)?;
             }
         }
-        //////eprintln!("Content: {:?}", content_bytes); // ***TEMP***
         Ok(Some(Self {
             header,
             content: Some(content_bytes.to_vec()),
@@ -572,10 +544,8 @@ fn basic_io() {
         'E' as u8,
     ];
     assert_eq!(test_content1.len(), test_header1.content_length as usize);
-    let padding1: Vec<u8> = vec![0xff; 6];
     test_data.extend(test_header1_bytes);
     test_data.extend(test_content1);
-    test_data.extend(padding1); //
     //  Stdin - empty content is an EOF
     let test_header2 = FcgiHeader {
         version: 1,
@@ -591,4 +561,5 @@ fn basic_io() {
     let mut out = std::io::stdout();
     let final_result = run(&mut instream, &mut out, do_req::<&mut dyn Write>);
     println!("Final result: {:?}", final_result);
+    assert_eq!(final_result.unwrap(), 0);
 }

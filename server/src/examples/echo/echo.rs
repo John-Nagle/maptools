@@ -9,25 +9,6 @@ use minifcgi::{init_fcgi};
 use anyhow::{Error};
 use log::LevelFilter;
 
-/*
-use std::collections::HashMap;
-
-fn handler(io: &mut dyn IO, env: HashMap<String, String>) -> anyhow::Result<i32> {
-    let mut all_data = Vec::new();
-    let sink = io.read_to_end(&mut all_data)?;
-    io.write_all(
-        format!(
-            r#"Content-type: text/plain; charset=utf-8
-
-Hello World! Your request method was "{}"!
-"#,
-            env.get("REQUEST_METHOD").unwrap()
-        )
-        .as_bytes(),
-    )?;
-    Ok(0)
-}
-*/
 
 /// Debug logging
 fn logger() {
@@ -44,69 +25,48 @@ fn logger() {
     log::warn!("Logging to {:?}", LOG_FILE_NAME); // where the log is going
 }
 
-
-/// Handler. actually handles the FCGI request.
+/// Handler. actually handles each FCGI request.
 fn handler(out: &mut dyn Write, request: &Request, env: &HashMap<String, String>) -> Result<(), Error> {
     let http_response = Response::http_response("text/plain", 200, "OK");  
     //  Return something useful.
     let b = format!("Env: {:?}\nParams: {:?}", env, request.params).into_bytes();
-    //////let b: &[u8] = Default::default(); // ***TEMP***
     Response::write_response(out, request, http_response.as_slice(), &b)?;
     Ok(())
 }
 
+/// Main program
 pub fn main() {
     logger();   // start logging
-    log::warn!("stdin points to {}", std::fs::read_link("/proc/self/fd/0").unwrap().display());
-    log::warn!("Environment: {:?}", std::env::vars());
-    //////let stdin = std::io::stdin();
-    //////drop(stdin);
-    
-    //////let listener = match UnixListener::bind("/proc/self/fd/0") {
+    log::info!("stdin points to {}", std::fs::read_link("/proc/self/fd/0").unwrap().display());
+    log::info!("Environment: {:?}", std::env::vars());
+    //  Set up in and out sockets.
+    //  Communication with the parent process is via a UNIX socket.
+    //  This is a pain to set up, because UNIX sockets are badly mis-matched
+    //  to parent/child process communication. 
+    //  See init_fcgi for how it is done.
     let listener = match init_fcgi() {
         Ok(listener) => {
-            log::info!("Bound to listener: {:?}", listener);
+            log::info!("init_fcgi created listener: {:?}", listener);
             listener
         }
         Err(e) => {
-            log::error!("bind function failed: {e:?}");
+            log::error!("init_fcgi was unable to create listener: {e:?}");
             panic!("Can't open");
         }
     };
-
-    //////let listener = stdin;
-/*
-    use std::os::fd::FromRawFd;
-    let mut listener = None;
-    unsafe { // ***AARGH***
-        listener = Some(UnixListener::from_raw_fd(0));
-    };
-    let listener = listener.unwrap();
-*/
+    //  Accept a connection on the listener socket. This hooks up
+    //  input and output to the parent process.
     let socket = match listener.accept() {
-        Ok((socket, addr)) => {
-            log::info!("Got a client: {addr:?}");
+        Ok((socket, _addr)) => {
             socket }
         Err(e) => {
-            log::error!("accept function failed: {e:?}");
-            panic!("Can't open");
+            log::error!("accept connection from parent process failed: {e:?}");
+            panic!("accept connection from parent process failed");
         }
     };
     let outsocket = socket.try_clone().expect("Unable to clone socket");
     let mut instream = std::io::BufReader::new(socket);
     let mut outio = std::io::BufWriter::new(outsocket); 
-    //////let inio = std::io::stdin();
-    //////inio.set_raw_mode().unwrap();
-    //////let mut instream = BufReader::new(inio);
-    //////let mut instream = inio.lock(); // Lock the stdin for reading.
-    /*
-    // ***TEMP TEST***
-    let mut header_bytes:[u8;8] = Default::default();
-    use std::io::Read;
-    let stat = instream.read_exact(&mut header_bytes);
-    log::debug!("Stat: {:?} Bytes: {:?}", stat, header_bytes);
-    std::process::exit(0);
-    // ***END TEMP***
-    */
+    //  Run the FCGI server.
     minifcgi::run(&mut instream, &mut outio, handler).expect("Run failed");
 }
