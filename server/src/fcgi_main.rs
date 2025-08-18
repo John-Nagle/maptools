@@ -60,7 +60,6 @@ fn main() {
         Ok(())
     }).expect("FCGI server failed");
 }
-*/
 use std::io::Write;
 use std::collections::HashMap;
 use std::io::BufReader;
@@ -79,3 +78,4 @@ pub fn main() {
     let mut instream = BufReader::new(inio);
     minifcgi::run(&mut instream, &mut outio, handler);
 }
+*/
