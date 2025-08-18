@@ -3,9 +3,7 @@
 //! Used by FCGI applications (responders)
 //! called from Apache-type web servers.
 //!
-//! Reads from standard input, outputs to
-//! standard output.
-//!
+//! Reads and writes to anything that talks Rust read/write.
 //!
 //! Normal usage:
 //!
@@ -13,6 +11,14 @@
 //!        minifcgi::run(|_|{}, handler)
 //!    }
 //!
+//!
+//! Since this code is intended to support only Apache mod_fcgid, it
+//! does not currently support "multiplexing", where
+//! multiple concurrent requests come into the same process.
+//! Apache fcgid uses multiple processes for that. Safer.
+//!
+//  Animats
+//  August, 2025
 // What a request and response looks like:
 //
 //     {FCGI_BEGIN_REQUEST,   1, {FCGI_RESPONDER, 0}}
@@ -27,37 +33,23 @@
 //         {FCGI_END_REQUEST, 1, {0, FCGI_REQUEST_COMPLETE}}
 //
 // Ref: https://www.mit.edu/~yandros/doc/specs/fcgi-spec.html
-//!
-//! Since this code is intended to support only Apache mod_fcgid, it
-//! does not currently support "multiplexing", where
-//! multiple concurrent requests come into the same process.
-//! Apache fcgid uses multiple processes for that. Safer.
-//!
-//  Animats
-//  August, 2025
+//
+// See the [Common Gateway Interface][1] specification for more information.
+//
+// [1]: https://tools.ietf.org/html/rfc3875
+//
+/// and the FastCGI specification:
+//
+// https://www.mit.edu/~yandros/doc/specs/fcgi-spec.html
+//
+// An implemention in Go, for comparison: see https://cs.opensource.google/go/go/+/master:src/net/http/fcgi/fcgi.go
+
 //
 use anyhow::{Error, Result, anyhow};
 use num_derive::{FromPrimitive, ToPrimitive}; // Derive the FromPrimitive trait
 use num_traits::{FromPrimitive, ToPrimitive};
 use std::collections::HashMap;
 use std::io::{BufRead, Write};
-
-
-/// Wraps the stdin and stdout streams of a standard CGI invocation.
-///
-/// See the [Common Gateway Interface][1] specification for more information.
-///
-/// [1]: https://tools.ietf.org/html/rfc3875
-///
-/// and the FastCGI specification:
-///
-/// https://www.mit.edu/~yandros/doc/specs/fcgi-spec.html
-///
-/// All this generic complexity is so we can test this thing
-/// using something other than stdin/stdout.
-///
-/// Protocol: see https://cs.opensource.google/go/go/+/master:src/net/http/fcgi/fcgi.go
-///
 
 /// Type of transaction. Only Responder is implemented.
 #[derive(Debug, FromPrimitive, ToPrimitive, Clone, PartialEq)]
@@ -288,7 +280,8 @@ impl Request {
                 ));
             }
         }
-        Ok(false) // ***TEMP***
+        //  Not done with request, keep reading records
+        Ok(false)
     }
 
     /// Fetch one encoded value.
