@@ -121,7 +121,11 @@ impl FcgiHeader {
             padding_length: b[7],
         };
         if header.padding_length != Self::calc_padding_length(content_length) {
-            log::error!("Received padding length {}, calculated padding length {}", header.padding_length, Self::calc_padding_length(content_length));
+            log::error!(
+                "Received padding length {}, calculated padding length {}",
+                header.padding_length,
+                Self::calc_padding_length(content_length)
+            );
         }
         log::info!("FCGI header: {:?}", header);
         Ok(header)
@@ -138,16 +142,15 @@ impl FcgiHeader {
             id_bytes[1],
             content_length_bytes[0],
             content_length_bytes[1],
-            self.padding_length,                      // padding is optional, per spec
-            0,                          // 8 reserved
+            self.padding_length, // padding is optional, per spec
+            0,                   // 8 reserved
         ]
     }
-    
-    /// padding needed to round up to next multiple of 8 
+
+    /// padding needed to round up to next multiple of 8
     fn calc_padding_length(content_length: u16) -> u8 {
-        (8 - u8::try_from(content_length & 0x7).unwrap()) & 0x7 
+        (8 - u8::try_from(content_length & 0x7).unwrap()) & 0x7
     }
-        
 }
 
 /// FcgiRecord -- one header and its data.
@@ -293,15 +296,15 @@ impl Request {
         if let Some(b0) = pos.next() {
             if *b0 > 127 {
                 //  Fetch 3 more bytes
-                let b1 = pos
-                    .next()
-                    .ok_or_else(|| anyhow!("FCGI responder: EOF reading multi-byte param length"))?;
-                let b2 = pos
-                    .next()
-                    .ok_or_else(|| anyhow!("FCGI responder: EOF reading multi-byte param length"))?;
-                let b3 = pos
-                    .next()
-                    .ok_or_else(|| anyhow!("FCGI responder: EOF reading multi-byte param length"))?;
+                let b1 = pos.next().ok_or_else(|| {
+                    anyhow!("FCGI responder: EOF reading multi-byte param length")
+                })?;
+                let b2 = pos.next().ok_or_else(|| {
+                    anyhow!("FCGI responder: EOF reading multi-byte param length")
+                })?;
+                let b3 = pos.next().ok_or_else(|| {
+                    anyhow!("FCGI responder: EOF reading multi-byte param length")
+                })?;
                 //  Compute length per spec
                 Ok(Some(
                     (((*b3 & 0x7f) as usize) << 24)
@@ -341,7 +344,9 @@ impl Request {
                     Self::fetch_field(vcnt, &mut pos)?,
                 )))
             } else {
-                Err(anyhow!("FCGI responder: EOF reading length of param value field"))
+                Err(anyhow!(
+                    "FCGI responder: EOF reading length of param value field"
+                ))
             }
         } else {
             Ok(None) // EOF
@@ -360,16 +365,20 @@ impl Request {
 }
 
 /// Response -- sends back a response to a request.
-pub struct Response {
-}
+pub struct Response {}
 
 impl Response {
-    /// Padding responses is optional, per spec. 
+    /// Padding responses is optional, per spec.
     /// mod_fcgid isn't padding its messages to us.
     const PAD_RESPONSES: bool = false;
 
     /// Write one response record.
-    fn write_response_record(out: &mut dyn Write, request: &Request, rec_type: FcgiRecType, b: &[u8]) -> Result<(), Error> {
+    fn write_response_record(
+        out: &mut dyn Write,
+        request: &Request,
+        rec_type: FcgiRecType,
+        b: &[u8],
+    ) -> Result<(), Error> {
         assert!(b.len() < u16::MAX.into());
         let padding_length = if Self::PAD_RESPONSES {
             //  Rounds up to 8 bytes
@@ -384,12 +393,16 @@ impl Response {
             content_length: b.len() as u16,
             padding_length,
         };
-        log::debug!("Writing response record: {:?} Data: {:?}", header, String::from_utf8_lossy(&b[0..b.len().min(200)].to_vec()));
+        log::debug!(
+            "Writing response record: {:?} Data: {:?}",
+            header,
+            String::from_utf8_lossy(&b[0..b.len().min(200)].to_vec())
+        );
         //  Write header
         out.write(&header.to_bytes())?;
-        //  Write data 
+        //  Write data
         if b.len() > 0 {
-            out.write(b)?; 
+            out.write(b)?;
         }
         //  Write padding
         if header.padding_length > 0 {
@@ -398,33 +411,52 @@ impl Response {
         }
         Ok(())
     }
-    
-    
+
     /// Write entire response.
     ///    {FCGI_STDOUT,      1, "Content-type: text/html\r\n\r\n<html>\n<head> ... "}
     ///    {FCGI_STDOUT,      1, ""}
     ///    {FCGI_END_REQUEST, 1, {0, FCGI_REQUEST_COMPLETE}}
-    pub fn write_response(out: &mut dyn Write, request: &Request, header_fields: &[String], b: &[u8]) -> Result<(), Error> {
+    pub fn write_response(
+        out: &mut dyn Write,
+        request: &Request,
+        header_fields: &[String],
+        b: &[u8],
+    ) -> Result<(), Error> {
         //  Send header fields
         let header_fields_group = header_fields.join("\r\n") + "\n\n";
         log::info!("Response header: {}", header_fields_group);
-        Self::write_response_record(out, request, FcgiRecType::Stdout, &header_fields_group.as_bytes())?;
+        Self::write_response_record(
+            out,
+            request,
+            FcgiRecType::Stdout,
+            &header_fields_group.as_bytes(),
+        )?;
         //  End of HTTP header record.
         Self::write_response_record(out, request, FcgiRecType::Stdout, "".as_bytes())?;
         //  Only send this much data at once to avoid clogging pipe.
         //  The connection to the parent process is two pipes in opposite directions and deadlock is possible.
         const CHUNK_SIZE: usize = 2048;
         for i in (0..b.len()).step_by(CHUNK_SIZE) {
-            Self::write_response_record(out, request, FcgiRecType::Stdout, &b[i..(i + CHUNK_SIZE).min(b.len())])?;
+            Self::write_response_record(
+                out,
+                request,
+                FcgiRecType::Stdout,
+                &b[i..(i + CHUNK_SIZE).min(b.len())],
+            )?;
         }
         //  End of data record.
         Self::write_response_record(out, request, FcgiRecType::Stdout, &[])?;
         // End of transaction record.
-        Self::write_response_record(out, request, FcgiRecType::EndRequest, &[0, FcgiStatus::RequestComplete.to_u8().unwrap()])?; 
+        Self::write_response_record(
+            out,
+            request,
+            FcgiRecType::EndRequest,
+            &[0, FcgiStatus::RequestComplete.to_u8().unwrap()],
+        )?;
         out.flush()?;
         Ok(())
     }
-    
+
     /// Build the most common response headers.
     pub fn http_response(content_type: &str, status: usize, msg: &str) -> Vec<String> {
         vec![
@@ -435,12 +467,16 @@ impl Response {
 }
 
 /// Read and run one transaction.
-/// Errors here result in a 500 error.
+/// Errors here result in a 500 error with a message.
 fn run_one(
     instream: &mut impl BufRead,
     out: &mut dyn Write,
     request: &mut Request,
-    handler: fn(out: &mut dyn Write, request: &Request, env: &HashMap<String, String>) -> Result<(), Error>,
+    handler: fn(
+        out: &mut dyn Write,
+        request: &Request,
+        env: &HashMap<String, String>,
+    ) -> Result<(), Error>,
     env: &HashMap<String, String>,
 ) -> Result<bool, Error> {
     loop {
@@ -449,7 +485,6 @@ fn run_one(
                 continue;
             }
             // We have enough records to handle the request.
-            //////return Err(anyhow!("Error test"));  // ***TEMP TEST***
             handler(out, &request, &env)?;
             break;
         } else {
@@ -463,7 +498,11 @@ fn run_one(
 pub fn run(
     instream: &mut impl BufRead,
     out: &mut dyn Write,
-    handler: fn(out: &mut dyn Write, request: &Request, env: &HashMap<String, String>) -> Result<(), Error>,
+    handler: fn(
+        out: &mut dyn Write,
+        request: &Request,
+        env: &HashMap<String, String>,
+    ) -> Result<(), Error>,
 ) -> Result<i32> {
     let env = std::env::vars().map(|(k, v)| (k, v)).collect();
     let mut request = Request::new();
@@ -478,7 +517,7 @@ pub fn run(
             Err(e) => {
                 //  Error occured. Try to get it back to the caller.
                 let msg = format!("FCGI responder error: {:?}", e);
-                log::error!("{}",msg);
+                log::error!("{}", msg);
                 if request.id.is_some() {
                     //  We have enough info to reply with an error
                     let error_response = Response::http_response("text", 500, msg.as_str());
@@ -488,7 +527,7 @@ pub fn run(
                     //  Failed so early we can't reply with an error.
                     panic!("FCGI responder failed before first record parsed: {}", msg);
                 }
-            }         
+            }
         }
     }
     Ok(0)
@@ -504,7 +543,7 @@ fn basic_io() {
         env: &HashMap<String, String>,
     ) -> Result<(), Error> {
         // Dummy up a response
-        let http_response = Response::http_response("text/plain", 200, "OK");  
+        let http_response = Response::http_response("text/plain", 200, "OK");
         let b = format!("Env: {:?}\nParams: {:?}", env, request.params).into_bytes();
         Response::write_response(out, request, http_response.as_slice(), &b)?;
         Ok(())

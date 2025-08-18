@@ -1,10 +1,9 @@
+use std::fs::File;
 /// https://users.rust-lang.org/t/reading-from-pipe-via-stdin-in-binary/133088/10
-
 use std::io;
 use std::io::stdin;
 use std::os::fd::{AsFd, AsRawFd};
-use std::os::unix::net::{UnixListener};
-use std::fs::File;
+use std::os::unix::net::UnixListener;
 
 use nix;
 use nix::sys::socket::getpeername;
