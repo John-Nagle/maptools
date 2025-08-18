@@ -441,11 +441,11 @@ impl Response {
     ///    {FCGI_END_REQUEST, 1, {0, FCGI_REQUEST_COMPLETE}}
     pub fn write_response(out: &mut dyn Write, request: &Request, header_fields: &[String], b: &[u8]) -> Result<(), Error> {
         //  Send header fields
-        let header_fields_group = header_fields.join("\r\n");
+        let header_fields_group = header_fields.join("\r\n") + "\n\n";
         log::info!("Response header: {}", header_fields_group);
         Self::write_response_record(out, request, FcgiRecType::Stdout, &header_fields_group.as_bytes())?;
         //  End of HTTP header record.
-        Self::write_response_record(out, request, FcgiRecType::Stdout, "\n".as_bytes())?;
+        Self::write_response_record(out, request, FcgiRecType::Stdout, "".as_bytes())?;
         //  Only send this much data at once to avoid clogging pipe.
         //  The connection to the parent process is two pipes in opposite directions and deadlock is possible.
         const CHUNK_SIZE: usize = 2048;
