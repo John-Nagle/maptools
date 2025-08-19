@@ -1,5 +1,6 @@
 //! FCGI echo server.
 //! For test use.
+use std::any::Any;
 use std::collections::HashMap;
 use std::io::Write;
 //////use std::io::BufReader;
@@ -27,6 +28,7 @@ fn handler(
     out: &mut dyn Write,
     request: &Request,
     env: &HashMap<String, String>,
+    _user_params: &Box<&dyn Any>,
 ) -> Result<(), Error> {
     let http_response = Response::http_response("text/plain", 200, "OK");
     //  Return something useful.
@@ -70,6 +72,8 @@ pub fn main() {
     let outsocket = socket.try_clone().expect("Unable to clone socket");
     let mut instream = std::io::BufReader::new(socket);
     let mut outio = std::io::BufWriter::new(outsocket);
+    let val: usize = 999;
+    let user_params: Box<&dyn Any> = Box::new(&val);
     //  Run the FCGI server.
-    minifcgi::run(&mut instream, &mut outio, handler).expect("Run failed");
+    minifcgi::run(&mut instream, &mut outio, handler, &user_params).expect("Run failed");
 }

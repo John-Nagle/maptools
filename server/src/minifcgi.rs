@@ -45,6 +45,7 @@
 // An implemention in Go, for comparison: see https://cs.opensource.google/go/go/+/master:src/net/http/fcgi/fcgi.go
 
 //
+use std::any::Any;
 use anyhow::{Error, Result, anyhow};
 use num_derive::{FromPrimitive, ToPrimitive}; // Derive the FromPrimitive trait
 use num_traits::{FromPrimitive, ToPrimitive};
@@ -83,7 +84,7 @@ enum FcgiRecType {
     EndRequest = 3,
     Params = 4,
     Stdin = 5,
-    Stdout = 6,
+    Stdout = 6,	
     Stderr = 7,
     Data = 8,
     GetValues = 9,
@@ -476,8 +477,10 @@ fn run_one(
         out: &mut dyn Write,
         request: &Request,
         env: &HashMap<String, String>,
+        user_params: &Box <&dyn Any>,
     ) -> Result<(), Error>,
     env: &HashMap<String, String>,
+    user_params: &Box <&dyn Any>,
 ) -> Result<bool, Error> {
     loop {
         if let Some(rec) = FcgiRecord::new_from_stream(instream)? {
@@ -485,7 +488,7 @@ fn run_one(
                 continue;
             }
             // We have enough records to handle the request.
-            handler(out, &request, &env)?;
+            handler(out, &request, &env, user_params)?;
             break;
         } else {
             return Ok(true); // normal EOF
@@ -502,12 +505,14 @@ pub fn run(
         out: &mut dyn Write,
         request: &Request,
         env: &HashMap<String, String>,
-    ) -> Result<(), Error>,
-) -> Result<i32> {
+        _user_params: &Box <&dyn Any>,
+        ) -> Result<(), Error>,
+    user_params: &Box <&dyn Any>,
+    ) -> Result<i32> {
     let env = std::env::vars().map(|(k, v)| (k, v)).collect();
     let mut request = Request::new();
     loop {
-        match run_one(instream, out, &mut request, handler, &env) {
+        match run_one(instream, out, &mut request, handler, &env, user_params) {
             Ok(done) => {
                 if done {
                     //  Normal end of this task.
@@ -541,6 +546,7 @@ fn basic_io() {
         out: &mut dyn Write,
         request: &Request,
         env: &HashMap<String, String>,
+        _user_params: &Box<&dyn Any>,
     ) -> Result<(), Error> {
         // Dummy up a response
         let http_response = Response::http_response("text/plain", 200, "OK");
@@ -591,7 +597,9 @@ fn basic_io() {
     let cursor = std::io::Cursor::new(test_data);
     let mut instream = BufReader::new(cursor);
     let mut out = std::io::stdout();
-    let final_result = run(&mut instream, &mut out, do_req::<&mut dyn Write>);
+    let val: usize = 999;
+    let user_params: Box<&dyn Any> = Box::new(&val);
+    let final_result = run(&mut instream, &mut out, do_req::<&mut dyn Write>, &user_params);
     println!("Final result: {:?}", final_result);
     assert_eq!(final_result.unwrap(), 0);
 }
