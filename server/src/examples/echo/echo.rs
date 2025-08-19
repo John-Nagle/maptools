@@ -1,6 +1,7 @@
 //! FCGI echo server.
 //! For test use.
 use std::any::Any;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::io::Write;
 //////use std::io::BufReader;
@@ -9,6 +10,12 @@ use log::LevelFilter;
 use minifcgi;
 use minifcgi::init_fcgi;
 use minifcgi::{Request, Response};
+
+//  User params passed through to handler
+#[derive(Debug)]
+struct HandlerParams {
+    n: usize,
+}
 
 /// Debug logging
 fn logger() {
@@ -28,11 +35,17 @@ fn handler(
     out: &mut dyn Write,
     request: &Request,
     env: &HashMap<String, String>,
-    _user_params: &Box<&dyn Any>,
+    user_params: &Box<&dyn Any>,
 ) -> Result<(), Error> {
+    //  Access user params.
+    let tally = {   let uprefcell  = user_params.downcast_ref::<RefCell<HandlerParams>>().unwrap();
+        let mut up = uprefcell.borrow_mut();    // get access to innards
+        up.n += 1;  // tally
+        up.n
+    };
     let http_response = Response::http_response("text/plain", 200, "OK");
     //  Return something useful.
-    let b = format!("Env: {:?}\nParams: {:?}", env, request.params).into_bytes();
+    let b = format!("Env: {:?}\nParams: {:?}\ntally: {}", env, request.params, tally).into_bytes();
     Response::write_response(out, request, http_response.as_slice(), &b)?;
     Ok(())
 }
@@ -72,7 +85,9 @@ pub fn main() {
     let outsocket = socket.try_clone().expect("Unable to clone socket");
     let mut instream = std::io::BufReader::new(socket);
     let mut outio = std::io::BufWriter::new(outsocket);
-    let val: usize = 999;
+    //  Dummy user data
+
+    let val = HandlerParams { n: 0 };
     let user_params: Box<&dyn Any> = Box::new(&val);
     //  Run the FCGI server.
     minifcgi::run(&mut instream, &mut outio, handler, &user_params).expect("Run failed");
