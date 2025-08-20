@@ -197,6 +197,7 @@ impl FcgiRecord {
         if header.content_length > 0 {
             log::debug!("About to read {} content bytes", content_bytes.len());
             instream.read_exact(&mut content_bytes)?;
+            log::debug!("Content: {:?}", String::from_utf8_lossy(&content_bytes[0..content_bytes.len().min(200)].to_vec()));
             let padding_length = header.padding_length;
             if padding_length > 0 {
                 let mut padding_bytes = vec![0; padding_length as usize];
@@ -225,7 +226,7 @@ pub struct Request {
     param_bytes: Vec<u8>,
     /// Params, as a key-value store
     pub params: Option<HashMap<String, String>>,
-    /// Standard input - the actual content, if any
+    /// Standard input - the actual content, if any. Usually from a POST request.
     standard_input: Vec<u8>,
 }
 
