@@ -1,7 +1,5 @@
 //! FCGI echo server.
 //! For test use.
-use std::any::Any;
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::io::Write;
 //////use std::io::BufReader;
@@ -9,13 +7,7 @@ use anyhow::Error;
 use log::LevelFilter;
 use minifcgi;
 use minifcgi::init_fcgi;
-use minifcgi::{Request, Response};
-
-//  User params passed through to handler
-#[derive(Debug)]
-struct HandlerParams {
-    n: usize,
-}
+use minifcgi::{Request, Response, Handler};
 
 /// Debug logging
 fn logger() {
@@ -30,6 +22,36 @@ fn logger() {
     log::warn!("Logging to {:?}", LOG_FILE_NAME); // where the log is going
 }
 
+//  Our data
+struct EchoHandler {
+        cnt: usize
+    }
+impl EchoHandler {
+    pub fn new() -> Self {
+        Self {
+            cnt: 0
+        }
+    }
+}
+//  Our "handler"
+impl Handler for EchoHandler {
+    fn handler(
+        &mut self,
+        out: &mut dyn Write,
+        request: &Request,
+        env: &HashMap<String, String>,
+    ) -> Result<(), Error> {
+        // Dummy up a response
+        self.cnt += 1;
+        let http_response = Response::http_response("text/plain", 200, "OK");
+        //  Return something useful.
+        let b = format!("Env: {:?}\nParams: {:?}\ntally: {}", env, request.params, self.cnt).into_bytes();
+        Response::write_response(out, request, http_response.as_slice(), &b)?;
+        Ok(())
+    }
+}
+
+/*
 /// Handler. actually handles each FCGI request.
 fn handler(
     out: &mut dyn Write,
@@ -49,6 +71,7 @@ fn handler(
     Response::write_response(out, request, http_response.as_slice(), &b)?;
     Ok(())
 }
+*/
 
 /// Main program
 pub fn main() {
@@ -86,9 +109,7 @@ pub fn main() {
     let mut instream = std::io::BufReader::new(socket);
     let mut outio = std::io::BufWriter::new(outsocket);
     //  Dummy user data
-
-    let val = HandlerParams { n: 0 };
-    let user_params: Box<&dyn Any> = Box::new(&val);
+    let mut echo_handler = EchoHandler::new();
     //  Run the FCGI server.
-    minifcgi::run(&mut instream, &mut outio, handler, &user_params).expect("Run failed");
+    minifcgi::run(&mut instream, &mut outio, &mut echo_handler).expect("Run failed");
 }

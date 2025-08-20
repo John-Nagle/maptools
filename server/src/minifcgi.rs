@@ -45,12 +45,21 @@
 // An implemention in Go, for comparison: see https://cs.opensource.google/go/go/+/master:src/net/http/fcgi/fcgi.go
 
 //
-use std::any::Any;
 use anyhow::{Error, Result, anyhow};
 use num_derive::{FromPrimitive, ToPrimitive}; // Derive the FromPrimitive trait
 use num_traits::{FromPrimitive, ToPrimitive};
 use std::collections::HashMap;
 use std::io::{BufRead, Write};
+/// Trait for callback
+pub trait Handler {
+    /// caller must provide handler fn
+    fn handler(
+        &mut self,
+        out: &mut dyn Write,
+        request: &Request,
+        env: &HashMap<String, String>,
+    ) -> Result<(), Error>;
+}
 
 /// Type of transaction. Only Responder is implemented.
 #[derive(Debug, FromPrimitive, ToPrimitive, Clone, PartialEq)]
@@ -469,18 +478,12 @@ impl Response {
 
 /// Read and run one transaction.
 /// Errors here result in a 500 error with a message.
-fn run_one(
+fn  run_one <T: Handler>(
     instream: &mut impl BufRead,
     out: &mut dyn Write,
     request: &mut Request,
-    handler: fn(
-        out: &mut dyn Write,
-        request: &Request,
-        env: &HashMap<String, String>,
-        user_params: &Box <&dyn Any>,
-    ) -> Result<(), Error>,
+    handler: &mut T,
     env: &HashMap<String, String>,
-    user_params: &Box <&dyn Any>,
 ) -> Result<bool, Error> {
     loop {
         if let Some(rec) = FcgiRecord::new_from_stream(instream)? {
@@ -488,7 +491,7 @@ fn run_one(
                 continue;
             }
             // We have enough records to handle the request.
-            handler(out, &request, &env, user_params)?;
+            handler.handler(out, &request, &env)?;
             break;
         } else {
             return Ok(true); // normal EOF
@@ -498,9 +501,10 @@ fn run_one(
 }
 
 /// Not the main program, but the main loop.
-pub fn run(
+pub fn run <T: Handler>(
     instream: &mut impl BufRead,
     out: &mut dyn Write,
+/*
     handler: fn(
         out: &mut dyn Write,
         request: &Request,
@@ -508,11 +512,13 @@ pub fn run(
         _user_params: &Box <&dyn Any>,
         ) -> Result<(), Error>,
     user_params: &Box <&dyn Any>,
+*/
+    handler: &mut T,
     ) -> Result<i32> {
     let env = std::env::vars().map(|(k, v)| (k, v)).collect();
     let mut request = Request::new();
     loop {
-        match run_one(instream, out, &mut request, handler, &env, user_params) {
+        match run_one(instream, out, &mut request, handler, &env) {
             Ok(done) => {
                 if done {
                     //  Normal end of this task.
@@ -541,18 +547,32 @@ pub fn run(
 #[test]
 fn basic_io() {
     use std::io::{BufReader, Write};
+    //  Our data
+    struct TestHandler {
+        cnt: usize
+    }
+    impl TestHandler {
+        pub fn new() -> Self {
+            Self {
+                cnt: 0
+            }
+        }
+    }
     //  Our "handler"
-    fn do_req<W: Write>(
-        out: &mut dyn Write,
-        request: &Request,
-        env: &HashMap<String, String>,
-        _user_params: &Box<&dyn Any>,
-    ) -> Result<(), Error> {
-        // Dummy up a response
-        let http_response = Response::http_response("text/plain", 200, "OK");
-        let b = format!("Env: {:?}\nParams: {:?}", env, request.params).into_bytes();
-        Response::write_response(out, request, http_response.as_slice(), &b)?;
-        Ok(())
+    impl Handler for TestHandler {
+        fn handler(
+            &mut self,
+            out: &mut dyn Write,
+            request: &Request,
+            env: &HashMap<String, String>,
+        ) -> Result<(), Error> {
+            // Dummy up a response
+            self.cnt += 1;
+            let http_response = Response::http_response("text/plain", 200, "OK");
+            let b = format!("Env: {:?}\nParams: {:?}", env, request.params).into_bytes();
+            Response::write_response(out, request, http_response.as_slice(), &b)?;
+            Ok(())
+        }
     }
     //  BeginRequest
     let test_header0 = FcgiHeader {
@@ -597,9 +617,12 @@ fn basic_io() {
     let cursor = std::io::Cursor::new(test_data);
     let mut instream = BufReader::new(cursor);
     let mut out = std::io::stdout();
+    let mut test_handler = TestHandler::new();
+/*
     let val: usize = 999;
     let user_params: Box<&dyn Any> = Box::new(&val);
-    let final_result = run(&mut instream, &mut out, do_req::<&mut dyn Write>, &user_params);
+*/
+    let final_result = run(&mut instream, &mut out, &mut test_handler);
     println!("Final result: {:?}", final_result);
     assert_eq!(final_result.unwrap(), 0);
 }
