@@ -317,12 +317,13 @@ impl Request {
                     anyhow!("FCGI responder: EOF reading multi-byte param length")
                 })?;
                 //  Compute length per spec
-                Ok(Some(
-                    (((*b3 & 0x7f) as usize) << 24)
-                        + ((*b2 as usize) << 16)
-                        + ((*b1 as usize) << 8)
-                        + *b0 as usize,
-                ))
+                let v = 
+                    (((*b0 & 0x7f) as usize) << 24)
+                        + ((*b1 as usize) << 16)
+                        + ((*b2 as usize) << 8)
+                        + *b3 as usize;
+                log::debug!("Param length, multibyte: {:02x} {:02x} {:02x} {:02x} -> {:08x}", b3, b2, b1, b0, v);
+                Ok(Some(v))
             } else {
                 Ok(Some(*b0 as usize))
             }
@@ -366,9 +367,14 @@ impl Request {
 
     /// Build key-value list from special format.
     pub fn build_params(b: &[u8]) -> Result<HashMap<String, String>, Error> {
+        log::debug!(
+            "Param bytes: {:?}",
+            String::from_utf8_lossy(&b[0..b.len().min(2000)].to_vec())
+        );
         let mut m = HashMap::new();
         let mut pos = b.iter();
         while let Some((k, v)) = Self::fetch_name_value_pair(&mut pos)? {
+            log::debug!("Param: \"{}\" = \"{}\"", k,v);
             m.insert(k, v);
         }
         Ok(m)
