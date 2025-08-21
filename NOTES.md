@@ -35,6 +35,7 @@ Users:
 
 "terrainuploader" - can append, only.
 "terrainreader" - can read, only.
+"terrainmgr" - can do everything
 (More users to come) 
 
 Tables:
@@ -62,5 +63,7 @@ SQL looks roughly like:
       - uploader is on trusted list (?)
       - 30 days with no changes.
       - This may be overkill.
+      
+Database created but only user is "terrainmgr"
       
       
