@@ -33,8 +33,8 @@ SQL setup:
 Database "terrain".
 Users: 
 
-"uploader" - can append, only.
-"reader" - can read, only.
+"terrainuploader" - can append, only.
+"terrainreader" - can read, only.
 (More users to come) 
 
 Tables:
@@ -51,3 +51,16 @@ raw_terrain_heights:
 SQL looks roughly like:
 
     CREATE TABLE 
+      json content
+      southwest corrner of region
+      uploader_id, upload_timestamp.
+      confirmer_id, confirmer_timestamp
+      
+   unique on location.
+   Entry goodness:
+      - uploader and confirmer ID are different.
+      - uploader is on trusted list (?)
+      - 30 days with no changes.
+      - This may be overkill.
+      
+      
