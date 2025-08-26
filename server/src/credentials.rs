@@ -1,7 +1,7 @@
 //! credentials -- manage database credentials and such
 
 
-use std::path::{Path, PathBuf};
+use std::path::{PathBuf};
 use envie::{Envie};
 use anyhow::{Error, anyhow};
 
@@ -37,12 +37,19 @@ impl Credentials {
 
     /// Usual new.
     /// Initializes the credentials
-    pub fn new() -> Option<Self> {
-        todo!();
+    pub fn new(filename: &str) -> Result<Self, Error> {
+        let path = Self::find_credentials(filename)?;
+        let creds = match Envie::load_with_path(path.to_str().ok_or_else(|| anyhow!("Credentials filename {:?} has illegal UTF-8 characters.", path))?) {
+            Ok(creds) => creds,
+            Err(s) => { return Err(anyhow!("Error loading credentials: {}", s)); }
+        };
+        Ok(Self {
+            creds
+        })
     }
     //  Get value for key.
-    pub fn get_value(key: &str) -> Option<String> {
-        todo!();
+    pub fn get(&self, key: &str) -> Option<String> {
+        self.creds.get(key)
     }
 }
 
