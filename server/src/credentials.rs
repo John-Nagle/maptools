@@ -1,5 +1,7 @@
 //! credentials -- manage database credentials and such
-
+//!
+//! Minimal low-security solution. Credentials are plain text
+//! but not in a diirectory visible to the web server.
 
 use std::path::{PathBuf};
 use envie::{Envie};

@@ -511,17 +511,8 @@ fn  run_one <T: Handler>(
 pub fn run <T: Handler>(
     instream: &mut impl BufRead,
     out: &mut dyn Write,
-/*
-    handler: fn(
-        out: &mut dyn Write,
-        request: &Request,
-        env: &HashMap<String, String>,
-        _user_params: &Box <&dyn Any>,
-        ) -> Result<(), Error>,
-    user_params: &Box <&dyn Any>,
-*/
     handler: &mut T,
-    ) -> Result<i32> {
+    ) -> Result<(), Error> {
     let env = std::env::vars().map(|(k, v)| (k, v)).collect();
     let mut request = Request::new();
     loop {
@@ -548,7 +539,7 @@ pub fn run <T: Handler>(
             }
         }
     }
-    Ok(0)
+    Ok(())
 }
 
 #[test]
@@ -625,11 +616,6 @@ fn basic_io() {
     let mut instream = BufReader::new(cursor);
     let mut out = std::io::stdout();
     let mut test_handler = TestHandler::new();
-/*
-    let val: usize = 999;
-    let user_params: Box<&dyn Any> = Box::new(&val);
-*/
-    let final_result = run(&mut instream, &mut out, &mut test_handler);
-    println!("Final result: {:?}", final_result);
-    assert_eq!(final_result.unwrap(), 0);
+    run(&mut instream, &mut out, &mut test_handler).expect("Run failed");
+
 }
