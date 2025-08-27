@@ -51,28 +51,6 @@ impl Handler for EchoHandler {
     }
 }
 
-/*
-/// Handler. actually handles each FCGI request.
-fn handler(
-    out: &mut dyn Write,
-    request: &Request,
-    env: &HashMap<String, String>,
-    user_params: &Box<&dyn Any>,
-) -> Result<(), Error> {
-    //  Access user params.
-    let tally = {   let uprefcell  = user_params.downcast_ref::<RefCell<HandlerParams>>().unwrap();
-        let mut up = uprefcell.borrow_mut();    // get access to innards
-        up.n += 1;  // tally
-        up.n
-    };
-    let http_response = Response::http_response("text/plain", 200, "OK");
-    //  Return something useful.
-    let b = format!("Env: {:?}\nParams: {:?}\ntally: {}", env, request.params, tally).into_bytes();
-    Response::write_response(out, request, http_response.as_slice(), &b)?;
-    Ok(())
-}
-*/
-
 /// Main program
 pub fn main() {
     logger(); // start logging

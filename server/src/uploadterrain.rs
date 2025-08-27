@@ -14,15 +14,18 @@ use std::collections::HashMap;
 use std::io::Write;
 use anyhow::Error;
 use log::LevelFilter;
+use chrono::{NaiveDateTime, Utc};
+use mysql::{OptsBuilder, Opts, Conn, Pool};
 use minifcgi::init_fcgi;
 use minifcgi::{Request, Response, Handler};
-use mysql::{OptsBuilder, Opts, Conn};
 use minifcgi::Credentials;
 
 /// MySQL Credentials for uploading.
 /// This filename will be searched for in parent directories,
 /// so it can be placed above the web root, where the web server can't see it.
 const UPLOAD_CREDS_FILE: &str = "upload_credentials.txt";
+/// Database name for terrain info
+const DB_NAME: &str = "terrain";
 
 /// Debug logging
 fn logger() {
@@ -36,16 +39,45 @@ fn logger() {
     )]);
     log::warn!("Logging to {:?}", LOG_FILE_NAME); // where the log is going
 }
-
-//  Our data
+///  Our data for uploading to the server
+pub struct TerrainUpload {
+    /// Grid name
+    grid: String,
+    /// Position of region in world, meters.
+    x: u32,
+    y: u32,
+    /// Region name
+    name: String,
+    /// Height data, a long set of hex data.  
+    height_data: String,
+    //  ***NEED SIZE, water height scale, etc.***
+/*
+    creator: String
+    creation_time: NaiveDateTime
+    confirmer String,
+    confirmation_time NaiveDateTime,
+*/
+}
+///  Our handler
 struct TerrainUploadHandler {
-        cnt: usize
+    pool: Pool,
 }
 impl TerrainUploadHandler {
-    pub fn new() -> Self {
+    /// Usual new. Saves connection pool for use.
+    pub fn new(pool: Pool) -> Self {
         Self {
-            cnt: 0
+            pool,
         }
+    }
+    
+    /// Parse a request
+    fn parse_request(b: &[u8], env: &HashMap<String, String>) -> Result<TerrainUpload, Error> {
+        //  Should be UTF-8. Check.
+        let s = core::str::from_utf8(b)?;
+        //  Should be valid JSON
+        let parsed = json::parse(s);
+        todo!();
+        
     }
 }
 //  Our "handler"
@@ -56,11 +88,12 @@ impl Handler for TerrainUploadHandler {
         request: &Request,
         env: &HashMap<String, String>,
     ) -> Result<(), Error> {
-        // Dummy up a response
-        self.cnt += 1;
+        //  We have a request. It's supposed to be in JSON.
+        
+        //  Dummy up a response
         let http_response = Response::http_response("text/plain", 200, "OK");
         //  Return something useful.
-        let b = format!("Env: {:?}\nParams: {:?}\ntally: {}", env, request.params, self.cnt).into_bytes();
+        let b = format!("Env: {:?}\nParams: {:?}\n", env, request.params).into_bytes();
         Response::write_response(out, request, http_response.as_slice(), &b)?;
         Ok(())
     }
@@ -84,10 +117,12 @@ pub fn run_responder() -> Result<(), Error> {
     //  Connect to the database
     let creds = Credentials::new(UPLOAD_CREDS_FILE)?;
     let opts = mysql::OptsBuilder::new()
-    .user(Some("foo"))
-    .db_name(Some("bar"));
+        .user(creds.get("DB_USER"))
+        .db_name(Some(DB_NAME));
+    drop(creds);
+    let pool = Pool::new(opts)?;
     //  Process terrain data
-    let mut terrain_upload_handler = TerrainUploadHandler::new();
+    let mut terrain_upload_handler = TerrainUploadHandler::new(pool);
     //  Run the FCGI server.
     minifcgi::run(&mut instream, &mut outio, &mut terrain_upload_handler)
 }
