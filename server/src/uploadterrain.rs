@@ -19,6 +19,7 @@ use mysql::{OptsBuilder, Opts, Conn, Pool};
 use minifcgi::init_fcgi;
 use minifcgi::{Request, Response, Handler};
 use minifcgi::Credentials;
+use serde::{Deserialize};
 
 /// MySQL Credentials for uploading.
 /// This filename will be searched for in parent directories,
@@ -39,24 +40,23 @@ fn logger() {
     )]);
     log::warn!("Logging to {:?}", LOG_FILE_NAME); // where the log is going
 }
-///  Our data for uploading to the server
-pub struct TerrainUpload {
+///  Our data as uploaded from SL/OS in JSON format
+// "{\"region\":\"Vallone\",\"scale\":1.092822,\"offset\":33.500740,\"waterlev\":20.000000,\"regioncoords\":[1807,1199],
+//  \"elevs\":[\"E7CAACA3A5A8ACAEB0B2B5B9BDC0C4C5C5C3C0BDB9B6B3B2B2B3B4B7BBBFC3C7CBCED1D3D5D5D4CFC4B5A4"";
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct UploadedRegionInfo {
     /// Grid name
     grid: String,
     /// Position of region in world, meters.
-    x: u32,
-    y: u32,
+    coords: [u32;2],
+    /// Region size. 256 x 256 if ommitted.
+    size: Option<[u32;2]>,
     /// Region name
     name: String,
     /// Height data, a long set of hex data.  
-    height_data: String,
-    //  ***NEED SIZE, water height scale, etc.***
-/*
-    creator: String
-    creation_time: NaiveDateTime
-    confirmer String,
-    confirmation_time NaiveDateTime,
-*/
+    elevs: String,
+    //  Water level
+    water_lev: f32,
 }
 ///  Our handler
 struct TerrainUploadHandler {
@@ -71,13 +71,11 @@ impl TerrainUploadHandler {
     }
     
     /// Parse a request
-    fn parse_request(b: &[u8], env: &HashMap<String, String>) -> Result<TerrainUpload, Error> {
+    fn parse_request(b: &[u8], env: &HashMap<String, String>) -> Result<UploadedRegionInfo, Error> {
         //  Should be UTF-8. Check.
         let s = core::str::from_utf8(b)?;
         //  Should be valid JSON
-        let parsed = json::parse(s);
-        todo!();
-        
+        Ok(serde_json::from_str(s)?)        
     }
 }
 //  Our "handler"
@@ -137,4 +135,9 @@ pub fn main() {
             panic!("Upload server failed: {:?}", e);
         }
     }
+}
+
+#[test]
+fn parse_terrain() {
+    const TEST_JSON: str = "{\"region\":\"Vallone\",\"scale\":1.092822,\"offset\":33.500740,\"waterlev\":20.000000,\"regioncoords\":[1807,1199],\"elevs\":[\"E7CAACA3A5A8ACAEB0B2B5B9BDC0C4C5C5C3C0BDB9B6B3B2B2B3B4B7BBBFC3C7CBCED1D3D5D5D4CFC4B5A4\"";
 }
