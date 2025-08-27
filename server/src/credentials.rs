@@ -60,7 +60,7 @@ fn test_credentials() {
     let cred_dir = Credentials::find_credentials(".bashrc").expect("Unable to find .bashrc");
     println!("Found {:?}", cred_dir);
     //  Test simple credentials file
-    let creds = Credentials::new("credentials.txt").expect("Problem opening credentials file");
+    let creds = Credentials::new("test_credentials.txt").expect("Problem opening credentials file");
     assert_eq!("foo", creds.get("DEMO1").expect("Did not find key DEMO1").as_str());
     assert_eq!(Some("bar".to_string()), creds.get("DEMO2"));
 }
