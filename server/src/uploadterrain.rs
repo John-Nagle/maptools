@@ -115,11 +115,16 @@ impl TerrainUploadHandler {
     }
     
     /// Parse a request
-    fn parse_request(b: &[u8], env: &HashMap<String, String>) -> Result<UploadedRegionInfo, Error> {
+    fn parse_request(b: &[u8], _env: &HashMap<String, String>) -> Result<UploadedRegionInfo, Error> {
         //  Should be UTF-8. Check.
         let s = core::str::from_utf8(b)?;
         //  Should be valid JSON
         Ok(UploadedRegionInfo::parse(s)?)        
+    }
+    
+    /// Handle request
+    fn process_request(region_info: UploadedRegionInfo, env: &HashMap<String, String>) -> Result<(), Error> {
+        Ok(())  // ***TEMP***
     }
 }
 //  Our "handler"
@@ -131,7 +136,26 @@ impl Handler for TerrainUploadHandler {
         env: &HashMap<String, String>,
     ) -> Result<(), Error> {
         //  We have a request. It's supposed to be in JSON.
-        
+        //  Parse. Error 400 with message if fail.
+        match Self::parse_request(&request.standard_input, env) {  
+            Ok(req) => {
+                //  Process. Error 500 if fail.
+                match Self::process_request(req, env) {
+                    Ok(_) => (),
+                    Err(e) => {
+                       let http_response = Response::http_response("text/plain", 500, format!("Problem processing request: {:?}", e).as_str());
+                        Response::write_response(out, request, http_response.as_slice(), &[])?;                    
+                    }
+                }               
+            }
+            Err(e) => {
+                let http_response = Response::http_response("text/plain", 400, format!("Incorrect request: {:?}", e).as_str());
+                //  Return something useful.
+                //////let b = format!("Env: {:?}\nParams: {:?}\n", env, request.params).into_bytes();
+                let b = [];
+                Response::write_response(out, request, http_response.as_slice(), &b)?;
+            }
+        }
         //  Dummy up a response
         let http_response = Response::http_response("text/plain", 200, "OK");
         //  Return something useful.

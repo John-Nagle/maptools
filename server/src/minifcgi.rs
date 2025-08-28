@@ -227,7 +227,7 @@ pub struct Request {
     /// Params, as a key-value store
     pub params: Option<HashMap<String, String>>,
     /// Standard input - the actual content, if any. Usually from a POST request.
-    standard_input: Vec<u8>,
+    pub standard_input: Vec<u8>,
 }
 
 impl Request {
