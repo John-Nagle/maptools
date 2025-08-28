@@ -24,9 +24,15 @@ use serde::{Deserialize};
 /// MySQL Credentials for uploading.
 /// This filename will be searched for in parent directories,
 /// so it can be placed above the web root, where the web server can't see it.
+/// The upload credentials file must contain
+///
+///     DB_USER = username
+///     DB_PASS = databasepassword
+///     DB_HOST = hostname
+///     DB_PORT = portnumber (optional, defaults to 3306)
+///     DB_NAME = databasename
+///
 const UPLOAD_CREDS_FILE: &str = "upload_credentials.txt";
-/// Database name for terrain info
-const DB_NAME: &str = "terrain";
 /// Default region size, used on grids that don't do varregions.
 const DEFAULT_REGION_SIZE: u32 = 256;
 
@@ -188,12 +194,22 @@ pub fn run_responder() -> Result<(), Error> {
     let mut outio = std::io::BufWriter::new(outsocket);
     //  Connect to the database
     let creds = Credentials::new(UPLOAD_CREDS_FILE)?;
+    //  Optional MySQL port number
+    let portnum = if let Some(port) = creds.get("DB_PORT") {
+        port.parse::<u16>()?
+    } else {
+        //  Use MySQL default
+        3306
+    };
     let opts = mysql::OptsBuilder::new()
-        .user(creds.get("DB_USER"))
-        .db_name(Some(DB_NAME));
+        .ip_or_hostname(creds.get("DB_HOST"))
+        .tcp_port(portnum)
+        .user(creds.get("DB_USER"))   
+        .pass(creds.get("DB_PASS"))  
+        .db_name(creds.get("DB_NAME"));
     drop(creds);
     let pool = Pool::new(opts)?;
-    //  Process terrain data
+    log::info!("Connected to database.");
     let mut terrain_upload_handler = TerrainUploadHandler::new(pool);
     //  Run the FCGI server.
     minifcgi::run(&mut instream, &mut outio, &mut terrain_upload_handler)
