@@ -122,7 +122,12 @@ impl TerrainUploadHandler {
         Ok(UploadedRegionInfo::parse(s)?)        
     }
     
-    /// Handle request
+    /// Handle request.
+    /// 
+    /// Start a database transaction.
+    /// Check if this data is the same as any stored data for this region.
+    /// If yes, just update confirmation user and time.
+    /// If no, replace old data entirely.
     fn process_request(region_info: UploadedRegionInfo, env: &HashMap<String, String>) -> Result<(), Error> {
         Ok(())  // ***TEMP***
     }
@@ -139,6 +144,7 @@ impl Handler for TerrainUploadHandler {
         //  Parse. Error 400 with message if fail.
         match Self::parse_request(&request.standard_input, env) {  
             Ok(req) => {
+                log::info!("Request made: {:?} env {:?}", req, env);
                 //  Process. Error 500 if fail.
                 match Self::process_request(req, env) {
                     Ok(_) => (),
