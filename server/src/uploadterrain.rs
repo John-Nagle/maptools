@@ -34,7 +34,7 @@ const DEFAULT_REGION_SIZE: u32 = 256;
 fn logger() {
     //  Log file is openly visible as a web page.
     //  Only for debug tests.
-    const LOG_FILE_NAME: &str = "logs/echolog.txt";
+    const LOG_FILE_NAME: &str = "logs/updatelog.txt";
     let _ = simplelog::CombinedLogger::init(vec![simplelog::WriteLogger::new(
         LevelFilter::Debug,
         simplelog::Config::default(),
