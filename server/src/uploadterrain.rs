@@ -48,7 +48,7 @@ pub struct UploadedRegionInfo {
     /// Grid name
     grid: String,
     /// Position of region in world, meters.
-    coords: [u32;2],
+    region_coords: [u32;2],
     /// Region size. 256 x 256 if ommitted.
     size: Option<[u32;2]>,
     /// Region name
@@ -57,6 +57,13 @@ pub struct UploadedRegionInfo {
     elevs: String,
     //  Water level
     water_lev: f32,
+}
+
+impl UploadedRegionInfo {
+    /// Parse from string
+    fn parse(s: &str) -> Result<Self, Error> {
+        Ok(serde_json::from_str(s)?)
+    }
 }
 ///  Our handler
 struct TerrainUploadHandler {
@@ -75,7 +82,7 @@ impl TerrainUploadHandler {
         //  Should be UTF-8. Check.
         let s = core::str::from_utf8(b)?;
         //  Should be valid JSON
-        Ok(serde_json::from_str(s)?)        
+        Ok(UploadedRegionInfo::parse(s)?)        
     }
 }
 //  Our "handler"
@@ -139,5 +146,8 @@ pub fn main() {
 
 #[test]
 fn parse_terrain() {
-    const TEST_JSON: str = "{\"region\":\"Vallone\",\"scale\":1.092822,\"offset\":33.500740,\"waterlev\":20.000000,\"regioncoords\":[1807,1199],\"elevs\":[\"E7CAACA3A5A8ACAEB0B2B5B9BDC0C4C5C5C3C0BDB9B6B3B2B2B3B4B7BBBFC3C7CBCED1D3D5D5D4CFC4B5A4\"";
+    const TEST_JSON: &str = "{\"grid\":\"agni\",\"name\":\"Vallone\",\"scale\":1.092822,\"offset\":33.500740,\"water_lev\":20.000000,\"region_coords\":[1807,1199],\"elevs\":\"E7CAACA3A5A8ACAEB0B2B5B9BDC0C4C5C5C3C0BDB9B6B3B2B2B3B4B7BBBFC3C7CBCED1D3D\"}";
+    println!("TEST_JSON: {}", TEST_JSON);
+    let parsed = UploadedRegionInfo::parse(TEST_JSON).expect("JSON misparsed");
+    println!("Parsed JSON: {:?}", parsed);
 }
