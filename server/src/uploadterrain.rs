@@ -12,7 +12,7 @@
 
 use std::collections::HashMap;
 use std::io::Write;
-use anyhow::Error;
+use anyhow::{Error, anyhow};
 use log::LevelFilter;
 use chrono::{NaiveDateTime, Utc};
 use mysql::{OptsBuilder, Opts, Conn, Pool};
@@ -62,7 +62,7 @@ pub struct UploadedRegionInfo {
     /// Region name
     name: String,
     /// Height data, a long set of hex data.  
-    elevs: String,
+    elevs: Vec::<String>,
     /// Scale factor for elevs
     scale: f32,
     /// Offset factor for elevs
@@ -99,13 +99,16 @@ impl UploadedRegionInfo {
     
     /// Get elevations as numbers before offsetting.
     /// Input is a hex string representing one elev per byte.
-    pub fn get_unscaled_elevs(&self) -> Result<Vec<u8>, Error> {
-        Ok(hex::decode(&self.elevs)?)
+    pub fn get_unscaled_elevs(&self) -> Result<Vec<Vec<u8>>, Error> {
+        todo!();
+        //////self.elevs.iter().map(|&s| hex::decode(s)).collect()
+        //////Ok(hex::decode(&self.elevs)?)
     }
     
     /// Scale the elevations
     pub fn get_scaled_elevs(&self) -> Result<Vec<f32>, Error> {
-        Ok(self.get_unscaled_elevs()?.iter().map(|&v| ((v as f32) / 256.0) * self.scale + self.offset).collect())
+        todo!();
+        //////Ok(self.get_unscaled_elevs()?.iter().map(|&v| ((v as f32) / 256.0) * self.scale + self.offset).collect())
     }
 }
 ///  Our handler
@@ -124,6 +127,10 @@ impl TerrainUploadHandler {
     fn parse_request(b: &[u8], _env: &HashMap<String, String>) -> Result<UploadedRegionInfo, Error> {
         //  Should be UTF-8. Check.
         let s = core::str::from_utf8(b)?;
+        if s.trim().is_empty() {
+            return Err(anyhow!("Empty request. JSON was expected"));
+        }
+        log::info!("Uploaded JSON:\n{}", s);
         //  Should be valid JSON
         Ok(UploadedRegionInfo::parse(s)?)        
     }
@@ -134,8 +141,10 @@ impl TerrainUploadHandler {
     /// Check if this data is the same as any stored data for this region.
     /// If yes, just update confirmation user and time.
     /// If no, replace old data entirely.
-    fn process_request(region_info: UploadedRegionInfo, env: &HashMap<String, String>) -> Result<(), Error> {
-        Ok(())  // ***TEMP***
+    fn process_request(region_info: UploadedRegionInfo, env: &HashMap<String, String>) -> Result<String, Error> {
+        let msg = format!("Region info:\n{:?}", region_info);
+        //////let msg = "Test OK".to_string(); // ***TEMP***
+        Ok(msg)  
     }
 }
 //  Our "handler"
@@ -153,7 +162,13 @@ impl Handler for TerrainUploadHandler {
                 log::info!("Request made: {:?} env {:?}", req, env);
                 //  Process. Error 500 if fail.
                 match Self::process_request(req, env) {
-                    Ok(_) => (),
+                    Ok(msg) => {
+                        //  Success. Send a plain "OK"
+                        let http_response = Response::http_response("text/plain", 200, "OK");
+                        //  Return something useful.
+                        let b = msg.into_bytes();
+                        Response::write_response(out, request, http_response.as_slice(), &b)?;
+                    }
                     Err(e) => {
                        let http_response = Response::http_response("text/plain", 500, format!("Problem processing request: {:?}", e).as_str());
                         Response::write_response(out, request, http_response.as_slice(), &[])?;                    
@@ -168,11 +183,6 @@ impl Handler for TerrainUploadHandler {
                 Response::write_response(out, request, http_response.as_slice(), &b)?;
             }
         }
-        //  Dummy up a response
-        let http_response = Response::http_response("text/plain", 200, "OK");
-        //  Return something useful.
-        let b = format!("Env: {:?}\nParams: {:?}\n", env, request.params).into_bytes();
-        Response::write_response(out, request, http_response.as_slice(), &b)?;
         Ok(())	
     }
 }
