@@ -101,12 +101,12 @@ impl UploadedRegionInfo {
     /// Input is a hex string representing one elev per byte.
     pub fn get_unscaled_elevs(&self) -> Result<Vec<Vec<u8>>, Error> {
         todo!();
-        //////self.elevs.iter().map(|&s| hex::decode(s)).collect()
-        //////Ok(hex::decode(&self.elevs)?)
+        let elevs: Result::<Vec<_>, _> = self.elevs.iter().map(|s| hex::decode(s)).collect();
+        Ok(elevs?)
     }
     
     /// Scale the elevations
-    pub fn get_scaled_elevs(&self) -> Result<Vec<f32>, Error> {
+    pub fn get_scaled_elevs(&self) -> Result<Vec<Vec<f32>>, Error> {
         todo!();
         //////Ok(self.get_unscaled_elevs()?.iter().map(|&v| ((v as f32) / 256.0) * self.scale + self.offset).collect())
     }
