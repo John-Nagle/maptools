@@ -202,12 +202,15 @@ pub fn run_responder() -> Result<(), Error> {
         3306
     };
     let opts = mysql::OptsBuilder::new()
+        //////.enable_cleartext_plugin(true)
+        //////.secure_auth(true)
         .ip_or_hostname(creds.get("DB_HOST"))
         .tcp_port(portnum)
         .user(creds.get("DB_USER"))   
         .pass(creds.get("DB_PASS"))  
         .db_name(creds.get("DB_NAME"));
     drop(creds);
+    //////log::info!("Opts: {:?}", opts);
     let pool = Pool::new(opts)?;
     log::info!("Connected to database.");
     let mut terrain_upload_handler = TerrainUploadHandler::new(pool);
