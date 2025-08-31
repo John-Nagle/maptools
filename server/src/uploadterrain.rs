@@ -202,8 +202,8 @@ pub fn run_responder() -> Result<(), Error> {
         3306
     };
     let opts = mysql::OptsBuilder::new()
-        //////.enable_cleartext_plugin(true)
-        //////.secure_auth(true)
+        //  Dreamhost is still using old authentication
+        .secure_auth(false)
         .ip_or_hostname(creds.get("DB_HOST"))
         .tcp_port(portnum)
         .user(creds.get("DB_USER"))   
