@@ -163,12 +163,12 @@ impl TerrainUploadHandler {
     
     /// SQL insert for new item
     fn do_sql_insert(&mut self, region_info: UploadedRegionInfo, params: &HashMap<String, String>) -> Result<(), Error> {
-        const SQL_INSERT: &str = r"INSERT INTO :table (grid, region_coords_x, region_coords_y, size_x, size_y, name, scale, offset, elevs,  water_level, creator) 
-            VALUES (:grid, :region_coords_x, :region_coords_y, :size_x, :size_y, :name, :scale, : offset, :elevs, :water_level, :creator)";
+        const SQL_INSERT: &str = r"INSERT INTO raw_terrain_heights (grid, region_coords_x, region_coords_y, size_x, size_y, name, scale, offset, elevs,  water_level, creator) 
+            VALUES (:grid, :region_coords_x, :region_coords_y, :size_x, :size_y, :name, :scale, :offset, :elevs, :water_level, :creator)";
         //  ***NEED TO FIX THIS FOR Open Simulator***
         let creator = params.get(OWNER_NAME).ok_or_else(|| anyhow!("This request is not from Second Life/Open Simulator"))?.trim();
         let values = params! {
-            "table" => RAW_TERRAIN_HEIGHTS,
+            //////"table" => RAW_TERRAIN_HEIGHTS,
             "grid" => region_info.grid.clone(), 
             "region_coords_x" => region_info.region_coords[0],
             "region_coords_y" => region_info.region_coords[1],
