@@ -37,6 +37,11 @@ use mysql::prelude::{Queryable, AsStatement};
 const UPLOAD_CREDS_FILE: &str = "upload_credentials.txt";
 /// Default region size, used on grids that don't do varregions.
 const DEFAULT_REGION_SIZE: u32 = 256;
+/// Table name
+const RAW_TERRAIN_HEIGHTS: &str = "raw_terrain_heights";
+/// Environment variables for obtaining owner info.
+/// ***ADD VALUES FOR OPEN SIMULATOR***
+const OWNER_NAME: &str = "HTTP_X_SECONDLIFE_OWNER_NAME";
 
 /// Debug logging
 fn logger() {
@@ -157,12 +162,13 @@ impl TerrainUploadHandler {
     }
     
     /// SQL insert for new item
-    fn do_sql_insert(&mut self, region_info: UploadedRegionInfo, env: &HashMap<String, String>) -> Result<(), Error> {
+    fn do_sql_insert(&mut self, region_info: UploadedRegionInfo, params: &HashMap<String, String>) -> Result<(), Error> {
         const SQL_INSERT: &str = r"INSERT INTO :table (grid, region_coords_x, region_coords_y, size_x, size_y, name, scale, offset, elevs,  water_level, creator) 
             VALUES (:grid, :region_coords_x, :region_coords_y, :size_x, :size_y, :name, :scale, : offset, :elevs, :water_level, :creator)";
         //  ***NEED TO FIX THIS FOR Open Simulator***
-        let creator = env.get("HTTP_X_SECONDLIFE_OWNER_NAME").ok_or_else(|| anyhow!("This request is not from Second Life/Open Simulator"))?.trim();
+        let creator = params.get(OWNER_NAME).ok_or_else(|| anyhow!("This request is not from Second Life/Open Simulator"))?.trim();
         let values = params! {
+            "table" => RAW_TERRAIN_HEIGHTS,
             "grid" => region_info.grid.clone(), 
             "region_coords_x" => region_info.region_coords[0],
             "region_coords_y" => region_info.region_coords[1],
@@ -174,7 +180,9 @@ impl TerrainUploadHandler {
             "elevs" => region_info.get_elevs_as_blob()?,
             "water_level" => region_info.water_lev,
             "creator" => creator };
+        log::debug!("SQL insert: {:?}", values);
         self.conn.exec_drop(SQL_INSERT, values)?;
+        log::debug!("SQL insert succeeded.");
         Ok(())
     }
     
@@ -196,10 +204,10 @@ impl TerrainUploadHandler {
     /// Check if this data is the same as any stored data for this region.
     /// If yes, just update confirmation user and time.
     /// If no, replace old data entirely.
-    fn process_request(&mut self, region_info: UploadedRegionInfo, env: &HashMap<String, String>) -> Result<String, Error> {
+    fn process_request(&mut self, region_info: UploadedRegionInfo, params: &HashMap<String, String>) -> Result<String, Error> {
         let msg = format!("Region info:\n{:?}", region_info);
         //  Initial test of SQL
-        self.do_sql_insert(region_info, env)?;   // ***TEMP***       
+        self.do_sql_insert(region_info, params)?;   // ***TEMP***       
         //////let msg = "Test OK".to_string(); // ***TEMP***
         Ok(msg)  
     }
@@ -217,8 +225,9 @@ impl Handler for TerrainUploadHandler {
         match Self::parse_request(&request.standard_input, env) {  
             Ok(req) => {
                 log::info!("Request made: {:?} env {:?}", req, env);
+                let params = request.params.as_ref().ok_or_else(|| anyhow!("No HTTP parameters found"))?;
                 //  Process. Error 500 if fail.
-                match self.process_request(req, env) {
+                match self.process_request(req, &params) {
                     Ok(msg) => {
                         //  Success. Send a plain "OK"
                         let http_response = Response::http_response("text/plain", 200, "OK");
