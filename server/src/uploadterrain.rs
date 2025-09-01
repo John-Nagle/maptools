@@ -160,7 +160,8 @@ impl TerrainUploadHandler {
     fn do_sql_insert(&mut self, region_info: UploadedRegionInfo, env: &HashMap<String, String>) -> Result<(), Error> {
         const SQL_INSERT: &str = r"INSERT INTO :table (grid, region_coords_x, region_coords_y, size_x, size_y, name, scale, offset, elevs,  water_level, creator) 
             VALUES (:grid, :region_coords_x, :region_coords_y, :size_x, :size_y, :name, :scale, : offset, :elevs, :water_level, :creator)";
-        let creator = ""; // ***TEMP***
+        //  ***NEED TO FIX THIS FOR Open Simulator***
+        let creator = env.get("HTTP_X_SECONDLIFE_OWNER_NAME").ok_or_else(|| anyhow!("This request is not from Second Life/Open Simulator"))?.trim();
         let values = params! {
             "grid" => region_info.grid.clone(), 
             "region_coords_x" => region_info.region_coords[0],
@@ -195,8 +196,10 @@ impl TerrainUploadHandler {
     /// Check if this data is the same as any stored data for this region.
     /// If yes, just update confirmation user and time.
     /// If no, replace old data entirely.
-    fn process_request(region_info: UploadedRegionInfo, env: &HashMap<String, String>) -> Result<String, Error> {
+    fn process_request(&mut self, region_info: UploadedRegionInfo, env: &HashMap<String, String>) -> Result<String, Error> {
         let msg = format!("Region info:\n{:?}", region_info);
+        //  Initial test of SQL
+        self.do_sql_insert(region_info, env)?;   // ***TEMP***       
         //////let msg = "Test OK".to_string(); // ***TEMP***
         Ok(msg)  
     }
@@ -215,7 +218,7 @@ impl Handler for TerrainUploadHandler {
             Ok(req) => {
                 log::info!("Request made: {:?} env {:?}", req, env);
                 //  Process. Error 500 if fail.
-                match Self::process_request(req, env) {
+                match self.process_request(req, env) {
                     Ok(msg) => {
                         //  Success. Send a plain "OK"
                         let http_response = Response::http_response("text/plain", 200, "OK");
