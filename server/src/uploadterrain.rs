@@ -72,6 +72,26 @@ pub struct UploadedRegionInfo {
     pub water_lev: f32,
 }
 
+/// Elevations as JSON data 
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct ElevsJson {
+    /// Offset and scale for elevation data
+    offset: f32,
+    /// Apply scale first, then offset.
+    scale: f32,
+    /// Height data, a long set of hex data.  
+    elevs: Vec::<String>, 
+}
+
+impl ElevsJson {
+    /// Get elevations as numbers before offsetting.
+    /// Input is a hex string representing one elev per byte.
+    pub fn get_unscaled_elevs(&self) -> Result<Vec<Vec<u8>>, Error> {
+        let elevs: Result::<Vec<_>, _> = self.elevs.iter().map(|s| hex::decode(s)).collect();
+        Ok(elevs?)
+    }
+}
+
 impl UploadedRegionInfo {
     /// Parse from string
     pub fn parse(s: &str) -> Result<Self, Error> {
@@ -95,7 +115,16 @@ impl UploadedRegionInfo {
     /// Get region name in canonical lowercase format
     pub fn get_name(&self) -> String {
         self.name.to_lowercase()
+    } 
+/*    
+    /// Get elevs as JSON for use in SQL.  
+    pub get_elevs_json(&self) -> String {
+        #[derive(Debug, Clone, PartialEq, Deserialize)]
+        struct elevs_as_json {
+        }
+
     }
+*/
     
     /// Get elevations as numbers before offsetting.
     /// Input is a hex string representing one elev per byte.
