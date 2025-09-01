@@ -118,24 +118,17 @@ impl UploadedRegionInfo {
     pub fn get_name(&self) -> String {
         self.name.to_lowercase()
     } 
-/*    
-    /// Get elevs as JSON for use in SQL.  
-    pub get_elevs_json(&self) -> String {
-        #[derive(Debug, Clone, PartialEq, Deserialize)]
-        struct elevs_as_json {
-        }
-
-    }
-*/
     
     /// Get elevs as a blob for SQL.
+    /// Elevs are a vector of rows of hex strings at this point.
     pub fn get_elevs_as_blob(&self) -> Result<Vec<u8>, Error> {
-        todo!()
+        let elevs_blob: Vec<_> = self.get_unscaled_elevs()?.into_iter().flatten().collect();
+        Ok(elevs_blob)
     }
     /// Get elevations as numbers before offsetting.
-    /// Input is a hex string representing one elev per byte.
+    /// Input is a hex string representing one elev per byte
+    /// Output is an array of hex strings.
     pub fn get_unscaled_elevs(&self) -> Result<Vec<Vec<u8>>, Error> {
-        todo!();
         let elevs: Result::<Vec<_>, _> = self.elevs.iter().map(|s| hex::decode(s)).collect();
         Ok(elevs?)
     }
