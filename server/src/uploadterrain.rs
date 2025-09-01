@@ -20,7 +20,7 @@ use minifcgi::init_fcgi;
 use minifcgi::{Request, Response, Handler};
 use minifcgi::Credentials;
 use serde::{Deserialize};
-use mysql::params;
+use mysql::{PooledConn, params};
 use mysql::prelude::{Queryable, AsStatement};
 
 /// MySQL Credentials for uploading.
@@ -148,14 +148,19 @@ impl UploadedRegionInfo {
 }
 ///  Our handler
 struct TerrainUploadHandler {
+    /// MySQL onnection pool. We only use one.
     pool: Pool,
+    /// Active MySQL connection.
+    conn: PooledConn,
 }
 impl TerrainUploadHandler {
     /// Usual new. Saves connection pool for use.
-    pub fn new(pool: Pool) -> Self {
-        Self {
+    pub fn new(pool: Pool) -> Result<Self, Error> {
+        let conn = pool.get_conn()?;
+        Ok(Self {
             pool,
-        }
+            conn,
+        })
     }
     
     /// SQL insert for new item
@@ -163,7 +168,6 @@ impl TerrainUploadHandler {
         const SQL_INSERT: &str = r"INSERT INTO :table (grid, region_coords_x, region_coords_y, size_x, size_y, name, scale, offset, elevs,  water_level, creator) 
             VALUES (:grid, :region_coords_x, :region_coords_y, :size_x, :size_y, :name, :scale, : offset, :elevs, :water_level, :creator)";
         let creator = ""; // ***TEMP***
-        let mut conn = self.pool.get_conn()?;//***TEMP***
         let values = params! {
             "grid" => region_info.grid.clone(), 
             "region_coords_x" => region_info.region_coords[0],
@@ -176,7 +180,7 @@ impl TerrainUploadHandler {
             "elevs" => region_info.get_elevs_as_blob()?,
             "water_level" => region_info.water_lev,
             "creator" => creator };
-        conn.exec_drop(SQL_INSERT, values)?;
+        self.conn.exec_drop(SQL_INSERT, values)?;
         Ok(())
     }
     
@@ -280,7 +284,7 @@ pub fn run_responder() -> Result<(), Error> {
     //////log::info!("Opts: {:?}", opts);
     let pool = Pool::new(opts)?;
     log::info!("Connected to database.");
-    let mut terrain_upload_handler = TerrainUploadHandler::new(pool);
+    let mut terrain_upload_handler = TerrainUploadHandler::new(pool)?;
     //  Run the FCGI server.
     minifcgi::run(&mut instream, &mut outio, &mut terrain_upload_handler)
 }
