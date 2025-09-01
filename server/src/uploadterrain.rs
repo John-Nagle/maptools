@@ -20,6 +20,8 @@ use minifcgi::init_fcgi;
 use minifcgi::{Request, Response, Handler};
 use minifcgi::Credentials;
 use serde::{Deserialize};
+use mysql::params;
+use mysql::prelude::{Queryable, AsStatement};
 
 /// MySQL Credentials for uploading.
 /// This filename will be searched for in parent directories,
@@ -126,6 +128,10 @@ impl UploadedRegionInfo {
     }
 */
     
+    /// Get elevs as a blob for SQL.
+    pub fn get_elevs_as_blob(&self) -> Result<Vec<u8>, Error> {
+        todo!()
+    }
     /// Get elevations as numbers before offsetting.
     /// Input is a hex string representing one elev per byte.
     pub fn get_unscaled_elevs(&self) -> Result<Vec<Vec<u8>>, Error> {
@@ -150,6 +156,28 @@ impl TerrainUploadHandler {
         Self {
             pool,
         }
+    }
+    
+    /// SQL insert for new item
+    fn do_sql_insert(&mut self, region_info: UploadedRegionInfo, env: &HashMap<String, String>) -> Result<(), Error> {
+        const SQL_INSERT: &str = r"INSERT INTO :table (grid, region_coords_x, region_coords_y, size_x, size_y, name, scale, offset, elevs,  water_level, creator) 
+            VALUES (:grid, :region_coords_x, :region_coords_y, :size_x, :size_y, :name, :scale, : offset, :elevs, :water_level, :creator)";
+        let creator = ""; // ***TEMP***
+        let mut conn = self.pool.get_conn()?;//***TEMP***
+        let values = params! {
+            "grid" => region_info.grid.clone(), 
+            "region_coords_x" => region_info.region_coords[0],
+            "region_coords_y" => region_info.region_coords[1],
+            "size_x" => region_info.get_size()[0],
+            "size_y" => region_info.get_size()[1],
+            "name" => region_info.name.clone(),
+            "scale" => region_info.scale,
+            "offset" => region_info.offset,
+            "elevs" => region_info.get_elevs_as_blob()?,
+            "water_level" => region_info.water_lev,
+            "creator" => creator };
+        conn.exec_drop(SQL_INSERT, values)?;
+        Ok(())
     }
     
     /// Parse a request
