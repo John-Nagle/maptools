@@ -186,6 +186,30 @@ impl TerrainUploadHandler {
         Ok(())
     }
     
+    fn do_sql_update(&mut self, region_info: UploadedRegionInfo, params: &HashMap<String, String>) -> Result<(), Error> {
+        const SQL_INSERT: &str = r"INSERT INTO raw_terrain_heights (grid, region_coords_x, region_coords_y, size_x, size_y, name, scale, offset, elevs,  water_level, creator) 
+            VALUES (:grid, :region_coords_x, :region_coords_y, :size_x, :size_y, :name, :scale, :offset, :elevs, :water_level, :creator)";
+        //  ***NEED TO FIX THIS FOR Open Simulator***
+        let creator = params.get(OWNER_NAME).ok_or_else(|| anyhow!("This request is not from Second Life/Open Simulator"))?.trim();
+        let values = params! {
+            //////"table" => RAW_TERRAIN_HEIGHTS,
+            "grid" => region_info.grid.clone(), 
+            "region_coords_x" => region_info.region_coords[0],
+            "region_coords_y" => region_info.region_coords[1],
+            "size_x" => region_info.get_size()[0],
+            "size_y" => region_info.get_size()[1],
+            "name" => region_info.name.clone(),
+            "scale" => region_info.scale,
+            "offset" => region_info.offset,
+            "elevs" => region_info.get_elevs_as_blob()?,
+            "water_level" => region_info.water_lev,
+            "creator" => creator };
+        log::debug!("SQL insert: {:?}", values);
+        self.conn.exec_drop(SQL_INSERT, values)?;
+        log::debug!("SQL insert succeeded.");
+        Ok(())
+    }
+    
     /// Parse a request
     fn parse_request(b: &[u8], _env: &HashMap<String, String>) -> Result<UploadedRegionInfo, Error> {
         //  Should be UTF-8. Check.

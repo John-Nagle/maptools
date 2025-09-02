@@ -65,5 +65,25 @@ SQL looks roughly like:
       - This may be overkill.
       
 Database created but only user is "terrainmgr"
+
+2025-09-01
+
+Prelminary version of terrain logging is working.
+LSL script is working. 
+Table raw_terrain_heights has been filled in for the Blake Sea area by carrying around a scripted object and flying over.
+Current updater will not change terrain if flown over again and the terrain is different. That needs to be fixed.
+
+Next steps:
+
+- Generate sculpts from above data. Same algorithm as old Python code.
+  - Test before a big upload.
+- Generate multi-region data for lower LODs. 
+  - Edge problems. For now, if no data for a region, treat it as water when building multi-region data.
+  - Have to generate the multi-region images too. 
+    - What to do when we have multi-region image info but not elevation?
+      - Generate the images, although they'll be underwater in some areas.
+      - Better than having two sets of images for large regions.
+- Add sculpt support in Sharpview.
+- Overfly Blake Sea and make video.
       
       
