@@ -24,6 +24,8 @@ use mysql::{OptsBuilder, Opts, Conn, Pool};
 use serde::{Deserialize};
 use mysql::{PooledConn, params};
 use mysql::prelude::{Queryable, AsStatement};
+//  Need to put this into a common dir.
+use minifcgi::Credentials;
 
 /// MySQL Credentials for uploading.
 /// This filename will be searched for in parent directories,
@@ -36,7 +38,7 @@ use mysql::prelude::{Queryable, AsStatement};
 ///     DB_PORT = portnumber (optional, defaults to 3306)
 ///     DB_NAME = databasename
 ///
-const UPLOAD_CREDS_FILE: &str = "upload_credentials.txt";
+const UPLOAD_CREDS_FILE: &str = "generate_credentials.txt";
 /// Default region size, used on grids that don't do varregions.
 const DEFAULT_REGION_SIZE: u32 = 256;
 /// Table name
@@ -296,26 +298,6 @@ pub fn run_responder() -> Result<(), Error> {
     let mut instream = std::io::BufReader::new(socket);
     let mut outio = std::io::BufWriter::new(outsocket);
     //  Connect to the database
-    let creds = Credentials::new(UPLOAD_CREDS_FILE)?;
-    //  Optional MySQL port number
-    let portnum = if let Some(port) = creds.get("DB_PORT") {
-        port.parse::<u16>()?
-    } else {
-        //  Use MySQL default
-        3306
-    };
-    let opts = mysql::OptsBuilder::new()
-        //  Dreamhost is still using old authentication
-        .secure_auth(false)
-        .ip_or_hostname(creds.get("DB_HOST"))
-        .tcp_port(portnum)
-        .user(creds.get("DB_USER"))   
-        .pass(creds.get("DB_PASS"))  
-        .db_name(creds.get("DB_NAME"));
-    drop(creds);
-    //////log::info!("Opts: {:?}", opts);
-    let pool = Pool::new(opts)?;
-    log::info!("Connected to database.");
     let mut terrain_upload_handler = TerrainUploadHandler::new(pool)?;
     //  Run the FCGI server.
     minifcgi::run(&mut instream, &mut outio, &mut terrain_upload_handler)
@@ -360,6 +342,30 @@ fn setup() -> Result<(), Error> {
     }
     let credsfile = credsfile.unwrap();
     let outdir = outdir.unwrap();
+    /// Create the output directory, empty.
+    //  ***MORE***
+    /// Connect to the database
+    let creds = Credentials::new(UPLOAD_CREDS_FILE)?;
+    //  Optional MySQL port number
+    let portnum = if let Some(port) = creds.get("DB_PORT") {
+        port.parse::<u16>()?
+    } else {
+        //  Use MySQL default
+        3306
+    };
+    let opts = mysql::OptsBuilder::new()
+        //  Dreamhost is still using old authentication
+        .secure_auth(false)
+        .ip_or_hostname(creds.get("DB_HOST"))
+        .tcp_port(portnum)
+        .user(creds.get("DB_USER"))   
+        .pass(creds.get("DB_PASS"))  
+        .db_name(creds.get("DB_NAME"));
+    drop(creds);
+    //////log::info!("Opts: {:?}", opts);
+    let pool = Pool::new(opts)?;
+    log::info!("Connected to database.");
+
     Ok(())
 }
 
@@ -380,5 +386,24 @@ fn main() {
 
 #[test]
 fn generate_terrain() {
-
+    let creds = Credentials::new(UPLOAD_CREDS_FILE)?;
+    //  Optional MySQL port number
+    let portnum = if let Some(port) = creds.get("DB_PORT") {
+        port.parse::<u16>()?
+    } else {
+        //  Use MySQL default
+        3306
+    };
+    let opts = mysql::OptsBuilder::new()
+        //  Dreamhost is still using old authentication
+        .secure_auth(false)
+        .ip_or_hostname(creds.get("DB_HOST"))
+        .tcp_port(portnum)
+        .user(creds.get("DB_USER"))   
+        .pass(creds.get("DB_PASS"))  
+        .db_name(creds.get("DB_NAME"));
+    drop(creds);
+    //////log::info!("Opts: {:?}", opts);
+    let pool = Pool::new(opts)?;
+    log::info!("Connected to database.");
 }
