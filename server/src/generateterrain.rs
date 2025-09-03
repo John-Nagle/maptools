@@ -1,10 +1,14 @@
-//! Upload Second Life / Open Simulator terrain to server
+//! Generate Second Life / Open Simulator terrain objects as files to be uploaded.
 //! Part of the Animats impostor system
 //!
-//! A Second Life/Open Simulator LSL script records terrain heights when visiting
-//! regions. It calls this FCGI responder to upload that data to a server.
-//! Later processing turns that into objects viewable in world via the
-//! region impostor system.
+//!
+//! In the previous step, a bot, or a large number of users, visited all regions
+//! while carrying a script which talks to the terrain uploader. That data
+//! should now be in the terrain database, in the raw_terrain_heights table.
+//!
+//! This program processes that data and generates images and meshes to
+//! be uploaded. These go into a local directory.
+//! This runs as a command line program, or perhaps a cron job.
 //!
 //!     License: LGPL.
 //!     Animats
@@ -47,7 +51,7 @@ const OWNER_NAME: &str = "HTTP_X_SECONDLIFE_OWNER_NAME";
 fn logger() {
     //  Log file is openly visible as a web page.
     //  Only for debug tests.
-    const LOG_FILE_NAME: &str = "logs/updatelog.txt";
+    const LOG_FILE_NAME: &str = "logs/gemeratelog.txt";
     let _ = simplelog::CombinedLogger::init(vec![simplelog::WriteLogger::new(
         LevelFilter::Debug,
         simplelog::Config::default(),
@@ -144,6 +148,7 @@ impl UploadedRegionInfo {
         //////Ok(self.get_unscaled_elevs()?.iter().map(|&v| ((v as f32) / 256.0) * self.scale + self.offset).collect())
     }
 }
+/*
 ///  Our handler
 struct TerrainUploadHandler {
     /// MySQL onnection pool. We only use one.
@@ -317,10 +322,12 @@ pub fn run_responder() -> Result<(), Error> {
     //  Run the FCGI server.
     minifcgi::run(&mut instream, &mut outio, &mut terrain_upload_handler)
 }
+*/
 
 /// Main program
 pub fn main() {
     logger();
+/*
     match run_responder() {
         Ok(()) => {},
         Err(e) => {
@@ -328,6 +335,7 @@ pub fn main() {
             panic!("Upload server failed: {:?}", e);
         }
     }
+*/
 }
 
 #[test]

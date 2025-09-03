@@ -85,5 +85,19 @@ Next steps:
       - Better than having two sets of images for large regions.
 - Add sculpt support in Sharpview.
 - Overfly Blake Sea and make video.
+
+2025-09-02
+
+- Converted all region positions to meters. [DONE]
+- Downscaling elevations.
+  - Create target array, 2D of f32. Initialize to 0
+  - Get an iterator over a SELECT of the region of interest. Retrieve relevant squares.
+  - Apply samples to target array.
+  - Get Z bounds for target array. Compute scaling and offset. Generate elevation image?
+  
+- Uploading needs to require a PUT operation. 
+
+- The sculpt maker program needs to create a local directory of named images.
+  - Used by a user, so it needs a web page.
       
       
