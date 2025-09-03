@@ -13,16 +13,14 @@
 //!     License: LGPL.
 //!     Animats
 //!     August, 2025.
-
+//
+use getopts::Options;
 use std::collections::HashMap;
 use std::io::Write;
 use anyhow::{Error, anyhow};
 use log::LevelFilter;
 use chrono::{NaiveDateTime, Utc};
 use mysql::{OptsBuilder, Opts, Conn, Pool};
-use minifcgi::init_fcgi;
-use minifcgi::{Request, Response, Handler};
-use minifcgi::Credentials;
 use serde::{Deserialize};
 use mysql::{PooledConn, params};
 use mysql::prelude::{Queryable, AsStatement};
@@ -324,25 +322,63 @@ pub fn run_responder() -> Result<(), Error> {
 }
 */
 
-/// Main program
-pub fn main() {
-    logger();
-/*
-    match run_responder() {
-        Ok(()) => {},
-        Err(e) => {
-            log::error!("Upload server failed: {:?}", e);
-            panic!("Upload server failed: {:?}", e);
-        }
+
+fn do_work() {
+    //////println!("{:?} {:?} {}", credsfile, outdir, verbose);
+}
+
+fn print_usage(program: &str, opts: Options) {
+    let brief = format!("Usage: {} [options]", program);
+    print!("{}", opts.usage(&brief));
+}
+
+/// Set up options, credentials, and database connection.
+fn setup() -> Result<(), Error> {
+    //  Usual options processing
+    let args: Vec<String> = std::env::args().collect();
+    let program = args[0].clone();
+    //  The options
+    let mut opts = Options::new();
+    opts.optopt("o", "outdir", "Set output direcory name.", "NAME");
+    opts.optopt("c", "credentials", "Get database credentials from this file.", "NAME");
+    opts.optflag("h", "help", "Print this help menu.");
+    opts.optflag("v", "verbose", "Verbose mode.");
+    let matches = match opts.parse(&args[1..]) {
+        Ok(m) => { m }
+        Err(f) => { panic!("{}", f.to_string()) }
+    };
+    if matches.opt_present("h") {
+        print_usage(&program, opts);
+        panic!("Help requested, will not run.");  
     }
-*/
+    let outdir = matches.opt_str("o");
+    let credsfile = matches.opt_str("c");
+    let verbose = matches.opt_present("v");
+    if outdir.is_none() || credsfile.is_none() {
+        print_usage(&program, opts);
+        return Err(anyhow!("Required command line options missing"));
+    }
+    let credsfile = credsfile.unwrap();
+    let outdir = outdir.unwrap();
+    Ok(())
+}
+
+/// Main program
+fn main() {
+    let _ = match setup() {
+        Ok(_) =>{
+            ////// logger();   // start logging
+            do_work()
+        }
+        Err(e) => {
+            panic!("Unable to start: {:?}", e);
+            
+        }
+    };
+    //////do_work(credsfile, outdir, verbose);
 }
 
 #[test]
-fn parse_terrain() {
-    const TEST_JSON: &str = "{\"grid\":\"agni\",\"name\":\"Vallone\",\"scale\":1.092822,\"offset\":33.500740,\"water_lev\":20.000000,\"region_coords\":[1807,1199],\"elevs\":\"E7CAACA3A5A8ACAEB0B2B5B9BDC0C4C5C5C3C0BDB9B6B3B2B2B3B4B7BBBFC3C7CBCED1D3\"}";
-    println!("TEST_JSON: {}", TEST_JSON);
-    let parsed = UploadedRegionInfo::parse(TEST_JSON).expect("JSON misparsed");
-    println!("Parsed JSON: {:?}", parsed);
-    println!("Elevs: {:?}", parsed.get_scaled_elevs());
+fn generate_terrain() {
+
 }
