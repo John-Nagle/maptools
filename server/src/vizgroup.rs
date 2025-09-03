@@ -19,11 +19,28 @@ use mysql::{PooledConn, params};
 use mysql::prelude::{Queryable, AsStatement};
 use anyhow::{Error, anyhow};
 
-/// Vizgroups - find all the visibility groups
-pub struct Vizgroups {
+/// RegionData - info about one region relevant to this computation.
+#[derive(Debug, Clone)]
+pub struct RegionData {
+    /// Which grid
+    grid: String,
+    /// X
+    region_coords_x: u32,
+    /// Y
+    region_coords_y: u32,
+    /// X size
+    size_x: u32,
+    /// Y size
+    size_y: u32,
+    /// Region name
+    name: String,
 }
 
-impl Vizgroups {
+/// Vizgroups - find all the visibility groups
+pub struct VizGroups {
+}
+
+impl VizGroups {
     /// Usual new
     pub fn new() -> Self {
         Self {
@@ -31,8 +48,18 @@ impl Vizgroups {
     }
     
     /// Build from database
-    pub fn build(&mut self, conn: PooledConn) -> Result<(), Error> {
+    pub fn build(&mut self, conn: &mut PooledConn) -> Result<(), Error> {
         println!("Build start");    // ***TEMP***
+        const SQL_SELECT: &str = r"SELECT grid, region_coords_x, region_coords_y, size_x, size_y, name FROM raw_terrain_heights ORDER BY grid, region_coords_x, region_coords_y";
+        
+        let _all_regions = conn
+            .query_map(
+                SQL_SELECT,
+                |(grid, region_coords_x, region_coords_y, size_x, size_y, name)| {
+                    let region_data = RegionData { grid, region_coords_x, region_coords_y, size_x, size_y, name };
+                    println!("{:?}", region_data);  // ***TEMP***                       
+                },
+        )?;
         Ok(())
     }
 }

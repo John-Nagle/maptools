@@ -29,7 +29,7 @@ use envie::{Envie};
 use minifcgi::Credentials;
 
 mod vizgroup;
-use vizgroup::{Vizgroups};
+use vizgroup::{VizGroups};
 
 /// MySQL Credentials for uploading.
 /// This filename will be searched for in parent directories,
@@ -311,9 +311,9 @@ pub fn run_responder() -> Result<(), Error> {
 /// Actually do the work
 fn run(pool: Pool, outdir: String, verbose: bool) -> Result<(), Error> {
     //////println!("{:?} {:?} {}", credsfile, outdir, verbose);
-    let mut vizgroups = Vizgroups::new();
-    let conn = pool.get_conn()?;
-    vizgroups.build(conn)?;
+    let mut vizgroups = VizGroups::new();
+    let mut conn = pool.get_conn()?;
+    vizgroups.build(&mut conn)?;
     Ok(())
 }
 
