@@ -47,19 +47,44 @@ impl VizGroups {
         }
     }
     
+    fn end_column(&mut self, column: &[RegionData] ) {
+        println!("End column.");
+    }
+    
+    fn end_grid(&mut self) {
+    }
+    
     /// Build from database
     pub fn build(&mut self, conn: &mut PooledConn) -> Result<(), Error> {
         println!("Build start");    // ***TEMP***
+        //  The loop here is sequential data processing with control breaks when a field changes.
         const SQL_SELECT: &str = r"SELECT grid, region_coords_x, region_coords_y, size_x, size_y, name FROM raw_terrain_heights ORDER BY grid, region_coords_x, region_coords_y";
-        
+        let mut prev_region_data: Option<RegionData> = None;
+        let mut column = Vec::new();
         let _all_regions = conn
             .query_map(
                 SQL_SELECT,
                 |(grid, region_coords_x, region_coords_y, size_x, size_y, name)| {
                     let region_data = RegionData { grid, region_coords_x, region_coords_y, size_x, size_y, name };
-                    println!("{:?}", region_data);  // ***TEMP***                       
+                    println!("{:?}", region_data);  // ***TEMP*** 
+                    if let Some(prev) = &prev_region_data {
+                        if region_data.grid != prev.grid {
+                            self.end_column(&column);
+                            column.clear();
+                            column.push(region_data.clone());
+                            self.end_grid();
+                        } else if region_data.region_coords_x != prev.region_coords_x {
+                            self.end_column(&column);
+                            column.clear();
+                            column.push(region_data.clone());
+                        }
+                    };    
+                    let prev_region_data = Some(region_data);                  
                 },
         )?;
+        self.end_column(&column);
+        column.clear();
+        self.end_grid();
         Ok(())
     }
 }
