@@ -52,6 +52,7 @@ impl VizGroups {
     }
     
     fn end_grid(&mut self) {
+        println!("End grid.");
     }
     
     /// Build from database
@@ -79,8 +80,8 @@ impl VizGroups {
                             column.push(region_data.clone());
                         }
                     };    
-                    let prev_region_data = Some(region_data);                  
-                },
+                    prev_region_data = Some(region_data);                  
+                },	
         )?;
         self.end_column(&column);
         column.clear();
