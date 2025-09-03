@@ -24,6 +24,7 @@ use mysql::{OptsBuilder, Opts, Conn, Pool};
 use serde::{Deserialize};
 use mysql::{PooledConn, params};
 use mysql::prelude::{Queryable, AsStatement};
+use envie::{Envie};
 //  Need to put this into a common dir.
 use minifcgi::Credentials;
 
@@ -345,7 +346,13 @@ fn setup() -> Result<(), Error> {
     /// Create the output directory, empty.
     //  ***MORE***
     /// Connect to the database
-    let creds = Credentials::new(UPLOAD_CREDS_FILE)?;
+    let creds = match Envie::load_with_path(&credsfile) {
+        Ok(creds) => creds,
+        Err(e) => {
+            //  Envie returns a string and we need an Error
+            return Err(anyhow!("Unable to open credentials file \"{}\": {:?}", credsfile, e));
+        }
+    };
     //  Optional MySQL port number
     let portnum = if let Some(port) = creds.get("DB_PORT") {
         port.parse::<u16>()?
@@ -364,6 +371,9 @@ fn setup() -> Result<(), Error> {
     drop(creds);
     //////log::info!("Opts: {:?}", opts);
     let pool = Pool::new(opts)?;
+    if verbose {
+        println!("Connected to database.");
+    }
     log::info!("Connected to database.");
 
     Ok(())

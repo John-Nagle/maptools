@@ -98,6 +98,28 @@ Next steps:
 - Uploading needs to require a PUT operation. 
 
 - The sculpt maker program needs to create a local directory of named images.
-  - Used by a user, so it needs a web page.
+  - This will be a command line program.
+  
+  Transitive closure:
+  
+  - SELECT grid, x, y, size_x, size_y ORDER BY grid, x, y;  
+  - Maintain an ordered list of sets of ??? (x, y) with size_x, size_y.
+  - Process sequentially.
+    - On control break of grid, done with grid, clear and restart.
+    - On control break of x, start new column.
+    
+    - Within a column:
+      - If Y item touches preceding Y item
+        - Merge into that items set
+      - If next Y item touches an item in the ordered list
+        - Merge into that item's set.
+      - Otherwise start new set
+    
+    - Start new column
+      - Anything not wide enough to reach new column, done.
+      
+    ***MORE***
+   
+  
       
       
