@@ -305,9 +305,10 @@ pub fn run_responder() -> Result<(), Error> {
 }
 */
 
-
-fn do_work() {
+/// Actually do the work
+fn run(pool: Pool, outdir: String, verbose: bool) -> Result<(), Error> {
     //////println!("{:?} {:?} {}", credsfile, outdir, verbose);
+    Ok(())
 }
 
 fn print_usage(program: &str, opts: Options) {
@@ -316,7 +317,7 @@ fn print_usage(program: &str, opts: Options) {
 }
 
 /// Set up options, credentials, and database connection.
-fn setup() -> Result<(), Error> {
+fn setup() -> Result<(Pool, String, bool), Error> {
     //  Usual options processing
     let args: Vec<String> = std::env::args().collect();
     let program = args[0].clone();
@@ -343,9 +344,9 @@ fn setup() -> Result<(), Error> {
     }
     let credsfile = credsfile.unwrap();
     let outdir = outdir.unwrap();
-    /// Create the output directory, empty.
+    // Create the output directory, empty.
     //  ***MORE***
-    /// Connect to the database
+    // Connect to the database
     let creds = match Envie::load_with_path(&credsfile) {
         Ok(creds) => creds,
         Err(e) => {
@@ -375,23 +376,31 @@ fn setup() -> Result<(), Error> {
         println!("Connected to database.");
     }
     log::info!("Connected to database.");
-
-    Ok(())
+    //  Setup complete. Return what's needed to run.
+    Ok((pool, outdir, verbose))
 }
 
-/// Main program
+/// Main program.
+/// Setup, then run.
 fn main() {
-    let _ = match setup() {
-        Ok(_) =>{
-            ////// logger();   // start logging
-            do_work()
+    match setup() {
+        Ok((pool, outdir, verbose)) => {
+            match run(pool, outdir, verbose) {
+                Ok(_) => {
+                    if verbose {
+                        println!("Done.");
+                    }
+                }
+                Err(e) => { 
+                    panic!("Failed: {:?}", e);
+                }
+            }   
         }
         Err(e) => {
             panic!("Unable to start: {:?}", e);
             
         }
     };
-    //////do_work(credsfile, outdir, verbose);
 }
 
 #[test]
