@@ -48,7 +48,10 @@ impl VizGroups {
     }
     
     fn end_column(&mut self, column: &[RegionData] ) {
-        println!("End column.");
+        for region_data in column {
+            println!("{:?}", region_data);  // ***TEMP*** 
+        }
+        println!("End column. {} regions.", column.len());
     }
     
     fn end_grid(&mut self) {
@@ -66,20 +69,19 @@ impl VizGroups {
             .query_map(
                 SQL_SELECT,
                 |(grid, region_coords_x, region_coords_y, size_x, size_y, name)| {
-                    let region_data = RegionData { grid, region_coords_x, region_coords_y, size_x, size_y, name };
-                    println!("{:?}", region_data);  // ***TEMP*** 
+                    let region_data = RegionData { grid, region_coords_x, region_coords_y, size_x, size_y, name };                    
                     if let Some(prev) = &prev_region_data {
                         if region_data.grid != prev.grid {
                             self.end_column(&column);
                             column.clear();
-                            column.push(region_data.clone());
                             self.end_grid();
                         } else if region_data.region_coords_x != prev.region_coords_x {
                             self.end_column(&column);
                             column.clear();
-                            column.push(region_data.clone());
                         }
-                    };    
+                    };
+                    //  Add to column, or start new column.
+                    column.push(region_data.clone());
                     prev_region_data = Some(region_data);                  
                 },	
         )?;
