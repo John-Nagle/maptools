@@ -28,6 +28,9 @@ use envie::{Envie};
 //  Need to put this into a common dir.
 use minifcgi::Credentials;
 
+mod vizgroup;
+use vizgroup::{Vizgroups};
+
 /// MySQL Credentials for uploading.
 /// This filename will be searched for in parent directories,
 /// so it can be placed above the web root, where the web server can't see it.
@@ -308,6 +311,9 @@ pub fn run_responder() -> Result<(), Error> {
 /// Actually do the work
 fn run(pool: Pool, outdir: String, verbose: bool) -> Result<(), Error> {
     //////println!("{:?} {:?} {}", credsfile, outdir, verbose);
+    let mut vizgroups = Vizgroups::new();
+    let conn = pool.get_conn()?;
+    vizgroups.build(conn)?;
     Ok(())
 }
 
