@@ -36,6 +36,28 @@ pub struct RegionData {
     name: String,
 }
 
+/// A set of regions which all have the same viz group
+pub struct VizGroup {
+    /// All in this viz group are in this string.
+    pub grid: String,
+    /// Regions
+    /// Will probably change to a different data structure
+    pub regions: Vec<RegionData>,
+}
+
+impl VizGroup {
+
+    /// Merge two VizGroups, consuming them.
+    pub fn merge(mut a: VizGroup, b: VizGroup) -> VizGroup {
+  	      assert_eq!(a.grid, b.grid);
+        a.regions.extend(b.regions);
+        Self {
+            grid: a.grid,
+            regions: a.regions
+        }
+    }
+}
+
 /// Vizgroups - find all the visibility groups
 pub struct VizGroups {
 }
