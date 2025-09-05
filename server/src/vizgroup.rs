@@ -18,6 +18,8 @@ use serde::{Deserialize};
 use mysql::{PooledConn, params};
 use mysql::prelude::{Queryable, AsStatement};
 use anyhow::{Error, anyhow};
+use std::cell::{RefCell};
+use std::rc::{Rc, Weak};
 
 /// RegionData - info about one region relevant to this computation.
 #[derive(Debug, Clone)]
@@ -36,15 +38,43 @@ pub struct RegionData {
     name: String,
 }
 
+//  General concept of transitive closure algorithm.
+//  (Tenative)
+//
+//  LiveBlocks have an Rc link to a VizGroup.
+//  When we detect that a region in a new column touches
+//  a LiveBlock or another region in the new column,
+//  VizGroups are merged.
+//  (This part is tricky for ownership reasons.)
+//
+//  When a LiveBlock is deleted, it drops its reference to the VizGroup.
+//  When a VizGroup is deleted because no LiveBlock is referencing it,
+//  that means a VizGroup is complete, so
+//  ownership of the VizGroup's data is transferred to a vector of
+//  completed VizGroup items in VizGroups.
+
+
 /// A rectangle of interest which might touch a object in an incoming column.
 pub struct LiveBlock {
+    /// This block
+    region_data: RegionData,
+    /// Link to VizGroup
+    viz_group: Rc<RefCell<VizGroup>>,
+    /// Backlink to VizGroups
+    viz_groups_weak: Weak<RefCell<VizGroups>>,
 }
 
-/// An ordered sequence of LiveBlock items hwich might touch an object in an incoming column.
+
+
+/// An ordered sequence of LiveBlock items which might touch an object in an incoming column.
 /// When a new column comes in, any LiveBlock which doesn't reach that far is purged.
 //  Needs an ordered representation.
 struct LiveBlocks {
-    // ***MORE***
+    /// This block
+    region_data: RegionData,
+    /// Link to VizGroup
+    viz_group: Rc<RefCell<VizGroup>>,
+
 }
 
 impl LiveBlocks {
@@ -71,11 +101,30 @@ pub struct VizGroup {
     pub grid: String,
     /// Regions
     /// Will probably change to a different data structure
-    pub regions: Vec<RegionData>,
+    /// This is inside an option so we can take it later.
+    pub regions: Option<Vec<RegionData>>,
+    /// Backlink to VizGroups
+    viz_groups_weak: Weak<RefCell<VizGroups>>,
+}
+
+impl Drop for VizGroup {
+
+    /// Drop happens when no live block is using this VizGroup.
+    /// So that VizGroup is complete.
+    /// The group is delivered to VizGroups as done.
+    fn drop(&mut self) {
+        let mut viz_groups = self.viz_groups_weak.upgrade().expect("Unable to upgrade vizgroups");
+        viz_groups.borrow_mut().add_completed_group(self.regions.take().expect("Regions should not be None"));
+    }
 }
 
 impl VizGroup {
-
+    /// Merge another VizGroup into this one. The other group cannot be used again.
+    pub fn merge(&mut self, other: &mut VizGroup) {
+        assert_eq!(self.grid, other.grid);
+        self.regions.as_mut().expect("Regions should not be None").append(&mut other.regions.take().expect("Regions should not be none"));
+    }
+/*
     /// Merge two VizGroups, consuming them.
     pub fn merge(mut a: VizGroup, b: VizGroup) -> VizGroup {
   	    assert_eq!(a.grid, b.grid);
@@ -85,17 +134,25 @@ impl VizGroup {
             regions: a.regions
         }
     }
+*/
 }
 
 /// Vizgroups - find all the visibility groups
 pub struct VizGroups {
+    completed_groups: Vec<Vec<RegionData>>,
 }
 
 impl VizGroups {
     /// Usual new
     pub fn new() -> Self {
         Self {
+            completed_groups: Vec::new(),
         }
+    }
+    
+    /// Add a completed VizGroup. This is one connected area of regions.
+    pub fn add_completed_group(&mut self, completed_group: Vec<RegionData>) {
+        self.completed_groups.push(completed_group);
     }
     
     fn end_column(&mut self, column: &[RegionData] ) {
