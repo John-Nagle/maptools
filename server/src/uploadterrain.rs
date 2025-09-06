@@ -332,9 +332,9 @@ pub fn main() {
 
 #[test]
 fn parse_terrain() {
-    const TEST_JSON: &str = "{\"grid\":\"agni\",\"name\":\"Vallone\",\"scale\":1.092822,\"offset\":33.500740,\"water_lev\":20.000000,\"region_coords\":[1807,1199],\"elevs\":\"E7CAACA3A5A8ACAEB0B2B5B9BDC0C4C5C5C3C0BDB9B6B3B2B2B3B4B7BBBFC3C7CBCED1D3\"}";
+    const TEST_JSON: &str = "{\"grid\":\"agni\",\"name\":\"Vallone\",\"scale\":1.092822,\"offset\":33.500740,\"water_lev\":20.000000,\"region_coords\":[1807,1199],\"elevs\":[\"E7CAACA3A5A8ACAEB0B2B5B9BDC0C4C5C5C3C0BDB9B6B3B2B2B3B4B7BBBFC3C7CBCED1D3\"]}";
     println!("TEST_JSON: {}", TEST_JSON);
     let parsed = UploadedRegionInfo::parse(TEST_JSON).expect("JSON misparsed");
     println!("Parsed JSON: {:?}", parsed);
-    println!("Elevs: {:?}", parsed.get_scaled_elevs());
+    println!("Elevs: {:?}", parsed.get_unscaled_elevs());
 }

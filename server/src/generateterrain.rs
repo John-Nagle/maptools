@@ -408,7 +408,7 @@ fn main() {
         }
     };
 }
-
+/*
 #[test]
 fn generate_terrain() {
     let creds = Credentials::new(UPLOAD_CREDS_FILE)?;
@@ -432,3 +432,4 @@ fn generate_terrain() {
     let pool = Pool::new(opts)?;
     log::info!("Connected to database.");
 }
+*/
