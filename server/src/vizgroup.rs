@@ -110,7 +110,7 @@ pub struct VizGroup {
 impl Drop for VizGroup {
 
     /// Drop happens when no live block is using this VizGroup.
-    /// So that VizGroup is complete.
+    /// Thus, that VizGroup is complete.
     /// The group is delivered to VizGroups as done.
     fn drop(&mut self) {
         let mut viz_groups = self.viz_groups_weak.upgrade().expect("Unable to upgrade vizgroups");
@@ -119,6 +119,15 @@ impl Drop for VizGroup {
 }
 
 impl VizGroup {
+
+    /// New, with the first region, and a back link to the VizGroups
+    pub fn new(region: RegionData, viz_groups_weak: &Weak<RefCell<VizGroups>>) -> Self {
+        Self {
+            grid: region.grid.clone(),
+            regions: Some(vec![region]),
+            viz_groups_weak: viz_groups_weak.clone()
+        }
+    }
     /// Merge another VizGroup into this one. The other group cannot be used again.
     pub fn merge(&mut self, other: &mut VizGroup) {
         assert_eq!(self.grid, other.grid);
