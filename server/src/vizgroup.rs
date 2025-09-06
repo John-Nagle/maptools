@@ -324,5 +324,10 @@ fn test_visgroup() {
     let test_data: Vec<_> = TEST_PATTERN.iter().map(|(grid, region_coords_x, region_coords_y, size_x, size_y, name)| 
         RegionData { grid: grid.to_string(), region_coords_x: *region_coords_x, region_coords_y: *region_coords_y, 
         size_x: *size_x, size_y: *size_y, name: name.to_string() }).collect(); 
-                      
+        
+    let mut viz_groups = VizGroups::new();
+    for item in test_data {
+        viz_groups.add_region_data(item);
+    }
+    viz_groups.end_grid();               
 }
