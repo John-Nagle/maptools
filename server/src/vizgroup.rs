@@ -20,6 +20,7 @@ use mysql::prelude::{Queryable, AsStatement};
 use anyhow::{Error, anyhow};
 use std::cell::{RefCell};
 use std::rc::{Rc, Weak};
+use std::collections::{BTreeMap};
 
 /// RegionData - info about one region relevant to this computation.
 #[derive(Debug, Clone)]
@@ -78,11 +79,8 @@ impl LiveBlock {
 /// When a new column comes in, any LiveBlock which doesn't reach that far is purged.
 //  Needs an ordered representation.
 struct LiveBlocks {
-    /// This block
-    region_data: RegionData,
-    /// Link to VizGroup
-    viz_group: Rc<RefCell<VizGroup>>,
-
+    /// The blocks
+    live_blocks: BTreeMap<u32, LiveBlock>,
 }
 
 impl LiveBlocks {
@@ -91,10 +89,10 @@ impl LiveBlocks {
     fn test_overlap(&self, column: &[RegionData]) -> usize {
         todo!();
     } 
-    /// Purge all blocks whose x edge is below the limit.
+    /// Purge all blocks whose X edge is below or equal to the limit.
     /// This is all of them on SL, but larger regions on OS might be kept.
-    fn purge_below_limit(lim: u32) -> Vec<LiveBlock> {
-        todo!();
+    fn purge_below_x_limit(&mut self, x_limit: u32) {
+        self.live_blocks.retain(|_, v| v.region_data.region_coords_x + v.region_data.size_x > x_limit);
     }
     
     /// Add all the regions in a column to the live blocks.
@@ -157,6 +155,10 @@ impl VizGroup {
 
 /// Vizgroups - find all the visibility groups
 pub struct VizGroups {
+    /// The active column
+    column: Vec<RegionData>,
+    /// Previous region data while inputting a column
+    prev_region_data: Option<RegionData>,
     /// Live blocks. The blocks that touch or pass the current column.
     /// Ordered by Y.
     live_blocks: Vec<LiveBlocks>,
@@ -169,6 +171,8 @@ impl VizGroups {
     /// Usual new
     pub fn new() -> Self {
         Self {
+            column: Vec::new(),
+            prev_region_data: None,
             completed_groups: Vec::new(),
             live_blocks: Vec::new(),
         }
@@ -186,9 +190,10 @@ impl VizGroups {
     /// entries in the column to check for overlap/touching.
     /// Eacn new column entry creates a new VizGroup.
     /// Overlapped/touching groups get their VizGroups merged.
-    fn end_column(&mut self, column: &[RegionData] ) {
+    /// ***WHAT HAPPENS FOR EMPTY COLUMN?***
+    fn end_column(&mut self) {
         // ***MORE***
-        for region_data in column {
+        for region_data in &self.column {
             println!("{:?}", region_data);  // ***TEMP*** 
         }
         //  Create a new list of live blocks from columns.
@@ -201,13 +206,30 @@ impl VizGroups {
         //  Update the list of live blocks.
         //  Ones that ended at the column edge disappear.
         //  All new ones are added.
-        println!("End column. {} regions.", column.len());
+        println!("End column. {} regions.", self.column.len());
+        self.column.clear();
     }
     
     fn end_grid(&mut self) {
+        self.end_column();
         println!("End grid.");
     }
     
+    /// Add one item of region data.
+    fn add_region_data(&mut self, region_data: RegionData) {
+        if let Some(prev) = &self.prev_region_data {
+            if region_data.grid != prev.grid {
+                self.end_column();
+                self.end_grid();
+            } else if region_data.region_coords_x != prev.region_coords_x {
+                self.end_column();
+            }
+        };
+        //  Add to column, or start new column.
+        self.column.push(region_data.clone());
+        self.prev_region_data = Some(region_data);                  
+    }
+/*    
     /// Build from database
     pub fn build(&mut self, conn: &mut PooledConn) -> Result<(), Error> {
         println!("Build start");    // ***TEMP***
@@ -237,6 +259,23 @@ impl VizGroups {
         )?;
         self.end_column(&column);
         column.clear();
+        self.end_grid();
+        Ok(())
+    }
+*/
+    /// Build from database
+    pub fn build(&mut self, conn: &mut PooledConn) -> Result<(), Error> {
+        println!("Build start");    // ***TEMP***
+        //  The loop here is sequential data processing with control breaks when a field changes.
+        const SQL_SELECT: &str = r"SELECT grid, region_coords_x, region_coords_y, size_x, size_y, name FROM raw_terrain_heights ORDER BY grid, region_coords_x, region_coords_y";
+        let _all_regions = conn
+            .query_map(
+                SQL_SELECT,
+                |(grid, region_coords_x, region_coords_y, size_x, size_y, name)| {
+                    let region_data = RegionData { grid, region_coords_x, region_coords_y, size_x, size_y, name }; 
+                    self.add_region_data(region_data);                  
+                },	
+        )?;
         self.end_grid();
         Ok(())
     }
