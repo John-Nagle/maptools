@@ -280,3 +280,49 @@ impl VizGroups {
         Ok(())
     }
 }
+
+//  Unit test.
+//  The test data represents this pattern.
+//  Ordered by x, y
+//
+//  X    XXXXXX
+//  X XX X    X
+//  X    X X  X
+//  X    X X  X
+//  XXXXXX
+//
+#[test]
+fn test_visgroup() {
+    /// Test pattern
+    /// Format: RegionData { grid, region_coords_x, region_coords_y, size_x, size_y, name }; 
+    const TEST_PATTERN: [(&str,u32, u32, u32, u32, &str);24] = [
+        ( "Test", 0, 0, 100, 100, "Bottom left" ),
+        ( "Test", 0, 100, 100, 100, "Left 100" ),
+        ( "Test", 0, 200, 100, 100, "Left 200" ),
+        ( "Test", 0, 300, 100, 100, "Left 300" ),
+        ( "Test", 0, 400, 100, 100, "Left 400" ),
+        ( "Test", 100, 0, 100, 100, "Bottom 100" ),
+        ( "Test", 200, 0, 100, 100, "Bottom 200" ),
+        ( "Test", 200, 300, 100, 100, "Tiny West" ),
+        ( "Test", 300, 0, 100, 100, "Bottom 300" ), 
+        ( "Test", 300, 300, 100, 100, "Tiny East" ),
+        ( "Test", 400, 0, 100, 100, "Bottom 400" ),
+        ( "Test", 500, 0, 100, 100, "Bottom 500" ),
+        ( "Test", 500, 100, 100, 100, "Column 5-1" ),
+        ( "Test", 500, 200, 100, 100, "Column 5-2" ),
+        ( "Test", 500, 300, 100, 100, "Column 5-3" ),
+        ( "Test", 500, 400, 100, 100, "Column 5-4" ),
+        ( "Test", 600, 400, 100, 100, "Top 600" ),
+        ( "Test", 700, 100, 100, 200, "Tall skinny region" ),
+        ( "Test", 700, 400, 100, 100, "Top 700" ),
+        ( "Test", 800, 400, 100, 100, "Top 800" ),   
+        ( "Test", 900, 100, 100, 100, "Right 100" ),
+        ( "Test", 900, 200, 100, 100, "Right 200" ),
+        ( "Test", 900, 300, 100, 100, "Right 300" ),
+        ( "Test", 900, 300, 100, 100, "Right 400" )];
+        
+    let test_data: Vec<_> = TEST_PATTERN.iter().map(|(grid, region_coords_x, region_coords_y, size_x, size_y, name)| 
+        RegionData { grid: grid.to_string(), region_coords_x: *region_coords_x, region_coords_y: *region_coords_y, 
+        size_x: *size_x, size_y: *size_y, name: name.to_string() }).collect(); 
+                      
+}
