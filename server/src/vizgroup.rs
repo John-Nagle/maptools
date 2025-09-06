@@ -65,10 +65,10 @@ pub struct LiveBlock {
 
 impl LiveBlock {
     /// Usual new
-    pub fn new(region_data: &RegionData, viz_groups_weak: &Weak<RefCell<VizGroups>>) -> Self {
+    pub fn new(region_data: &RegionData, completed_groups_weak: &Weak<RefCell<CompletedGroups>>) -> Self {
         Self {
             region_data: region_data.clone(),
-            viz_group: VizGroup::new(region_data.clone(), viz_groups_weak),
+            viz_group: VizGroup::new(region_data.clone(), completed_groups_weak),
         }
     }
 }
@@ -109,8 +109,8 @@ pub struct VizGroup {
     /// Will probably change to a different data structure
     /// This is inside an option so we can take it later.
     pub regions: Option<Vec<RegionData>>,
-    /// Backlink to VizGroups
-    viz_groups_weak: Weak<RefCell<VizGroups>>,
+    /// Backlink to completed groups so they can be updated from drop.
+    completed_groups_weak: Weak<RefCell<CompletedGroups>>,
 }
 
 impl Drop for VizGroup {
@@ -119,19 +119,19 @@ impl Drop for VizGroup {
     /// Thus, that VizGroup is complete.
     /// The group is delivered to VizGroups as done.
     fn drop(&mut self) {
-        let mut viz_groups = self.viz_groups_weak.upgrade().expect("Unable to upgrade vizgroups");
-        viz_groups.borrow_mut().add_completed_group(self.regions.take().expect("Regions should not be None"));
+        let mut completed_groups = self.completed_groups_weak.upgrade().expect("Unable to upgrade vizgroups");
+        completed_groups.borrow_mut().push(self.regions.take().expect("Regions should not be None"));
     }
 }
 
 impl VizGroup {
 
     /// New, with the first region, and a back link to the VizGroups
-    pub fn new(region: RegionData, viz_groups_weak: &Weak<RefCell<VizGroups>>) -> Rc<RefCell<Self>> {
+    pub fn new(region: RegionData, completed_groups_weak: &Weak<RefCell<CompletedGroups>>) -> Rc<RefCell<Self>> {
         let new_item = Self {
             grid: region.grid.clone(),
             regions: Some(vec![region]),
-            viz_groups_weak: viz_groups_weak.clone()
+            completed_groups_weak: completed_groups_weak.clone()
         };
         Rc::new(RefCell::new(new_item))
     }
@@ -153,6 +153,8 @@ impl VizGroup {
 */
 }
 
+type CompletedGroups = Vec<Vec<RegionData>>;
+
 /// Vizgroups - find all the visibility groups
 pub struct VizGroups {
     /// The active column
@@ -164,7 +166,7 @@ pub struct VizGroups {
     live_blocks: Vec<LiveBlocks>,
     /// Completed groups. This is the output from transitive closure.
     /// No ordering
-    completed_groups: Vec<Vec<RegionData>>,
+    completed_groups: Rc<RefCell<CompletedGroups>>,
 }
 
 impl VizGroups {
@@ -173,15 +175,16 @@ impl VizGroups {
         Self {
             column: Vec::new(),
             prev_region_data: None,
-            completed_groups: Vec::new(),
+            completed_groups: Rc::new(RefCell::new(Vec::new())),
             live_blocks: Vec::new(),
         }
     }
-    
+/*    
     /// Add a completed VizGroup. This is one connected area of regions.
     pub fn add_completed_group(&mut self, completed_group: Vec<RegionData>) {
         self.completed_groups.push(completed_group);
     }
+*/
     
     /// End of a column.
     /// Where all the real work gets done.
@@ -283,7 +286,8 @@ impl VizGroups {
 
 //  Unit test.
 //  The test data represents this pattern.
-//  Ordered by x, y
+//  Ordered by x, y.
+//  Result should be three VizGroup items.
 //
 //  X    XXXXXX
 //  X XX X    X
