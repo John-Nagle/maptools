@@ -60,8 +60,16 @@ pub struct LiveBlock {
     region_data: RegionData,
     /// Link to VizGroup
     viz_group: Rc<RefCell<VizGroup>>,
-    /// Backlink to VizGroups
-    viz_groups_weak: Weak<RefCell<VizGroups>>,
+}
+
+impl LiveBlock {
+    /// Usual new
+    pub fn new(region_data: &RegionData, viz_groups_weak: &Weak<RefCell<VizGroups>>) -> Self {
+        Self {
+            region_data: region_data.clone(),
+            viz_group: VizGroup::new(region_data.clone(), viz_groups_weak),
+        }
+    }
 }
 
 
@@ -121,12 +129,13 @@ impl Drop for VizGroup {
 impl VizGroup {
 
     /// New, with the first region, and a back link to the VizGroups
-    pub fn new(region: RegionData, viz_groups_weak: &Weak<RefCell<VizGroups>>) -> Self {
-        Self {
+    pub fn new(region: RegionData, viz_groups_weak: &Weak<RefCell<VizGroups>>) -> Rc<RefCell<Self>> {
+        let new_item = Self {
             grid: region.grid.clone(),
             regions: Some(vec![region]),
             viz_groups_weak: viz_groups_weak.clone()
-        }
+        };
+        Rc::new(RefCell::new(new_item))
     }
     /// Merge another VizGroup into this one. The other group cannot be used again.
     pub fn merge(&mut self, other: &mut VizGroup) {
@@ -148,6 +157,11 @@ impl VizGroup {
 
 /// Vizgroups - find all the visibility groups
 pub struct VizGroups {
+    /// Live blocks. The blocks that touch or pass the current column.
+    /// Ordered by Y.
+    live_blocks: Vec<LiveBlocks>,
+    /// Completed groups. This is the output from transitive closure.
+    /// No ordering
     completed_groups: Vec<Vec<RegionData>>,
 }
 
@@ -156,6 +170,7 @@ impl VizGroups {
     pub fn new() -> Self {
         Self {
             completed_groups: Vec::new(),
+            live_blocks: Vec::new(),
         }
     }
     
@@ -164,10 +179,28 @@ impl VizGroups {
         self.completed_groups.push(completed_group);
     }
     
+    /// End of a column.
+    /// Where all the real work gets done.
+    /// Each entry in the new column has to be compared with the
+    /// live blocks to check for overlap/touching, and with adjacent
+    /// entries in the column to check for overlap/touching.
+    /// Eacn new column entry creates a new VizGroup.
+    /// Overlapped/touching groups get their VizGroups merged.
     fn end_column(&mut self, column: &[RegionData] ) {
+        // ***MORE***
         for region_data in column {
             println!("{:?}", region_data);  // ***TEMP*** 
         }
+        //  Create a new list of live blocks from columns.
+        //  Each live block gets its own VizGroup.
+        //  If two live blocks in this list overlap, merge their viz groups.
+        //  ***MORE***
+        //  Compare previous list of live blocks with this one. If there is
+        //  overlap, merge their viz groups.
+        //  ***MORE***
+        //  Update the list of live blocks.
+        //  Ones that ended at the column edge disappear.
+        //  All new ones are added.
         println!("End column. {} regions.", column.len());
     }
     
