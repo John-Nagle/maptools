@@ -219,14 +219,19 @@ impl VizGroups {
         //  All new ones are added.
         println!("End column. {} regions.", self.column.len());
         if !self.column.is_empty() {
-            //  Purge now-dead live blocks.
+            //  Purge now-dead live blocks. This will be all of them on SL, but wide regions on OS may not be ready to die yet.
             let x_limit = self.column[0].region_data.region_coords_x;
             self.live_blocks.purge_below_x_limit(x_limit);
             //  Add new live blocks.
             //////self.column.iter().map(|b| self.live_blocks.live_blocks.insert(b.region_data.region_coords_y, b));
+            //////let _  = self.column.drain(..).map(|b| self.live_blocks.live_blocks.insert(b.region_data.region_coords_y, b));
+            //  ***Proper way above does nothing***
+            
             while let Some(b) = self.column.pop() {
                 self.live_blocks.live_blocks.insert(b.region_data.region_coords_y, b);
             }
+            println!("{} live blocks", self.live_blocks.live_blocks.len()); // ***TEMP***
+            assert!(self.column.is_empty());
         }
         self.column.clear();
     }
@@ -341,7 +346,7 @@ fn test_visgroup() {
         ( "Test", 900, 100, 100, 100, "Right 100" ),
         ( "Test", 900, 200, 100, 100, "Right 200" ),
         ( "Test", 900, 300, 100, 100, "Right 300" ),
-        ( "Test", 900, 300, 100, 100, "Right 400" )];
+        ( "Test", 900, 400, 100, 100, "Right 400" )];
         
     let test_data: Vec<_> = TEST_PATTERN.iter().map(|(grid, region_coords_x, region_coords_y, size_x, size_y, name)| 
         RegionData { grid: grid.to_string(), region_coords_x: *region_coords_x, region_coords_y: *region_coords_y, 
