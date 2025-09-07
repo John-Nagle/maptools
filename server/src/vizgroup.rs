@@ -79,6 +79,12 @@ impl LiveBlock {
         self.viz_group.borrow_mut().merge(&mut other.viz_group.borrow_mut());
         other.viz_group = self.viz_group.clone()
     }
+    
+    /// y-adjacent - true if adjacent in y
+    fn y_adjacent(&self, b: &mut LiveBlock, tolerance: u32) -> bool {
+        assert!(self.region_data.region_coords_y <= b.region_data.region_coords_y); // ordered properly, a < b in Y
+        self.region_data.region_coords_y + self.region_data.size_y + tolerance >= b.region_data.region_coords_y
+    }
 }
 
 
@@ -206,7 +212,7 @@ impl VizGroups {
 */
 
     /// y-adjacent - true if adjacent in y
-    fn y_adjacent(&self, a: &LiveBlock, b: &LiveBlock) -> bool {
+    fn y_adjacent(&self, a: &mut LiveBlock, b: &mut LiveBlock) -> bool {
         assert!(a.region_data.region_coords_y <= b.region_data.region_coords_y); // ordered properly, a < b in Y
         a.region_data.region_coords_y + a.region_data.size_y + self.tolerance >= b.region_data.region_coords_y
     }
@@ -229,7 +235,8 @@ impl VizGroups {
         let mut prev_opt: Option<&mut LiveBlock> = None;
         for item in &mut self.column {
             if let Some(prev) = prev_opt {
-                let overlap = self.y_adjacent(prev, item);
+                //////let overlap = self.y_adjacent(prev, item);
+                let overlap = prev.y_adjacent(item, self.tolerance);
                 if overlap {	
                     prev.merge(item)
                 }
