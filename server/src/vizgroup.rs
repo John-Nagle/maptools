@@ -23,7 +23,7 @@ use std::rc::{Rc, Weak};
 use std::collections::{BTreeMap};
 
 /// RegionData - info about one region relevant to this computation.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct RegionData {
     /// Which grid
     grid: String,
@@ -77,8 +77,10 @@ impl LiveBlock {
     /// Both LiveBlocks get an Rc to the same VisGroup.
     pub fn merge(&mut self, other: &mut LiveBlock) {
         println!("Merging"); // ***TEMP***
-        self.viz_group.borrow_mut().merge(&mut other.viz_group.borrow_mut());
-        other.viz_group = self.viz_group.clone()
+        if self.viz_group != other.viz_group {
+            self.viz_group.borrow_mut().merge(&mut other.viz_group.borrow_mut());
+            other.viz_group = self.viz_group.clone()
+        }
     }
     
     /// y-adjacent - true if adjacent in y.
@@ -141,6 +143,16 @@ pub struct VizGroup {
     pub regions: Option<Vec<RegionData>>,
     /// Backlink to completed groups so they can be updated from drop.
     completed_groups_weak: Weak<RefCell<CompletedGroups>>,
+}
+
+impl PartialEq for VizGroup {
+    /// Equality test.
+    //  ***TOO EXPENSIVE - scans entire region list.***
+    //  ***add a serial number or something.
+    fn eq(&self, other: &Self) -> bool {
+        self.grid == other.grid
+        && self.regions == other.regions
+    }
 }
 
 impl Drop for VizGroup {
