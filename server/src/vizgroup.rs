@@ -231,9 +231,8 @@ impl VizGroups {
             }
         };
         //  Add to column, or start new column.
-        //////self.column.push(region_data.clone());
         self.column.push(LiveBlock::new(&region_data, &Rc::<RefCell<Vec<Vec<RegionData>>>>::downgrade(&self.completed_groups)));
-        //////self.prev_region_data = Some(region_data);                  
+        self.prev_region_data = Some(region_data);                  
     }
 /*    
     /// Build from database
