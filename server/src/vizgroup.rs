@@ -76,6 +76,7 @@ impl LiveBlock {
     /// Merge the VizGroups of two LiveBlock items.
     /// Both LiveBlocks get an Rc to the same VisGroup.
     pub fn merge(&mut self, other: &mut LiveBlock) {
+        println!("Merging"); // ***TEMP***
         self.viz_group.borrow_mut().merge(&mut other.viz_group.borrow_mut());
         other.viz_group = self.viz_group.clone()
     }
@@ -141,7 +142,9 @@ impl Drop for VizGroup {
     /// The group is delivered to VizGroups as done.
     fn drop(&mut self) {
         let mut completed_groups = self.completed_groups_weak.upgrade().expect("Unable to upgrade vizgroups");
-        completed_groups.borrow_mut().push(self.regions.take().expect("Regions should not be None"));
+        if let Some(group) = self.regions.take() {
+            completed_groups.borrow_mut().push(group);
+        }
     }
 }
 
@@ -209,13 +212,13 @@ impl VizGroups {
     pub fn add_completed_group(&mut self, completed_group: Vec<RegionData>) {
         self.completed_groups.push(completed_group);
     }
-*/
 
     /// y-adjacent - true if adjacent in y
     fn y_adjacent(&self, a: &mut LiveBlock, b: &mut LiveBlock) -> bool {
         assert!(a.region_data.region_coords_y <= b.region_data.region_coords_y); // ordered properly, a < b in Y
         a.region_data.region_coords_y + a.region_data.size_y + self.tolerance >= b.region_data.region_coords_y
     }
+*/
     
     /// End of a column.
     /// Where all the real work gets done.
@@ -235,9 +238,7 @@ impl VizGroups {
         let mut prev_opt: Option<&mut LiveBlock> = None;
         for item in &mut self.column {
             if let Some(prev) = prev_opt {
-                //////let overlap = self.y_adjacent(prev, item);
-                let overlap = prev.y_adjacent(item, self.tolerance);
-                if overlap {	
+                if prev.y_adjacent(item, self.tolerance) {
                     prev.merge(item)
                 }
             }
