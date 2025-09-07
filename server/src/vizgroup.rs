@@ -81,16 +81,27 @@ impl LiveBlock {
         other.viz_group = self.viz_group.clone()
     }
     
-    /// y-adjacent - true if adjacent in y
+    /// y-adjacent - true if adjacent in y.
+    /// Called while iterating over a single column.
     fn y_adjacent(&self, b: &mut LiveBlock, tolerance: u32) -> bool {
         assert!(self.region_data.region_coords_y <= b.region_data.region_coords_y); // ordered properly, a < b in Y
         self.region_data.region_coords_y + self.region_data.size_y + tolerance >= b.region_data.region_coords_y
     }
     
     /// xy-adjacent - true if adjacent in x and y, on different columns.
+    /// Called when iterating over two columns in sync.
     fn xy_adjacent(&self, b: &mut LiveBlock, tolerance: u32) -> bool {
-        println!("XY-adjacent test: {:?}\nvs {:?}", self, b); // ***TEMP***
-        false   // ***TEMP***
+        assert!(self.region_data.region_coords_x + self.region_data.size_x <= b.region_data.region_coords_x); // columns must be adjacent in X.
+        //  True if overlaps in Y.
+        // ***MORE***
+        let ax0 = self.region_data.region_coords_y;
+        let ax1 = ax0 + self.region_data.size_y;
+        let bx0 = b.region_data.region_coords_y;
+        let bx1 = bx0 + b.region_data.size_y;
+        let overlap = ax0 <= bx1 && ax1 >= bx0;
+        println!("XY-adjacent test: overlap: {}\n
+            {:?}\nvs {:?}", overlap, self, b); // ***TEMP***
+        overlap
     }
 }
 
@@ -365,5 +376,7 @@ fn test_visgroup() {
     for item in test_data {
         viz_groups.add_region_data(item);
     }
-    viz_groups.end_grid();               
+    viz_groups.end_grid();
+    //  Display results
+    println!("Result: Viz groups: {:?}", viz_groups.completed_groups.borrow());               
 }
