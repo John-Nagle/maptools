@@ -72,6 +72,13 @@ impl LiveBlock {
             viz_group: VizGroup::new(region_data.clone(), completed_groups_weak),
         }
     }
+    
+    /// Merge the VizGroups of two LiveBlock items.
+    /// Both LiveBlocks get an Rc to the same VisGroup.
+    pub fn merge(&mut self, other: &mut LiveBlock) {
+        self.viz_group.borrow_mut().merge(&mut other.viz_group.borrow_mut());
+        other.viz_group = self.viz_group.clone()
+    }
 }
 
 
@@ -210,6 +217,8 @@ impl VizGroups {
         //  Create a new list of live blocks from columns.
         //  Each live block gets its own VizGroup.
         //  If two live blocks in this list overlap, merge their viz groups.
+        //  This is the check for overlap in Y.
+        
         //  ***MORE***
         //  Compare previous list of live blocks with this one. If there is
         //  overlap, merge their viz groups.
