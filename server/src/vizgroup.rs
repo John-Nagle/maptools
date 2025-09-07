@@ -85,6 +85,12 @@ struct LiveBlocks {
 }
 
 impl LiveBlocks {
+    /// Usual new
+    pub fn new() -> Self {
+        Self {
+            live_blocks: BTreeMap::new(),
+        }
+    }
     /// Test for overlap between a column and the live blocks.
     //  *** What should this return? ***
     fn test_overlap(&self, column: &[RegionData]) -> usize {
@@ -165,7 +171,7 @@ pub struct VizGroups {
     prev_region_data: Option<RegionData>,
     /// Live blocks. The blocks that touch or pass the current column.
     /// Ordered by Y.
-    live_blocks: Vec<LiveBlocks>,
+    live_blocks: LiveBlocks,
     /// Completed groups. This is the output from transitive closure.
     /// No ordering
     completed_groups: Rc<RefCell<CompletedGroups>>,
@@ -178,7 +184,7 @@ impl VizGroups {
             column: Vec::new(),
             prev_region_data: None,
             completed_groups: Rc::new(RefCell::new(Vec::new())),
-            live_blocks: Vec::new(),
+            live_blocks: LiveBlocks::new(),
         }
     }
 /*    
@@ -212,6 +218,16 @@ impl VizGroups {
         //  Ones that ended at the column edge disappear.
         //  All new ones are added.
         println!("End column. {} regions.", self.column.len());
+        if !self.column.is_empty() {
+            //  Purge now-dead live blocks.
+            let x_limit = self.column[0].region_data.region_coords_x;
+            self.live_blocks.purge_below_x_limit(x_limit);
+            //  Add new live blocks.
+            //////self.column.iter().map(|b| self.live_blocks.live_blocks.insert(b.region_data.region_coords_y, b));
+            while let Some(b) = self.column.pop() {
+                self.live_blocks.live_blocks.insert(b.region_data.region_coords_y, b);
+            }
+        }
         self.column.clear();
     }
     
