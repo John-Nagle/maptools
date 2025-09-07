@@ -182,6 +182,9 @@ pub struct VizGroups {
     /// Completed groups. This is the output from transitive closure.
     /// No ordering
     completed_groups: Rc<RefCell<CompletedGroups>>,
+    /// Tolerance. 0 or 1. 1 expands regions 1 unit for the overlap test.
+    /// This makes corner adjacency work for Open Simulator
+    tolerance: u32,
 }
 
 impl VizGroups {
@@ -192,6 +195,7 @@ impl VizGroups {
             prev_region_data: None,
             completed_groups: Rc::new(RefCell::new(Vec::new())),
             live_blocks: LiveBlocks::new(),
+            tolerance: 0,
         }
     }
 /*    
@@ -200,6 +204,12 @@ impl VizGroups {
         self.completed_groups.push(completed_group);
     }
 */
+
+    /// y-adjacent - true if adjacent in y
+    fn y_adjacent(&self, a: &LiveBlock, b: &LiveBlock) -> bool {
+        assert!(a.region_data.region_coords_y <= b.region_data.region_coords_y); // ordered properly, a < b in Y
+        a.region_data.region_coords_y + a.region_data.size_y + self.tolerance >= b.region_data.region_coords_y
+    }
     
     /// End of a column.
     /// Where all the real work gets done.
@@ -214,10 +224,18 @@ impl VizGroups {
         for region_data in &self.column {
             println!("{:?}", region_data);  // ***TEMP*** 
         }
-        //  Create a new list of live blocks from columns.
-        //  Each live block gets its own VizGroup.
         //  If two live blocks in this list overlap, merge their viz groups.
         //  This is the check for overlap in Y.
+        let mut prev_opt: Option<&mut LiveBlock> = None;
+        for item in &mut self.column {
+            if let Some(prev) = prev_opt {
+                let overlap = self.y_adjacent(prev, item);
+                if overlap {	
+                    prev.merge(item)
+                }
+            }
+            prev_opt = Some(item);
+        }
         
         //  ***MORE***
         //  Compare previous list of live blocks with this one. If there is
