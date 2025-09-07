@@ -56,6 +56,7 @@ pub struct RegionData {
 
 
 /// A rectangle of interest which might touch a object in an incoming column.
+#[derive(Debug)]
 pub struct LiveBlock {
     /// This block
     region_data: RegionData,
@@ -102,6 +103,7 @@ impl LiveBlocks {
 }
 
 /// A set of regions which all have the same viz group
+#[derive(Debug)]
 pub struct VizGroup {
     /// All in this viz group are in this string.
     pub grid: String,
@@ -158,7 +160,7 @@ type CompletedGroups = Vec<Vec<RegionData>>;
 /// Vizgroups - find all the visibility groups
 pub struct VizGroups {
     /// The active column
-    column: Vec<RegionData>,
+    column: Vec<LiveBlock>,
     /// Previous region data while inputting a column
     prev_region_data: Option<RegionData>,
     /// Live blocks. The blocks that touch or pass the current column.
@@ -229,8 +231,9 @@ impl VizGroups {
             }
         };
         //  Add to column, or start new column.
-        self.column.push(region_data.clone());
-        self.prev_region_data = Some(region_data);                  
+        //////self.column.push(region_data.clone());
+        self.column.push(LiveBlock::new(&region_data, &Rc::<RefCell<Vec<Vec<RegionData>>>>::downgrade(&self.completed_groups)));
+        //////self.prev_region_data = Some(region_data);                  
     }
 /*    
     /// Build from database
