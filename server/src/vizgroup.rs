@@ -111,20 +111,11 @@ impl LiveBlocks {
             live_blocks: BTreeMap::new(),
         }
     }
-    /// Test for overlap between a column and the live blocks.
-    //  *** What should this return? ***
-    fn test_overlap(&self, column: &[RegionData]) -> usize {
-        todo!();
-    } 
+
     /// Purge all blocks whose X edge is below or equal to the limit.
     /// This is all of them on SL, but larger regions on OS might be kept.
     fn purge_below_x_limit(&mut self, x_limit: u32) {
         self.live_blocks.retain(|_, v| v.region_data.region_coords_x + v.region_data.size_x > x_limit);
-    }
-    
-    /// Add all the regions in a column to the live blocks.
-    fn add_column(&mut self, column: &[RegionData]) {
-        todo!();
     }
 }
 
@@ -170,17 +161,6 @@ impl VizGroup {
         assert_eq!(self.grid, other.grid);
         self.regions.as_mut().expect("Regions should not be None").append(&mut other.regions.take().expect("Regions should not be none"));
     }
-/*
-    /// Merge two VizGroups, consuming them.
-    pub fn merge(mut a: VizGroup, b: VizGroup) -> VizGroup {
-  	    assert_eq!(a.grid, b.grid);
-        a.regions.extend(b.regions);
-        Self {
-            grid: a.grid,
-            regions: a.regions
-        }
-    }
-*/
 }
 
 type CompletedGroups = Vec<Vec<RegionData>>;
@@ -317,40 +297,7 @@ impl VizGroups {
         self.column.push(LiveBlock::new(&region_data, &Rc::<RefCell<Vec<Vec<RegionData>>>>::downgrade(&self.completed_groups)));
         self.prev_region_data = Some(region_data);                  
     }
-/*    
-    /// Build from database
-    pub fn build(&mut self, conn: &mut PooledConn) -> Result<(), Error> {
-        println!("Build start");    // ***TEMP***
-        //  The loop here is sequential data processing with control breaks when a field changes.
-        const SQL_SELECT: &str = r"SELECT grid, region_coords_x, region_coords_y, size_x, size_y, name FROM raw_terrain_heights ORDER BY grid, region_coords_x, region_coords_y";
-        let mut prev_region_data: Option<RegionData> = None;
-        let mut column = Vec::new();
-        let _all_regions = conn
-            .query_map(
-                SQL_SELECT,
-                |(grid, region_coords_x, region_coords_y, size_x, size_y, name)| {
-                    let region_data = RegionData { grid, region_coords_x, region_coords_y, size_x, size_y, name };                    
-                    if let Some(prev) = &prev_region_data {
-                        if region_data.grid != prev.grid {
-                            self.end_column(&column);
-                            column.clear();
-                            self.end_grid();
-                        } else if region_data.region_coords_x != prev.region_coords_x {
-                            self.end_column(&column);
-                            column.clear();
-                        }
-                    };
-                    //  Add to column, or start new column.
-                    column.push(region_data.clone());
-                    prev_region_data = Some(region_data);                  
-                },	
-        )?;
-        self.end_column(&column);
-        column.clear();
-        self.end_grid();
-        Ok(())
-    }
-*/
+
     /// Build from database
     pub fn build(&mut self, conn: &mut PooledConn) -> Result<(), Error> {
         println!("Build start");    // ***TEMP***
