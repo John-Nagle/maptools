@@ -86,6 +86,12 @@ impl LiveBlock {
         assert!(self.region_data.region_coords_y <= b.region_data.region_coords_y); // ordered properly, a < b in Y
         self.region_data.region_coords_y + self.region_data.size_y + tolerance >= b.region_data.region_coords_y
     }
+    
+    /// xy-adjacent - true if adjacent in x and y, on different columns.
+    fn xy_adjacent(&self, b: &mut LiveBlock, tolerance: u32) -> bool {
+        println!("XY-adjacent test: {:?}\nvs {:?}", self, b); // ***TEMP***
+        false   // ***TEMP***
+    }
 }
 
 
@@ -207,18 +213,36 @@ impl VizGroups {
             tolerance: 0,
         }
     }
-/*    
-    /// Add a completed VizGroup. This is one connected area of regions.
-    pub fn add_completed_group(&mut self, completed_group: Vec<RegionData>) {
-        self.completed_groups.push(completed_group);
-    }
 
-    /// y-adjacent - true if adjacent in y
-    fn y_adjacent(&self, a: &mut LiveBlock, b: &mut LiveBlock) -> bool {
-        assert!(a.region_data.region_coords_y <= b.region_data.region_coords_y); // ordered properly, a < b in Y
-        a.region_data.region_coords_y + a.region_data.size_y + self.tolerance >= b.region_data.region_coords_y
+    /// Check the current and previous live block lists.
+    /// They're both sequential in y.
+    fn check_overlap_live_block_columns(&mut self) {
+        //  Create iterators for existing live blocks and new column.
+        let mut prev_iter = self.live_blocks.live_blocks.iter_mut();
+        let mut prev_opt = prev_iter.next();
+        let mut curr_iter = self.column.iter_mut();
+        let mut curr_opt = curr_iter.next();
+        loop {
+            if let Some(ref mut prev) = prev_opt {
+                if let Some(ref mut curr) = curr_opt {
+                    //  Test if we want to merge viz groups
+                    if prev.1.xy_adjacent(curr, self.tolerance) {
+                        prev.1.merge(curr)
+                    }
+                    
+                    if curr.region_data.region_coords_y < prev.1.region_data.region_coords_y {
+                        curr_opt = curr_iter.next();
+                    } else {
+                        prev_opt = prev_iter.next();
+                    }
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
     }
-*/
     
     /// End of a column.
     /// Where all the real work gets done.
@@ -244,6 +268,9 @@ impl VizGroups {
             }
             prev_opt = Some(item);
         }
+        //  Next, need the check for overlap in X, between existing live blocks
+        //  and new live blocks
+        self.check_overlap_live_block_columns();
         
         //  ***MORE***
         //  Compare previous list of live blocks with this one. If there is
