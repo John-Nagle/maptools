@@ -77,7 +77,7 @@ impl LiveBlock {
     /// Both LiveBlocks get an Rc to the same VisGroup.
     pub fn merge(&mut self, other: &mut LiveBlock) {
         println!("Merging"); // ***TEMP***
-        if self.viz_group != other.viz_group {
+        if !Rc::ptr_eq(&self.viz_group, &other.viz_group) {
             self.viz_group.borrow_mut().merge(&mut other.viz_group.borrow_mut());
             other.viz_group = self.viz_group.clone()
         }
@@ -144,7 +144,7 @@ pub struct VizGroup {
     /// Backlink to completed groups so they can be updated from drop.
     completed_groups_weak: Weak<RefCell<CompletedGroups>>,
 }
-
+/*
 impl PartialEq for VizGroup {
     /// Equality test.
     //  ***TOO EXPENSIVE - scans entire region list.***
@@ -154,6 +154,7 @@ impl PartialEq for VizGroup {
         && self.regions == other.regions
     }
 }
+*/
 
 impl Drop for VizGroup {
 
