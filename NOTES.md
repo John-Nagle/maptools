@@ -120,6 +120,30 @@ Next steps:
       
     ***MORE***
    
+2025-09-07
+
+   Can detect all touching blocks. Lots of (a touches b) items.
+   a and b have an ordering. Reverse pair so that they all
+   have the same order.
+   Lowest entry in set has a set of all the others. All others
+   have a link back to the lowest entry.
+   Merging requires changing a lot of links.
+   Is there another way?
+   
+2025-09-10
+
+   New plan:
+   - VizGroup has a set of weak backlinks to the LiveBlock items.
+   - On VizGroup merge,
+     - All linked LiveBlocks get their VizGroup updated.
+       - But this creates a circular borrow problem at the LiveBlock level.
+       - Have to distinguish between the LiveBlock whose VizGroup isn't changing (the survivor,
+         currently borrowed) and othe LiveBlock items. The others get their VizGroup changed.
+         They're not currently borrowed. 
+       - Also at that time, purge dead weak links from the set of weak backlinks.
+       
+    This has tricky borrow plumbing.
+   
   
       
       

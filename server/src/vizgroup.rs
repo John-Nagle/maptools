@@ -62,19 +62,32 @@ pub struct LiveBlock {
     region_data: RegionData,
     /// Link to VizGroup
     viz_group: Rc<RefCell<VizGroup>>,
+    /// Weak link to self
+    weak_link_to_self: Weak<RefCell<LiveBlock>>,
 }
+
+/// So we can have backpointers.
+type LiveBlockLink = Rc<RefCell<LiveBlock>>;
+type WeakLiveBlockLink = Weak<RefCell<LiveBlock>>;
 
 impl LiveBlock {
     /// Usual new
-    pub fn new(region_data: &RegionData, completed_groups_weak: &Weak<RefCell<CompletedGroups>>) -> Self {
-        Self {
-            region_data: region_data.clone(),
-            viz_group: VizGroup::new(region_data.clone(), completed_groups_weak),
-        }
-    }
+    // ***DOES NOT COMPILE although https://play.rust-lang.org/?version=stable&mode=debug&edition=2024&gist=a47f1b09cd984517e7e748b2596bbb6e
+    // does compile. ???
+    pub fn new(region_data: &RegionData, completed_groups_weak: &Weak<RefCell<CompletedGroups>>) -> Rc<RefCell<LiveBlock>> {
+        //  ***WRONG*** We need a RefCell in there. Probably
+        Rc::new_cyclic(|weak_self| {
+            RefCell::new(LiveBlock {
+                region_data: region_data.clone(),
+                viz_group: VizGroup::new(region_data.clone(), completed_groups_weak),
+                weak_link_to_self: weak_self.clone()
+            })
+        })
+    }	
     
     /// Merge the VizGroups of two LiveBlock items.
     /// Both LiveBlocks get an Rc to the same VisGroup.
+    //  ***WRONG*** this fixes up the current LiveBlock, but not all shared owners of the VizGroup.
     pub fn merge(&mut self, other: &mut LiveBlock) {
         println!("Merging"); // ***TEMP***
         if !Rc::ptr_eq(&self.viz_group, &other.viz_group) {
@@ -85,14 +98,14 @@ impl LiveBlock {
     
     /// y-adjacent - true if adjacent in y.
     /// Called while iterating over a single column.
-    fn y_adjacent(&self, b: &mut LiveBlock, tolerance: u32) -> bool {
+    fn y_adjacent(&self, b: &Rc<LiveBlock>, tolerance: u32) -> bool {
         assert!(self.region_data.region_coords_y <= b.region_data.region_coords_y); // ordered properly, a < b in Y
         self.region_data.region_coords_y + self.region_data.size_y + tolerance >= b.region_data.region_coords_y
     }
     
     /// xy-adjacent - true if adjacent in x and y, on different columns.
     /// Called when iterating over two columns in sync.
-    fn xy_adjacent(&self, b: &mut LiveBlock, tolerance: u32) -> bool {
+    fn xy_adjacent(&self, b: &Rc<LiveBlock>, tolerance: u32) -> bool {
         assert!(self.region_data.region_coords_x + self.region_data.size_x <= b.region_data.region_coords_x); // columns must be adjacent in X.
         //  True if overlaps in Y.
         // ***MORE***
@@ -114,7 +127,7 @@ impl LiveBlock {
 //  Needs an ordered representation.
 struct LiveBlocks {
     /// The blocks
-    live_blocks: BTreeMap<u32, LiveBlock>,
+    live_blocks: BTreeMap<u32, Rc<LiveBlock>>,
 }
 
 impl LiveBlocks {
@@ -192,7 +205,7 @@ type CompletedGroups = Vec<Vec<RegionData>>;
 /// Vizgroups - find all the visibility groups
 pub struct VizGroups {
     /// The active column
-    column: Vec<LiveBlock>,
+    column: Vec<Rc<LiveBlock>>,
     /// Previous region data while inputting a column
     prev_region_data: Option<RegionData>,
     /// Live blocks. The blocks that touch or pass the current column.
