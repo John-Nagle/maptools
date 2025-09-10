@@ -88,24 +88,28 @@ impl LiveBlock {
     /// Merge the VizGroups of two LiveBlock items.
     /// Both LiveBlocks get an Rc to the same VisGroup.
     //  ***WRONG*** this fixes up the current LiveBlock, but not all shared owners of the VizGroup.
-    pub fn merge(&mut self, other: &mut LiveBlock) {
+    pub fn merge(&mut self, other: &Rc<RefCell<LiveBlock>>) {
         println!("Merging"); // ***TEMP***
+/* ***TEMP TURNOFF*** needs redesign
         if !Rc::ptr_eq(&self.viz_group, &other.viz_group) {
             self.viz_group.borrow_mut().merge(&mut other.viz_group.borrow_mut());
             other.viz_group = self.viz_group.clone()
         }
+*/
     }
     
     /// y-adjacent - true if adjacent in y.
     /// Called while iterating over a single column.
-    fn y_adjacent(&self, b: &Rc<LiveBlock>, tolerance: u32) -> bool {
+    fn y_adjacent(&self, bref: &Rc<RefCell<LiveBlock>>, tolerance: u32) -> bool {
+        let b = bref.borrow();
         assert!(self.region_data.region_coords_y <= b.region_data.region_coords_y); // ordered properly, a < b in Y
         self.region_data.region_coords_y + self.region_data.size_y + tolerance >= b.region_data.region_coords_y
     }
     
     /// xy-adjacent - true if adjacent in x and y, on different columns.
     /// Called when iterating over two columns in sync.
-    fn xy_adjacent(&self, b: &Rc<LiveBlock>, tolerance: u32) -> bool {
+    fn xy_adjacent(&self, bref: &Rc<RefCell<LiveBlock>>, tolerance: u32) -> bool {
+        let b = bref.borrow();
         assert!(self.region_data.region_coords_x + self.region_data.size_x <= b.region_data.region_coords_x); // columns must be adjacent in X.
         //  True if overlaps in Y.
         // ***MORE***
@@ -127,7 +131,7 @@ impl LiveBlock {
 //  Needs an ordered representation.
 struct LiveBlocks {
     /// The blocks
-    live_blocks: BTreeMap<u32, Rc<LiveBlock>>,
+    live_blocks: BTreeMap<u32, Rc<RefCell<LiveBlock>>>,
 }
 
 impl LiveBlocks {
@@ -141,7 +145,7 @@ impl LiveBlocks {
     /// Purge all blocks whose X edge is below or equal to the limit.
     /// This is all of them on SL, but larger regions on OS might be kept.
     fn purge_below_x_limit(&mut self, x_limit: u32) {
-        self.live_blocks.retain(|_, v| v.region_data.region_coords_x + v.region_data.size_x > x_limit);
+        self.live_blocks.retain(|_, v| { let bk = v.borrow(); bk.region_data.region_coords_x + bk.region_data.size_x > x_limit} );
     }
 }
 
@@ -205,7 +209,7 @@ type CompletedGroups = Vec<Vec<RegionData>>;
 /// Vizgroups - find all the visibility groups
 pub struct VizGroups {
     /// The active column
-    column: Vec<Rc<LiveBlock>>,
+    column: Vec<Rc<RefCell<LiveBlock>>>,
     /// Previous region data while inputting a column
     prev_region_data: Option<RegionData>,
     /// Live blocks. The blocks that touch or pass the current column.
@@ -243,11 +247,11 @@ impl VizGroups {
             if let Some(ref mut prev) = prev_opt {
                 if let Some(ref mut curr) = curr_opt {
                     //  Test if we want to merge viz groups
-                    if prev.1.xy_adjacent(curr, self.tolerance) {
-                        prev.1.merge(curr)
+                    if prev.1.borrow().xy_adjacent(curr, self.tolerance) {
+                        prev.1.borrow_mut().merge(curr)
                     }
                     
-                    if curr.region_data.region_coords_y < prev.1.region_data.region_coords_y {
+                    if curr.borrow().region_data.region_coords_y < prev.1.borrow().region_data.region_coords_y {
                         curr_opt = curr_iter.next();
                     } else {
                         prev_opt = prev_iter.next();
@@ -276,14 +280,14 @@ impl VizGroups {
         }
         //  If two live blocks in this list overlap, merge their viz groups.
         //  This is the check for overlap in Y.
-        let mut prev_opt: Option<&mut LiveBlock> = None;
+        let mut prev_opt: Option<Rc<RefCell<LiveBlock>>> = None;
         for item in &mut self.column {
             if let Some(prev) = prev_opt {
-                if prev.y_adjacent(item, self.tolerance) {
-                    prev.merge(item)
+                if prev.borrow().y_adjacent(item, self.tolerance) {
+                    prev.borrow_mut().merge(item)
                 }
             }
-            prev_opt = Some(item);
+            prev_opt = Some(item.clone());
         }
         //  Next, need the check for overlap in X, between existing live blocks
         //  and new live blocks
@@ -299,7 +303,7 @@ impl VizGroups {
         println!("End column. {} regions.", self.column.len());
         if !self.column.is_empty() {
             //  Purge now-dead live blocks. This will be all of them on SL, but wide regions on OS may not be ready to die yet.
-            let x_limit = self.column[0].region_data.region_coords_x;
+            let x_limit = self.column[0].borrow().region_data.region_coords_x;
             self.live_blocks.purge_below_x_limit(x_limit);
             //  Add new live blocks.
             //////self.column.iter().map(|b| self.live_blocks.live_blocks.insert(b.region_data.region_coords_y, b));
@@ -307,7 +311,8 @@ impl VizGroups {
             //  ***Proper way above does nothing***
             
             while let Some(b) = self.column.pop() {
-                self.live_blocks.live_blocks.insert(b.region_data.region_coords_y, b);
+                let y = b.borrow().region_data.region_coords_y;
+                self.live_blocks.live_blocks.insert(y, b);
             }
             println!("{} live blocks", self.live_blocks.live_blocks.len()); // ***TEMP***
             assert!(self.column.is_empty());
