@@ -63,7 +63,7 @@ pub struct LiveBlock {
     /// Link to VizGroup
     viz_group: Rc<RefCell<VizGroup>>,
     /// Weak link to self
-    weak_link_to_self: Weak<RefCell<LiveBlock>>,
+    weak_link_to_self: WeakLiveBlockLink,
 }
 
 /// So we can have backpointers.
@@ -72,14 +72,11 @@ type WeakLiveBlockLink = Weak<RefCell<LiveBlock>>;
 
 impl LiveBlock {
     /// Usual new
-    // ***DOES NOT COMPILE although https://play.rust-lang.org/?version=stable&mode=debug&edition=2024&gist=a47f1b09cd984517e7e748b2596bbb6e
-    // does compile. ???
     pub fn new(region_data: &RegionData, completed_groups_weak: &Weak<RefCell<CompletedGroups>>) -> Rc<RefCell<LiveBlock>> {
-        //  ***WRONG*** We need a RefCell in there. Probably
         Rc::new_cyclic(|weak_self| {
             RefCell::new(LiveBlock {
                 region_data: region_data.clone(),
-                viz_group: VizGroup::new(region_data.clone(), completed_groups_weak),
+                viz_group: VizGroup::new(region_data.clone(), weak_self.clone(), completed_groups_weak),
                 weak_link_to_self: weak_self.clone()
             })
         })
@@ -158,6 +155,9 @@ pub struct VizGroup {
     /// Will probably change to a different data structure
     /// This is inside an option so we can take it later.
     pub regions: Option<Vec<RegionData>>,
+    /// Backlink to LiveBlocks that use this VizGroup.
+    /// Used to tell the LiveBlock about a merge.
+    pub live_blocks_weak: Vec<Weak<RefCell<LiveBlock>>>,
     /// Backlink to completed groups so they can be updated from drop.
     completed_groups_weak: Weak<RefCell<CompletedGroups>>,
 }
@@ -189,10 +189,11 @@ impl Drop for VizGroup {
 impl VizGroup {
 
     /// New, with the first region, and a back link to the VizGroups
-    pub fn new(region: RegionData, completed_groups_weak: &Weak<RefCell<CompletedGroups>>) -> Rc<RefCell<Self>> {
+    pub fn new(region: RegionData, live_block_weak: WeakLiveBlockLink, completed_groups_weak: &Weak<RefCell<CompletedGroups>>) -> Rc<RefCell<Self>> {
         let new_item = Self {
             grid: region.grid.clone(),
             regions: Some(vec![region]),
+            live_blocks_weak: vec![live_block_weak],
             completed_groups_weak: completed_groups_weak.clone()
         };
         Rc::new(RefCell::new(new_item))
