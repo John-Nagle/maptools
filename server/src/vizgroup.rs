@@ -85,7 +85,7 @@ impl LiveBlock {
     /// Merge the VizGroups of two LiveBlock items.
     /// Both LiveBlocks get an Rc to the same VisGroup.
     //  ***WRONG*** this fixes up the current LiveBlock, but not all shared owners of the VizGroup.
-    pub fn merge(&mut self, other: &Rc<RefCell<LiveBlock>>) {
+    pub fn merge(&mut self, other: &LiveBlockLink) {
         println!("Merging"); // ***TEMP***
 /* ***TEMP TURNOFF*** needs redesign
         if !Rc::ptr_eq(&self.viz_group, &other.viz_group) {
@@ -97,7 +97,7 @@ impl LiveBlock {
     
     /// y-adjacent - true if adjacent in y.
     /// Called while iterating over a single column.
-    fn y_adjacent(&self, bref: &Rc<RefCell<LiveBlock>>, tolerance: u32) -> bool {
+    fn y_adjacent(&self, bref: &LiveBlockLink, tolerance: u32) -> bool {
         let b = bref.borrow();
         assert!(self.region_data.region_coords_y <= b.region_data.region_coords_y); // ordered properly, a < b in Y
         self.region_data.region_coords_y + self.region_data.size_y + tolerance >= b.region_data.region_coords_y
@@ -105,7 +105,7 @@ impl LiveBlock {
     
     /// xy-adjacent - true if adjacent in x and y, on different columns.
     /// Called when iterating over two columns in sync.
-    fn xy_adjacent(&self, bref: &Rc<RefCell<LiveBlock>>, tolerance: u32) -> bool {
+    fn xy_adjacent(&self, bref: &LiveBlockLink, tolerance: u32) -> bool {
         let b = bref.borrow();
         assert!(self.region_data.region_coords_x + self.region_data.size_x <= b.region_data.region_coords_x); // columns must be adjacent in X.
         //  True if overlaps in Y.
@@ -128,7 +128,7 @@ impl LiveBlock {
 //  Needs an ordered representation.
 struct LiveBlocks {
     /// The blocks
-    live_blocks: BTreeMap<u32, Rc<RefCell<LiveBlock>>>,
+    live_blocks: BTreeMap<u32, LiveBlockLink>,
 }
 
 impl LiveBlocks {
