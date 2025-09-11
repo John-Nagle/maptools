@@ -195,6 +195,7 @@ impl Drop for VizGroup {
     /// The group is delivered to VizGroups as done.
     fn drop(&mut self) {
         let completed_groups = self.completed_groups_weak.upgrade().expect("Unable to upgrade vizgroups");
+        println!("Drop of VizGroup: {} regions", self.regions.len());   // ***TEMP***
         completed_groups.borrow_mut().push(self.regions.clone());
     }
 }
