@@ -29,7 +29,7 @@ use envie::{Envie};
 use minifcgi::Credentials;
 
 mod vizgroup;
-use vizgroup::{VizGroups};
+use vizgroup::{VizGroups, RegionData};
 
 /// MySQL Credentials for uploading.
 /// This filename will be searched for in parent directories,
@@ -308,12 +308,29 @@ pub fn run_responder() -> Result<(), Error> {
 }
 */
 
+/// Build from database
+pub fn transitive_closure(vizgroups: &mut VizGroups, conn: &mut PooledConn) -> Result<(), Error> {
+    println!("Build start");    // ***TEMP***
+    //  The loop here is sequential data processing with control breaks when a field changes.
+    const SQL_SELECT: &str = r"SELECT grid, region_coords_x, region_coords_y, size_x, size_y, name FROM raw_terrain_heights ORDER BY grid, region_coords_x, region_coords_y";
+    let _all_regions = conn
+        .query_map(
+            SQL_SELECT,
+            |(grid, region_coords_x, region_coords_y, size_x, size_y, name)| {
+                let region_data = RegionData { grid, region_coords_x, region_coords_y, size_x, size_y, name }; 
+                vizgroups.add_region_data(region_data);                  
+            },	
+    )?;
+    vizgroups.end_grid();
+    Ok(())
+}
+
 /// Actually do the work
 fn run(pool: Pool, outdir: String, verbose: bool) -> Result<(), Error> {
     //////println!("{:?} {:?} {}", credsfile, outdir, verbose);
     let mut vizgroups = VizGroups::new();
     let mut conn = pool.get_conn()?;
-    vizgroups.build(&mut conn)?;
+    transitive_closure(&mut vizgroups, &mut conn)?;
     Ok(())
 }
 

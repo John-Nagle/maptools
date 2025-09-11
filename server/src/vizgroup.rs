@@ -13,8 +13,6 @@
 //! September, 2025
 //! License: LGPL.
 //!
-use mysql::{PooledConn, params};
-use mysql::prelude::{Queryable, AsStatement};
 use anyhow::{Error};
 use std::cell::{RefCell};
 use std::rc::{Rc, Weak};
@@ -24,17 +22,17 @@ use std::collections::{BTreeMap};
 #[derive(Debug, Clone, PartialEq)]
 pub struct RegionData {
     /// Which grid
-    grid: String,
+    pub grid: String,
     /// X
-    region_coords_x: u32,
+    pub region_coords_x: u32,
     /// Y
-    region_coords_y: u32,
+    pub region_coords_y: u32,
     /// X size
-    size_x: u32,
+    pub size_x: u32,
     /// Y size
-    size_y: u32,
+    pub size_y: u32,
     /// Region name
-    name: String,
+    pub name: String,
 }
 
 impl std::fmt::Display for RegionData {
@@ -330,7 +328,7 @@ impl VizGroups {
         self.column.clear();
     }
     
-    fn end_grid(&mut self) {
+    pub fn end_grid(&mut self) {
         //  Finish last column
         self.end_column();
         //  Flush all waiting live blocks.
@@ -339,7 +337,7 @@ impl VizGroups {
     }
     
     /// Add one item of region data.
-    fn add_region_data(&mut self, region_data: RegionData) {
+    pub fn add_region_data(&mut self, region_data: RegionData) {
         if let Some(prev) = &self.prev_region_data {
             if region_data.grid != prev.grid {
                 self.end_column();
@@ -351,23 +349,6 @@ impl VizGroups {
         //  Add to column, or start new column.
         self.column.push(LiveBlock::new(&region_data, &Rc::<RefCell<Vec<Vec<RegionData>>>>::downgrade(&self.completed_groups)));
         self.prev_region_data = Some(region_data);                  
-    }
-
-    /// Build from database
-    pub fn build(&mut self, conn: &mut PooledConn) -> Result<(), Error> {
-        println!("Build start");    // ***TEMP***
-        //  The loop here is sequential data processing with control breaks when a field changes.
-        const SQL_SELECT: &str = r"SELECT grid, region_coords_x, region_coords_y, size_x, size_y, name FROM raw_terrain_heights ORDER BY grid, region_coords_x, region_coords_y";
-        let _all_regions = conn
-            .query_map(
-                SQL_SELECT,
-                |(grid, region_coords_x, region_coords_y, size_x, size_y, name)| {
-                    let region_data = RegionData { grid, region_coords_x, region_coords_y, size_x, size_y, name }; 
-                    self.add_region_data(region_data);                  
-                },	
-        )?;
-        self.end_grid();
-        Ok(())
     }
 }
 
