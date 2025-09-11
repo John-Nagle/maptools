@@ -82,19 +82,18 @@ impl LiveBlock {
         })
     }	
     
-    /// Merge the VizGroups of two LiveBlock items.
-    /// Both LiveBlocks get an Rc to the same VisGroup.
-    //  ***WRONG*** this fixes up the current LiveBlock, but not all shared owners of the VizGroup.
-    pub fn merge(&mut self, other: &LiveBlockLink) {
-        println!("Merging"); // ***TEMP***
-/* ***TEMP TURNOFF*** needs redesign
-        if !Rc::ptr_eq(&self.viz_group, &other.viz_group) {
-            self.viz_group.borrow_mut().merge(&mut other.viz_group.borrow_mut());
-            other.viz_group = self.viz_group.clone()
-        }
-*/
-        //  Merge into this live block, if not merge with self.
+    /// Two live blocks touch.
+    /// Their VizGroup must be merged.
+    /// And all live blocks that use the VizGroup that was merged out must be redirected to the new combined group.
+    pub fn blocks_touch(&mut self, other: &LiveBlockLink) {
+        
+        //  Merge VizGroup data of the two LiveBlock items.
+        //  At end, both share the same combined VizGroup, and the "other" VizGroup is dead, never to be used again.
         if !Rc::ptr_eq(&self.viz_group, &other.borrow().viz_group) {
+            println!("Blocks with different viz groups touch: ({},{}) and ({},{})", 
+                self.region_data.region_coords_x, self.region_data.region_coords_y,
+                other.borrow().region_data.region_coords_x, other.borrow().region_data.region_coords_y); // ***TEMP***
+            //  Merge the VizGroup sets.
             self.viz_group.borrow_mut().merge(&mut other.borrow().viz_group.borrow_mut());
 
             //  Tell all other involved LiveBlock items about this merge.
@@ -111,7 +110,6 @@ impl LiveBlock {
             for weak_block in &other_shared_groups {
                 if !Weak::ptr_eq(&self.weak_link_to_self, weak_block) {
                     if let Some(block) = weak_block.upgrade() {
-                        //  ***NEED DOUBLE BORROW PREVENTION***
                         block.borrow_mut().viz_group = self.viz_group.clone();
                     }
                 }
@@ -225,6 +223,8 @@ impl VizGroup {
     /// Merge another VizGroup into this one. The other group cannot be used again.
     pub fn merge(&mut self, other: &mut VizGroup) {
         assert_eq!(self.grid, other.grid);
+        //  ***NEED TO MERGE live_blocks_weak TOO ***
+        self.live_blocks_weak.append(&mut other.live_blocks_weak);
         self.regions.as_mut().expect("Regions should not be None").append(&mut other.regions.take().expect("Regions should not be none"));
     }
 }
@@ -273,7 +273,7 @@ impl VizGroups {
                 if let Some(ref mut curr) = curr_opt {
                     //  Test if we want to merge viz groups
                     if prev.1.borrow().xy_adjacent(curr, self.tolerance) {
-                        prev.1.borrow_mut().merge(curr)
+                        prev.1.borrow_mut().blocks_touch(curr)
                     }
                     
                     if curr.borrow().region_data.region_coords_y < prev.1.borrow().region_data.region_coords_y {
@@ -309,7 +309,7 @@ impl VizGroups {
         for item in &mut self.column {
             if let Some(prev) = prev_opt {
                 if prev.borrow().y_adjacent(item, self.tolerance) {
-                    prev.borrow_mut().merge(item)
+                    prev.borrow_mut().blocks_touch(item)
                 }
             }
             prev_opt = Some(item.clone());
