@@ -131,14 +131,13 @@ impl LiveBlock {
         let b = bref.borrow();
         assert!(self.region_data.region_coords_x + self.region_data.size_x <= b.region_data.region_coords_x); // columns must be adjacent in X.
         //  True if overlaps in Y.
-        // ***MORE***
-        let ax0 = self.region_data.region_coords_y;
-        let ax1 = ax0 + self.region_data.size_y;
-        let bx0 = b.region_data.region_coords_y;
-        let bx1 = bx0 + b.region_data.size_y;
-        let overlap = ax0 <= bx1 && ax1 >= bx0;
-        println!("XY-adjacent test: overlap: {}\n
-            {:?}\nvs {:?}", overlap, self, b); // ***TEMP***
+        // ***NEED TO CHECK TOLERANCE***
+        let a0 = self.region_data.region_coords_y;
+        let a1 = a0 + self.region_data.size_y + tolerance;
+        let b0 = b.region_data.region_coords_y;
+        let b1 = b0 + b.region_data.size_y + tolerance;
+        let overlap = a0 < b1 && a1 >= b0;
+        println!("XY-adjacent test: overlap: ({}, {}) vs ({}, {}) overlap: {}", a0, a1, b0, b1, overlap);
         overlap
     }
 }
