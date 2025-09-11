@@ -426,5 +426,6 @@ fn test_visgroup() {
     for viz_group in viz_groups.completed_groups.borrow().iter() {
         println!("Viz group: {:?}", viz_group);
     }
+    assert_eq!(viz_groups.completed_groups.borrow().len(), 3);  // 3 groups in this test case.
                   
 }
