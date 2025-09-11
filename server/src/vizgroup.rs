@@ -13,11 +13,9 @@
 //! September, 2025
 //! License: LGPL.
 //!
-use mysql::{OptsBuilder, Opts, Conn, Pool};
-use serde::{Deserialize};
 use mysql::{PooledConn, params};
 use mysql::prelude::{Queryable, AsStatement};
-use anyhow::{Error, anyhow};
+use anyhow::{Error};
 use std::cell::{RefCell};
 use std::rc::{Rc, Weak};
 use std::collections::{BTreeMap};
@@ -196,7 +194,9 @@ impl Drop for VizGroup {
     fn drop(&mut self) {
         let completed_groups = self.completed_groups_weak.upgrade().expect("Unable to upgrade vizgroups");
         println!("Drop of VizGroup: {} regions", self.regions.len());   // ***TEMP***
-        completed_groups.borrow_mut().push(self.regions.clone());
+        if !self.regions.is_empty() {
+            completed_groups.borrow_mut().push(self.regions.clone());
+        }
     }
 }
 
@@ -216,7 +216,6 @@ impl VizGroup {
     pub fn merge(&mut self, other: &mut VizGroup) {
         assert_eq!(self.grid, other.grid);
         self.live_blocks_weak.append(&mut other.live_blocks_weak);
-        //////self.regions.as_mut().append(&mut other.regions);
         <Vec<RegionData> as AsMut<Vec<RegionData>>>::as_mut(&mut self.regions).append(&mut other.regions);
         println!("Merged: {} live blocks weak, {} regions", self.live_blocks_weak.len(), self.regions.len()); // ***TEMP***
     }
@@ -291,11 +290,6 @@ impl VizGroups {
     /// Eacn new column entry creates a new VizGroup.
     /// Overlapped/touching groups get their VizGroups merged.
     fn end_column(&mut self) {
-/*
-        for region_data in &self.column {
-            println!("{:?}", region_data);  // ***TEMP*** 
-        }
-*/
         //  If two live blocks in this list overlap, merge their viz groups.
         //  This is the check for overlap in Y.
         let mut prev_opt: Option<Rc<RefCell<LiveBlock>>> = None;
