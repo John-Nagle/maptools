@@ -13,7 +13,6 @@
 //! September, 2025
 //! License: LGPL.
 //!
-use anyhow::Error;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::rc::{Rc, Weak};
@@ -47,13 +46,11 @@ impl std::fmt::Display for RegionData {
 }
 
 //  General concept of transitive closure algorithm.
-//  (Tenative)
 //
 //  LiveBlocks have an Rc link to a VizGroup.
 //  When we detect that a region in a new column touches
 //  a LiveBlock or another region in the new column,
 //  VizGroups are merged.
-//  (This part is tricky for ownership reasons.)
 //
 //  When a LiveBlock is deleted, it drops its reference to the VizGroup.
 //  When a VizGroup is deleted because no LiveBlock is referencing it,
@@ -251,7 +248,8 @@ impl VizGroup {
     }
 }
 
-type CompletedGroups = Vec<Vec<RegionData>>;
+/// Array of completed groups for one grid.
+pub type CompletedGroups = Vec<Vec<RegionData>>;
 
 /// Vizgroups - find all the visibility groups
 pub struct VizGroups {
@@ -272,14 +270,23 @@ pub struct VizGroups {
 
 impl VizGroups {
     /// Usual new
-    pub fn new() -> Self {
+    pub fn new(detect_corners_touching: bool) -> Self {
         Self {
             column: Vec::new(),
             prev_region_data: None,
             completed_groups: Rc::new(RefCell::new(Vec::new())),
             live_blocks: LiveBlocks::new(),
-            tolerance: 0,
+            tolerance: if detect_corners_touching { 1 } else { 0 },
         }
+    }
+    
+    /// Reset to ground state.
+    /// Done after each grid.
+    pub fn clear(&mut self) {
+        self.column = Vec::new();
+        self.prev_region_data = None;
+        self.completed_groups = Rc::new(RefCell::new(Vec::new()));
+        self.live_blocks = LiveBlocks::new();
     }
 
     /// Check the current and previous live block lists.
@@ -365,20 +372,25 @@ impl VizGroups {
         self.column.clear();
     }
 
-    pub fn end_grid(&mut self) {
+    /// End of input for one grid. Returns completed groups.
+    pub fn end_grid(&mut self) -> CompletedGroups {
         //  Finish last column
         self.end_column();
         //  Flush all waiting live blocks.
         self.live_blocks.purge_below_x_limit(u32::MAX);
         println!("End grid.");
+        let result = self.completed_groups.take();
+        self.clear();
+        result
     }
 
     /// Add one item of region data.
-    pub fn add_region_data(&mut self, region_data: RegionData) {
+    pub fn add_region_data(&mut self, region_data: RegionData)  -> Option<CompletedGroups> {
+        let mut result = None;
         if let Some(prev) = &self.prev_region_data {
             if region_data.grid != prev.grid {
                 self.end_column();
-                self.end_grid();
+                result = Some(self.end_grid());
             } else if region_data.region_coords_x != prev.region_coords_x {
                 self.end_column();
             }
@@ -389,6 +401,7 @@ impl VizGroups {
             &Rc::<RefCell<Vec<Vec<RegionData>>>>::downgrade(&self.completed_groups),
         ));
         self.prev_region_data = Some(region_data);
+        result
     }
 }
 
@@ -448,18 +461,20 @@ fn test_visgroup() {
         )
         .collect();
 
-    let mut viz_groups = VizGroups::new();
+    let mut viz_groups = VizGroups::new(false);
     for item in test_data {
-        viz_groups.add_region_data(item);
+        let grid_break = viz_groups.add_region_data(item);
+        //  This example is all one grid, so there's no control break.
+        assert_eq!(grid_break, None);
     }
-    viz_groups.end_grid();
+    let results = viz_groups.end_grid();
     //  Display results
     println!(
         "Result: Viz groups: {}",
-        viz_groups.completed_groups.borrow().len()
+        results.len()
     );
-    for viz_group in viz_groups.completed_groups.borrow().iter() {
+    for viz_group in results.iter() {
         println!("Viz group: {:?}", viz_group);
     }
-    assert_eq!(viz_groups.completed_groups.borrow().len(), 3); // 3 groups in this test case.
+    assert_eq!(results.len(), 3); // 3 groups in this test case.
 }

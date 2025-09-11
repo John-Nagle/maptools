@@ -29,7 +29,7 @@ use std::io::Write;
 use minifcgi::Credentials;
 
 mod vizgroup;
-use vizgroup::{RegionData, VizGroups};
+use vizgroup::{RegionData, VizGroups, CompletedGroups};
 
 /// MySQL Credentials for uploading.
 /// This filename will be searched for in parent directories,
@@ -309,7 +309,8 @@ pub fn run_responder() -> Result<(), Error> {
 */
 
 /// Build from database
-pub fn transitive_closure(vizgroups: &mut VizGroups, conn: &mut PooledConn) -> Result<(), Error> {
+pub fn transitive_closure(vizgroups: &mut VizGroups, conn: &mut PooledConn) -> Result<Vec<CompletedGroups>, Error> {
+    let mut grids = Vec::new();
     println!("Build start"); // ***TEMP***
     //  The loop here is sequential data processing with control breaks when a field changes.
     const SQL_SELECT: &str = r"SELECT grid, region_coords_x, region_coords_y, size_x, size_y, name FROM raw_terrain_heights ORDER BY grid, region_coords_x, region_coords_y";
@@ -324,19 +325,23 @@ pub fn transitive_closure(vizgroups: &mut VizGroups, conn: &mut PooledConn) -> R
                 size_y,
                 name,
             };
-            vizgroups.add_region_data(region_data);
+            if let Some(completed_groups) = vizgroups.add_region_data(region_data) {
+                grids.push(completed_groups);
+            }
         },
     )?;
-    vizgroups.end_grid();
-    Ok(())
+    grids.push(vizgroups.end_grid());
+    Ok(grids)
 }
 
 /// Actually do the work
 fn run(pool: Pool, outdir: String, verbose: bool) -> Result<(), Error> {
     //////println!("{:?} {:?} {}", credsfile, outdir, verbose);
-    let mut vizgroups = VizGroups::new();
+    let corners_touch_connects = false; // for now
+    let mut vizgroups = VizGroups::new(corners_touch_connects);
     let mut conn = pool.get_conn()?;
-    transitive_closure(&mut vizgroups, &mut conn)?;
+    let _results = transitive_closure(&mut vizgroups, &mut conn)?;
+    //  ***MORE***
     Ok(())
 }
 
