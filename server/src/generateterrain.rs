@@ -14,22 +14,22 @@
 //!     Animats
 //!     August, 2025.
 //
+use anyhow::{Error, anyhow};
+use chrono::{NaiveDateTime, Utc};
+use envie::Envie;
 use getopts::Options;
+use log::LevelFilter;
+use mysql::prelude::{AsStatement, Queryable};
+use mysql::{Conn, Opts, OptsBuilder, Pool};
+use mysql::{PooledConn, params};
+use serde::Deserialize;
 use std::collections::HashMap;
 use std::io::Write;
-use anyhow::{Error, anyhow};
-use log::LevelFilter;
-use chrono::{NaiveDateTime, Utc};
-use mysql::{OptsBuilder, Opts, Conn, Pool};
-use serde::{Deserialize};
-use mysql::{PooledConn, params};
-use mysql::prelude::{Queryable, AsStatement};
-use envie::{Envie};
 //  Need to put this into a common dir.
 use minifcgi::Credentials;
 
 mod vizgroup;
-use vizgroup::{VizGroups, RegionData};
+use vizgroup::{RegionData, VizGroups};
 
 /// MySQL Credentials for uploading.
 /// This filename will be searched for in parent directories,
@@ -71,13 +71,13 @@ pub struct UploadedRegionInfo {
     /// Grid name
     grid: String,
     /// Position of region in world, meters.
-    pub region_coords: [u32;2],
+    pub region_coords: [u32; 2],
     /// Region size. 256 x 256 if ommitted.
-    size: Option<[u32;2]>,
+    size: Option<[u32; 2]>,
     /// Region name
     name: String,
     /// Height data, a long set of hex data.  
-    elevs: Vec::<String>,
+    elevs: Vec<String>,
     /// Scale factor for elevs
     scale: f32,
     /// Offset factor for elevs
@@ -87,7 +87,7 @@ pub struct UploadedRegionInfo {
     pub water_lev: f32,
 }
 
-/// Elevations as JSON data 
+/// Elevations as JSON data
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 pub struct ElevsJson {
     /// Offset and scale for elevation data
@@ -95,14 +95,14 @@ pub struct ElevsJson {
     /// Apply scale first, then offset.
     scale: f32,
     /// Height data, a long set of hex data.  
-    elevs: Vec::<String>, 
+    elevs: Vec<String>,
 }
 
 impl ElevsJson {
     /// Get elevations as numbers before offsetting.
     /// Input is a hex string representing one elev per byte.
     pub fn get_unscaled_elevs(&self) -> Result<Vec<Vec<u8>>, Error> {
-        let elevs: Result::<Vec<_>, _> = self.elevs.iter().map(|s| hex::decode(s)).collect();
+        let elevs: Result<Vec<_>, _> = self.elevs.iter().map(|s| hex::decode(s)).collect();
         Ok(elevs?)
     }
 }
@@ -112,26 +112,26 @@ impl UploadedRegionInfo {
     pub fn parse(s: &str) -> Result<Self, Error> {
         Ok(serde_json::from_str(s)?)
     }
-    
+
     /// Get size, applying default region size for non-varregions
-    pub fn get_size(&self) -> [u32;2] {
+    pub fn get_size(&self) -> [u32; 2] {
         if let Some(size) = self.size {
             size
         } else {
             [DEFAULT_REGION_SIZE, DEFAULT_REGION_SIZE]
         }
     }
-    
+
     /// Get grid in canonial lowercase format
     pub fn get_grid(&self) -> String {
         self.grid.to_lowercase()
     }
-    
+
     /// Get region name in canonical lowercase format
     pub fn get_name(&self) -> String {
         self.name.to_lowercase()
-    } 
-    
+    }
+
     /// Get elevs as a blob for SQL.
     /// Elevs are a vector of rows of hex strings at this point.
     pub fn get_elevs_as_blob(&self) -> Result<Vec<u8>, Error> {
@@ -142,10 +142,10 @@ impl UploadedRegionInfo {
     /// Input is a hex string representing one elev per byte
     /// Output is an array of hex strings.
     pub fn get_unscaled_elevs(&self) -> Result<Vec<Vec<u8>>, Error> {
-        let elevs: Result::<Vec<_>, _> = self.elevs.iter().map(|s| hex::decode(s)).collect();
+        let elevs: Result<Vec<_>, _> = self.elevs.iter().map(|s| hex::decode(s)).collect();
         Ok(elevs?)
     }
-    
+
     /// Scale the elevations
     pub fn get_scaled_elevs(&self) -> Result<Vec<Vec<f32>>, Error> {
         todo!();
@@ -169,16 +169,16 @@ impl TerrainUploadHandler {
             conn,
         })
     }
-    
+
     /// SQL insert for new item
     fn do_sql_insert(&mut self, region_info: UploadedRegionInfo, params: &HashMap<String, String>) -> Result<(), Error> {
-        const SQL_INSERT: &str = r"INSERT INTO raw_terrain_heights (grid, region_coords_x, region_coords_y, size_x, size_y, name, scale, offset, elevs,  water_level, creator) 
+        const SQL_INSERT: &str = r"INSERT INTO raw_terrain_heights (grid, region_coords_x, region_coords_y, size_x, size_y, name, scale, offset, elevs,  water_level, creator)
             VALUES (:grid, :region_coords_x, :region_coords_y, :size_x, :size_y, :name, :scale, :offset, :elevs, :water_level, :creator)";
         //  ***NEED TO FIX THIS FOR Open Simulator***
         let creator = params.get(OWNER_NAME).ok_or_else(|| anyhow!("This request is not from Second Life/Open Simulator"))?.trim();
         let values = params! {
             //////"table" => RAW_TERRAIN_HEIGHTS,
-            "grid" => region_info.grid.clone(), 
+            "grid" => region_info.grid.clone(),
             "region_coords_x" => region_info.region_coords[0],
             "region_coords_y" => region_info.region_coords[1],
             "size_x" => region_info.get_size()[0],
@@ -194,15 +194,15 @@ impl TerrainUploadHandler {
         log::debug!("SQL insert succeeded.");
         Ok(())
     }
-    
+
     fn do_sql_update(&mut self, region_info: UploadedRegionInfo, params: &HashMap<String, String>) -> Result<(), Error> {
-        const SQL_INSERT: &str = r"INSERT INTO raw_terrain_heights (grid, region_coords_x, region_coords_y, size_x, size_y, name, scale, offset, elevs,  water_level, creator) 
+        const SQL_INSERT: &str = r"INSERT INTO raw_terrain_heights (grid, region_coords_x, region_coords_y, size_x, size_y, name, scale, offset, elevs,  water_level, creator)
             VALUES (:grid, :region_coords_x, :region_coords_y, :size_x, :size_y, :name, :scale, :offset, :elevs, :water_level, :creator)";
         //  ***NEED TO FIX THIS FOR Open Simulator***
         let creator = params.get(OWNER_NAME).ok_or_else(|| anyhow!("This request is not from Second Life/Open Simulator"))?.trim();
         let values = params! {
             //////"table" => RAW_TERRAIN_HEIGHTS,
-            "grid" => region_info.grid.clone(), 
+            "grid" => region_info.grid.clone(),
             "region_coords_x" => region_info.region_coords[0],
             "region_coords_y" => region_info.region_coords[1],
             "size_x" => region_info.get_size()[0],
@@ -218,7 +218,7 @@ impl TerrainUploadHandler {
         log::debug!("SQL insert succeeded.");
         Ok(())
     }
-    
+
     /// Parse a request
     fn parse_request(b: &[u8], _env: &HashMap<String, String>) -> Result<UploadedRegionInfo, Error> {
         //  Should be UTF-8. Check.
@@ -228,11 +228,11 @@ impl TerrainUploadHandler {
         }
         log::info!("Uploaded JSON:\n{}", s);
         //  Should be valid JSON
-        Ok(UploadedRegionInfo::parse(s)?)        
+        Ok(UploadedRegionInfo::parse(s)?)
     }
-    
+
     /// Handle request.
-    /// 
+    ///
     /// Start a database transaction.
     /// Check if this data is the same as any stored data for this region.
     /// If yes, just update confirmation user and time.
@@ -240,9 +240,9 @@ impl TerrainUploadHandler {
     fn process_request(&mut self, region_info: UploadedRegionInfo, params: &HashMap<String, String>) -> Result<String, Error> {
         let msg = format!("Region info:\n{:?}", region_info);
         //  Initial test of SQL
-        self.do_sql_insert(region_info, params)?;   // ***TEMP***       
+        self.do_sql_insert(region_info, params)?;   // ***TEMP***
         //////let msg = "Test OK".to_string(); // ***TEMP***
-        Ok(msg)  
+        Ok(msg)
     }
 }
 //  Our "handler"
@@ -255,7 +255,7 @@ impl Handler for TerrainUploadHandler {
     ) -> Result<(), Error> {
         //  We have a request. It's supposed to be in JSON.
         //  Parse. Error 400 with message if fail.
-        match Self::parse_request(&request.standard_input, env) {  
+        match Self::parse_request(&request.standard_input, env) {
             Ok(req) => {
                 log::info!("Request made: {:?} env {:?}", req, env);
                 let params = request.params.as_ref().ok_or_else(|| anyhow!("No HTTP parameters found"))?;
@@ -270,9 +270,9 @@ impl Handler for TerrainUploadHandler {
                     }
                     Err(e) => {
                        let http_response = Response::http_response("text/plain", 500, format!("Problem processing request: {:?}", e).as_str());
-                        Response::write_response(out, request, http_response.as_slice(), &[])?;                    
+                        Response::write_response(out, request, http_response.as_slice(), &[])?;
                     }
-                }               
+                }
             }
             Err(e) => {
                 let http_response = Response::http_response("text/plain", 400, format!("Incorrect request: {:?}", e).as_str());
@@ -282,7 +282,7 @@ impl Handler for TerrainUploadHandler {
                 Response::write_response(out, request, http_response.as_slice(), &b)?;
             }
         }
-        Ok(())	
+        Ok(())
     }
 }
 
@@ -297,7 +297,7 @@ pub fn run_responder() -> Result<(), Error> {
     let listener = init_fcgi()?;
     //  Accept a connection on the listener socket. This hooks up
     //  input and output to the parent process.
-    let (socket, _addr) = listener.accept()?; 
+    let (socket, _addr) = listener.accept()?;
     let outsocket = socket.try_clone()?;
     let mut instream = std::io::BufReader::new(socket);
     let mut outio = std::io::BufWriter::new(outsocket);
@@ -310,16 +310,22 @@ pub fn run_responder() -> Result<(), Error> {
 
 /// Build from database
 pub fn transitive_closure(vizgroups: &mut VizGroups, conn: &mut PooledConn) -> Result<(), Error> {
-    println!("Build start");    // ***TEMP***
+    println!("Build start"); // ***TEMP***
     //  The loop here is sequential data processing with control breaks when a field changes.
     const SQL_SELECT: &str = r"SELECT grid, region_coords_x, region_coords_y, size_x, size_y, name FROM raw_terrain_heights ORDER BY grid, region_coords_x, region_coords_y";
-    let _all_regions = conn
-        .query_map(
-            SQL_SELECT,
-            |(grid, region_coords_x, region_coords_y, size_x, size_y, name)| {
-                let region_data = RegionData { grid, region_coords_x, region_coords_y, size_x, size_y, name }; 
-                vizgroups.add_region_data(region_data);                  
-            },	
+    let _all_regions = conn.query_map(
+        SQL_SELECT,
+        |(grid, region_coords_x, region_coords_y, size_x, size_y, name)| {
+            let region_data = RegionData {
+                grid,
+                region_coords_x,
+                region_coords_y,
+                size_x,
+                size_y,
+                name,
+            };
+            vizgroups.add_region_data(region_data);
+        },
     )?;
     vizgroups.end_grid();
     Ok(())
@@ -347,16 +353,23 @@ fn setup() -> Result<(Pool, String, bool), Error> {
     //  The options
     let mut opts = Options::new();
     opts.optopt("o", "outdir", "Set output direcory name.", "NAME");
-    opts.optopt("c", "credentials", "Get database credentials from this file.", "NAME");
+    opts.optopt(
+        "c",
+        "credentials",
+        "Get database credentials from this file.",
+        "NAME",
+    );
     opts.optflag("h", "help", "Print this help menu.");
     opts.optflag("v", "verbose", "Verbose mode.");
     let matches = match opts.parse(&args[1..]) {
-        Ok(m) => { m }
-        Err(f) => { panic!("{}", f.to_string()) }
+        Ok(m) => m,
+        Err(f) => {
+            panic!("{}", f.to_string())
+        }
     };
     if matches.opt_present("h") {
         print_usage(&program, opts);
-        panic!("Help requested, will not run.");  
+        panic!("Help requested, will not run.");
     }
     let outdir = matches.opt_str("o");
     let credsfile = matches.opt_str("c");
@@ -374,7 +387,11 @@ fn setup() -> Result<(Pool, String, bool), Error> {
         Ok(creds) => creds,
         Err(e) => {
             //  Envie returns a string and we need an Error
-            return Err(anyhow!("Unable to open credentials file \"{}\": {:?}", credsfile, e));
+            return Err(anyhow!(
+                "Unable to open credentials file \"{}\": {:?}",
+                credsfile,
+                e
+            ));
         }
     };
     //  Optional MySQL port number
@@ -389,8 +406,8 @@ fn setup() -> Result<(Pool, String, bool), Error> {
         .secure_auth(false)
         .ip_or_hostname(creds.get("DB_HOST"))
         .tcp_port(portnum)
-        .user(creds.get("DB_USER"))   
-        .pass(creds.get("DB_PASS"))  
+        .user(creds.get("DB_USER"))
+        .pass(creds.get("DB_PASS"))
         .db_name(creds.get("DB_NAME"));
     drop(creds);
     //////log::info!("Opts: {:?}", opts);
@@ -407,21 +424,18 @@ fn setup() -> Result<(Pool, String, bool), Error> {
 /// Setup, then run.
 fn main() {
     match setup() {
-        Ok((pool, outdir, verbose)) => {
-            match run(pool, outdir, verbose) {
-                Ok(_) => {
-                    if verbose {
-                        println!("Done.");
-                    }
+        Ok((pool, outdir, verbose)) => match run(pool, outdir, verbose) {
+            Ok(_) => {
+                if verbose {
+                    println!("Done.");
                 }
-                Err(e) => { 
-                    panic!("Failed: {:?}", e);
-                }
-            }   
-        }
+            }
+            Err(e) => {
+                panic!("Failed: {:?}", e);
+            }
+        },
         Err(e) => {
             panic!("Unable to start: {:?}", e);
-            
         }
     };
 }
@@ -441,8 +455,8 @@ fn generate_terrain() {
         .secure_auth(false)
         .ip_or_hostname(creds.get("DB_HOST"))
         .tcp_port(portnum)
-        .user(creds.get("DB_USER"))   
-        .pass(creds.get("DB_PASS"))  
+        .user(creds.get("DB_USER"))
+        .pass(creds.get("DB_PASS"))
         .db_name(creds.get("DB_NAME"));
     drop(creds);
     //////log::info!("Opts: {:?}", opts);

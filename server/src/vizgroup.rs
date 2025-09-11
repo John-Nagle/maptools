@@ -3,20 +3,20 @@
 //! The visibiilty groups indicate which regions can be seen
 //! from which other regions. If there is a path of connected
 //! regions from one region to another, the regions can see
-//! each other. 
+//! each other.
 //!
 //! It's a transitive closure on "adjacent".
-//! 
+//!
 //! Corners are adjacent on Open Simulator but not Second Life.
 //!
 //! Animats
 //! September, 2025
 //! License: LGPL.
 //!
-use anyhow::{Error};
-use std::cell::{RefCell};
+use anyhow::Error;
+use std::cell::RefCell;
+use std::collections::BTreeMap;
 use std::rc::{Rc, Weak};
-use std::collections::{BTreeMap};
 
 /// RegionData - info about one region relevant to this computation.
 #[derive(Debug, Clone, PartialEq)]
@@ -38,7 +38,11 @@ pub struct RegionData {
 impl std::fmt::Display for RegionData {
     /// Just name and location, no size.
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "\"{}\" ({}, {})", self.name, self.region_coords_x, self.region_coords_y)
+        write!(
+            f,
+            "\"{}\" ({}, {})",
+            self.name, self.region_coords_x, self.region_coords_y
+        )
     }
 }
 
@@ -57,7 +61,6 @@ impl std::fmt::Display for RegionData {
 //  ownership of the VizGroup's data is transferred to a vector of
 //  completed VizGroup items in VizGroups.
 
-
 /// A rectangle of interest which might touch a object in an incoming column.
 #[derive(Debug)]
 pub struct LiveBlock {
@@ -75,28 +78,39 @@ type WeakLiveBlockLink = Weak<RefCell<LiveBlock>>;
 
 impl LiveBlock {
     /// Usual new
-    pub fn new(region_data: &RegionData, completed_groups_weak: &Weak<RefCell<CompletedGroups>>) -> Rc<RefCell<LiveBlock>> {
+    pub fn new(
+        region_data: &RegionData,
+        completed_groups_weak: &Weak<RefCell<CompletedGroups>>,
+    ) -> Rc<RefCell<LiveBlock>> {
         Rc::new_cyclic(|weak_self| {
             RefCell::new(LiveBlock {
                 region_data: region_data.clone(),
-                viz_group: VizGroup::new(region_data.clone(), weak_self.clone(), completed_groups_weak),
-                weak_link_to_self: weak_self.clone()
+                viz_group: VizGroup::new(
+                    region_data.clone(),
+                    weak_self.clone(),
+                    completed_groups_weak,
+                ),
+                weak_link_to_self: weak_self.clone(),
             })
         })
-    }	
-    
+    }
+
     /// Two live blocks touch.
     /// Their VizGroup must be merged.
     /// And all live blocks that use the VizGroup that was merged out must be redirected to the new combined group.
     pub fn blocks_touch(&mut self, other: &LiveBlockLink) {
-        
         //  Merge VizGroup data of the two LiveBlock items.
         //  At end, both share the same combined VizGroup, and the "other" VizGroup is dead, never to be used again.
         if !Rc::ptr_eq(&self.viz_group, &other.borrow().viz_group) {
-            println!("Blocks with different viz groups touch: {} and {}", 
-                self.region_data, other.borrow().region_data); // ***TEMP***
+            println!(
+                "Blocks with different viz groups touch: {} and {}",
+                self.region_data,
+                other.borrow().region_data
+            ); // ***TEMP***
             //  Merge the VizGroup sets.
-            self.viz_group.borrow_mut().merge(&mut other.borrow().viz_group.borrow_mut());
+            self.viz_group
+                .borrow_mut()
+                .merge(&mut other.borrow().viz_group.borrow_mut());
 
             //  Tell all other involved LiveBlock items about this merge.
             //  Cloning here clones a vector, but we have to get out from under those borrows.
@@ -118,20 +132,24 @@ impl LiveBlock {
             }
         }
     }
-    
+
     /// y-adjacent - true if adjacent in y.
     /// Called while iterating over a single column.
     fn y_adjacent(&self, bref: &LiveBlockLink, tolerance: u32) -> bool {
         let b = bref.borrow();
         assert!(self.region_data.region_coords_y <= b.region_data.region_coords_y); // ordered properly, a < b in Y
-        self.region_data.region_coords_y + self.region_data.size_y + tolerance >= b.region_data.region_coords_y
+        self.region_data.region_coords_y + self.region_data.size_y + tolerance
+            >= b.region_data.region_coords_y
     }
-    
+
     /// xy-adjacent - true if adjacent in x and y, on different columns.
     /// Called when iterating over two columns in sync.
     fn xy_adjacent(&self, bref: &LiveBlockLink, tolerance: u32) -> bool {
         let b = bref.borrow();
-        assert!(self.region_data.region_coords_x + self.region_data.size_x <= b.region_data.region_coords_x); // columns must be adjacent in X.
+        assert!(
+            self.region_data.region_coords_x + self.region_data.size_x
+                <= b.region_data.region_coords_x
+        ); // columns must be adjacent in X.
         //  True if overlaps in Y.
         // ***NEED TO CHECK TOLERANCE***
         let a0 = self.region_data.region_coords_y;
@@ -139,12 +157,13 @@ impl LiveBlock {
         let b0 = b.region_data.region_coords_y;
         let b1 = b0 + b.region_data.size_y + tolerance;
         let overlap = a0 < b1 && a1 >= b0;
-        println!("XY-adjacent test: overlap: ({}, {}) vs ({}, {}) overlap: {}", a0, a1, b0, b1, overlap);
+        println!(
+            "XY-adjacent test: overlap: ({}, {}) vs ({}, {}) overlap: {}",
+            a0, a1, b0, b1, overlap
+        );
         overlap
     }
 }
-
-
 
 /// An ordered sequence of LiveBlock items which might touch an object in an incoming column.
 /// When a new column comes in, any LiveBlock which doesn't reach that far is purged.
@@ -165,7 +184,10 @@ impl LiveBlocks {
     /// Purge all blocks whose X edge is below or equal to the limit.
     /// This is all of them on SL, but larger regions on OS might be kept.
     fn purge_below_x_limit(&mut self, x_limit: u32) {
-        self.live_blocks.retain(|_, v| { let bk = v.borrow(); bk.region_data.region_coords_x + bk.region_data.size_x > x_limit} );
+        self.live_blocks.retain(|_, v| {
+            let bk = v.borrow();
+            bk.region_data.region_coords_x + bk.region_data.size_x > x_limit
+        });
     }
 }
 
@@ -185,13 +207,15 @@ pub struct VizGroup {
 }
 
 impl Drop for VizGroup {
-
     /// Drop happens when no live block is using this VizGroup.
     /// Thus, that VizGroup is complete.
     /// The group is delivered to VizGroups as done.
     fn drop(&mut self) {
-        let completed_groups = self.completed_groups_weak.upgrade().expect("Unable to upgrade vizgroups");
-        println!("Drop of VizGroup: {} regions", self.regions.len());   // ***TEMP***
+        let completed_groups = self
+            .completed_groups_weak
+            .upgrade()
+            .expect("Unable to upgrade vizgroups");
+        println!("Drop of VizGroup: {} regions", self.regions.len()); // ***TEMP***
         if !self.regions.is_empty() {
             completed_groups.borrow_mut().push(self.regions.clone());
         }
@@ -199,14 +223,17 @@ impl Drop for VizGroup {
 }
 
 impl VizGroup {
-
     /// New, with the first region, and a back link to the VizGroups
-    pub fn new(region: RegionData, live_block_weak: WeakLiveBlockLink, completed_groups_weak: &Weak<RefCell<CompletedGroups>>) -> Rc<RefCell<Self>> {
+    pub fn new(
+        region: RegionData,
+        live_block_weak: WeakLiveBlockLink,
+        completed_groups_weak: &Weak<RefCell<CompletedGroups>>,
+    ) -> Rc<RefCell<Self>> {
         let new_item = Self {
             grid: region.grid.clone(),
             regions: vec![region],
             live_blocks_weak: vec![live_block_weak],
-            completed_groups_weak: completed_groups_weak.clone()
+            completed_groups_weak: completed_groups_weak.clone(),
         };
         Rc::new(RefCell::new(new_item))
     }
@@ -214,8 +241,13 @@ impl VizGroup {
     pub fn merge(&mut self, other: &mut VizGroup) {
         assert_eq!(self.grid, other.grid);
         self.live_blocks_weak.append(&mut other.live_blocks_weak);
-        <Vec<RegionData> as AsMut<Vec<RegionData>>>::as_mut(&mut self.regions).append(&mut other.regions);
-        println!("Merged: {} live blocks weak, {} regions", self.live_blocks_weak.len(), self.regions.len()); // ***TEMP***
+        <Vec<RegionData> as AsMut<Vec<RegionData>>>::as_mut(&mut self.regions)
+            .append(&mut other.regions);
+        println!(
+            "Merged: {} live blocks weak, {} regions",
+            self.live_blocks_weak.len(),
+            self.regions.len()
+        ); // ***TEMP***
     }
 }
 
@@ -265,8 +297,10 @@ impl VizGroups {
                     if prev.1.borrow().xy_adjacent(curr, self.tolerance) {
                         prev.1.borrow_mut().blocks_touch(curr)
                     }
-                    
-                    if curr.borrow().region_data.region_coords_y < prev.1.borrow().region_data.region_coords_y {
+
+                    if curr.borrow().region_data.region_coords_y
+                        < prev.1.borrow().region_data.region_coords_y
+                    {
                         curr_opt = curr_iter.next();
                     } else {
                         prev_opt = prev_iter.next();
@@ -279,7 +313,7 @@ impl VizGroups {
             }
         }
     }
-    
+
     /// End of a column.
     /// Where all the real work gets done.
     /// Each entry in the new column has to be compared with the
@@ -293,8 +327,11 @@ impl VizGroups {
         let mut prev_opt: Option<Rc<RefCell<LiveBlock>>> = None;
         for item in &mut self.column {
             if let Some(prev) = prev_opt {
-                assert!(prev.borrow().region_data.region_coords_y <= item.borrow().region_data.region_coords_y,
-                    "VizGroup data not sorted into increasing order in Y");
+                assert!(
+                    prev.borrow().region_data.region_coords_y
+                        <= item.borrow().region_data.region_coords_y,
+                    "VizGroup data not sorted into increasing order in Y"
+                );
                 if prev.borrow().y_adjacent(item, self.tolerance) {
                     prev.borrow_mut().blocks_touch(item)
                 }
@@ -304,7 +341,7 @@ impl VizGroups {
         //  Next, need the check for overlap in X, between existing live blocks
         //  and new live blocks
         self.check_overlap_live_block_columns();
-        
+
         //  Update the list of live blocks.
         //  Ones that ended at the column edge disappear.
         //  All new ones are added.
@@ -317,7 +354,7 @@ impl VizGroups {
             //////self.column.iter().map(|b| self.live_blocks.live_blocks.insert(b.region_data.region_coords_y, b));
             //////let _  = self.column.drain(..).map(|b| self.live_blocks.live_blocks.insert(b.region_data.region_coords_y, b));
             //  ***Proper way above does nothing***
-            
+
             while let Some(b) = self.column.pop() {
                 let y = b.borrow().region_data.region_coords_y;
                 self.live_blocks.live_blocks.insert(y, b);
@@ -327,7 +364,7 @@ impl VizGroups {
         }
         self.column.clear();
     }
-    
+
     pub fn end_grid(&mut self) {
         //  Finish last column
         self.end_column();
@@ -335,7 +372,7 @@ impl VizGroups {
         self.live_blocks.purge_below_x_limit(u32::MAX);
         println!("End grid.");
     }
-    
+
     /// Add one item of region data.
     pub fn add_region_data(&mut self, region_data: RegionData) {
         if let Some(prev) = &self.prev_region_data {
@@ -347,8 +384,11 @@ impl VizGroups {
             }
         };
         //  Add to column, or start new column.
-        self.column.push(LiveBlock::new(&region_data, &Rc::<RefCell<Vec<Vec<RegionData>>>>::downgrade(&self.completed_groups)));
-        self.prev_region_data = Some(region_data);                  
+        self.column.push(LiveBlock::new(
+            &region_data,
+            &Rc::<RefCell<Vec<Vec<RegionData>>>>::downgrade(&self.completed_groups),
+        ));
+        self.prev_region_data = Some(region_data);
     }
 }
 
@@ -366,47 +406,60 @@ impl VizGroups {
 #[test]
 fn test_visgroup() {
     /// Test pattern
-    /// Format: RegionData { grid, region_coords_x, region_coords_y, size_x, size_y, name }; 
-    const TEST_PATTERN: [(&str,u32, u32, u32, u32, &str);24] = [
-        ( "Test", 0, 0, 100, 100, "Bottom left" ),
-        ( "Test", 0, 100, 100, 100, "Left 100" ),
-        ( "Test", 0, 200, 100, 100, "Left 200" ),
-        ( "Test", 0, 300, 100, 100, "Left 300" ),
-        ( "Test", 0, 400, 100, 100, "Left 400" ),
-        ( "Test", 100, 0, 100, 100, "Bottom 100" ),
-        ( "Test", 200, 0, 100, 100, "Bottom 200" ),
-        ( "Test", 200, 300, 100, 100, "Tiny West" ),
-        ( "Test", 300, 0, 100, 100, "Bottom 300" ), 
-        ( "Test", 300, 300, 100, 100, "Tiny East" ),
-        ( "Test", 400, 0, 100, 100, "Bottom 400" ),
-        ( "Test", 500, 0, 100, 100, "Bottom 500" ),
-        ( "Test", 500, 100, 100, 100, "Column 5-1" ),
-        ( "Test", 500, 200, 100, 100, "Column 5-2" ),
-        ( "Test", 500, 300, 100, 100, "Column 5-3" ),
-        ( "Test", 500, 400, 100, 100, "Column 5-4" ),
-        ( "Test", 600, 400, 100, 100, "Top 600" ),
-        ( "Test", 700, 100, 100, 200, "Tall skinny region" ),
-        ( "Test", 700, 400, 100, 100, "Top 700" ),
-        ( "Test", 800, 400, 100, 100, "Top 800" ),   
-        ( "Test", 900, 100, 100, 100, "Right 100" ),
-        ( "Test", 900, 200, 100, 100, "Right 200" ),
-        ( "Test", 900, 300, 100, 100, "Right 300" ),
-        ( "Test", 900, 400, 100, 100, "Right 400" )];
-        
-    let test_data: Vec<_> = TEST_PATTERN.iter().map(|(grid, region_coords_x, region_coords_y, size_x, size_y, name)| 
-        RegionData { grid: grid.to_string(), region_coords_x: *region_coords_x, region_coords_y: *region_coords_y, 
-        size_x: *size_x, size_y: *size_y, name: name.to_string() }).collect(); 
-        
+    /// Format: RegionData { grid, region_coords_x, region_coords_y, size_x, size_y, name };
+    const TEST_PATTERN: [(&str, u32, u32, u32, u32, &str); 24] = [
+        ("Test", 0, 0, 100, 100, "Bottom left"),
+        ("Test", 0, 100, 100, 100, "Left 100"),
+        ("Test", 0, 200, 100, 100, "Left 200"),
+        ("Test", 0, 300, 100, 100, "Left 300"),
+        ("Test", 0, 400, 100, 100, "Left 400"),
+        ("Test", 100, 0, 100, 100, "Bottom 100"),
+        ("Test", 200, 0, 100, 100, "Bottom 200"),
+        ("Test", 200, 300, 100, 100, "Tiny West"),
+        ("Test", 300, 0, 100, 100, "Bottom 300"),
+        ("Test", 300, 300, 100, 100, "Tiny East"),
+        ("Test", 400, 0, 100, 100, "Bottom 400"),
+        ("Test", 500, 0, 100, 100, "Bottom 500"),
+        ("Test", 500, 100, 100, 100, "Column 5-1"),
+        ("Test", 500, 200, 100, 100, "Column 5-2"),
+        ("Test", 500, 300, 100, 100, "Column 5-3"),
+        ("Test", 500, 400, 100, 100, "Column 5-4"),
+        ("Test", 600, 400, 100, 100, "Top 600"),
+        ("Test", 700, 100, 100, 200, "Tall skinny region"),
+        ("Test", 700, 400, 100, 100, "Top 700"),
+        ("Test", 800, 400, 100, 100, "Top 800"),
+        ("Test", 900, 100, 100, 100, "Right 100"),
+        ("Test", 900, 200, 100, 100, "Right 200"),
+        ("Test", 900, 300, 100, 100, "Right 300"),
+        ("Test", 900, 400, 100, 100, "Right 400"),
+    ];
+
+    let test_data: Vec<_> = TEST_PATTERN
+        .iter()
+        .map(
+            |(grid, region_coords_x, region_coords_y, size_x, size_y, name)| RegionData {
+                grid: grid.to_string(),
+                region_coords_x: *region_coords_x,
+                region_coords_y: *region_coords_y,
+                size_x: *size_x,
+                size_y: *size_y,
+                name: name.to_string(),
+            },
+        )
+        .collect();
+
     let mut viz_groups = VizGroups::new();
     for item in test_data {
         viz_groups.add_region_data(item);
     }
     viz_groups.end_grid();
     //  Display results
-    println!("Result: Viz groups: {}", viz_groups.completed_groups.borrow().len());
+    println!(
+        "Result: Viz groups: {}",
+        viz_groups.completed_groups.borrow().len()
+    );
     for viz_group in viz_groups.completed_groups.borrow().iter() {
         println!("Viz group: {:?}", viz_group);
     }
-    assert_eq!(viz_groups.completed_groups.borrow().len(), 3);  // 3 groups in this test case.
-                  
+    assert_eq!(viz_groups.completed_groups.borrow().len(), 3); // 3 groups in this test case.
 }

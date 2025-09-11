@@ -7,7 +7,7 @@ use anyhow::Error;
 use log::LevelFilter;
 use minifcgi;
 use minifcgi::init_fcgi;
-use minifcgi::{Request, Response, Handler};
+use minifcgi::{Handler, Request, Response};
 
 /// Debug logging
 fn logger() {
@@ -24,13 +24,11 @@ fn logger() {
 
 //  Our data
 struct EchoHandler {
-        cnt: usize
-    }
+    cnt: usize,
+}
 impl EchoHandler {
     pub fn new() -> Self {
-        Self {
-            cnt: 0
-        }
+        Self { cnt: 0 }
     }
 }
 //  Our "handler"
@@ -45,7 +43,11 @@ impl Handler for EchoHandler {
         self.cnt += 1;
         let http_response = Response::http_response("text/plain", 200, "OK");
         //  Return something useful.
-        let b = format!("Env: {:?}\nParams: {:?}\ntally: {}", env, request.params, self.cnt).into_bytes();
+        let b = format!(
+            "Env: {:?}\nParams: {:?}\ntally: {}",
+            env, request.params, self.cnt
+        )
+        .into_bytes();
         Response::write_response(out, request, http_response.as_slice(), &b)?;
         Ok(())
     }

@@ -93,7 +93,7 @@ enum FcgiRecType {
     EndRequest = 3,
     Params = 4,
     Stdin = 5,
-    Stdout = 6,	
+    Stdout = 6,
     Stderr = 7,
     Data = 8,
     GetValues = 9,
@@ -197,7 +197,10 @@ impl FcgiRecord {
         if header.content_length > 0 {
             log::debug!("About to read {} content bytes", content_bytes.len());
             instream.read_exact(&mut content_bytes)?;
-            log::debug!("Content: {:?}", String::from_utf8_lossy(&content_bytes[0..content_bytes.len().min(200)].to_vec()));
+            log::debug!(
+                "Content: {:?}",
+                String::from_utf8_lossy(&content_bytes[0..content_bytes.len().min(200)].to_vec())
+            );
             let padding_length = header.padding_length;
             if padding_length > 0 {
                 let mut padding_bytes = vec![0; padding_length as usize];
@@ -317,12 +320,18 @@ impl Request {
                     anyhow!("FCGI responder: EOF reading multi-byte param length")
                 })?;
                 //  Compute length per spec
-                let v = 
-                    (((*b0 & 0x7f) as usize) << 24)
-                        + ((*b1 as usize) << 16)
-                        + ((*b2 as usize) << 8)
-                        + *b3 as usize;
-                log::debug!("Param length, multibyte: {:02x} {:02x} {:02x} {:02x} -> {:08x}", b3, b2, b1, b0, v);
+                let v = (((*b0 & 0x7f) as usize) << 24)
+                    + ((*b1 as usize) << 16)
+                    + ((*b2 as usize) << 8)
+                    + *b3 as usize;
+                log::debug!(
+                    "Param length, multibyte: {:02x} {:02x} {:02x} {:02x} -> {:08x}",
+                    b3,
+                    b2,
+                    b1,
+                    b0,
+                    v
+                );
                 Ok(Some(v))
             } else {
                 Ok(Some(*b0 as usize))
@@ -374,7 +383,7 @@ impl Request {
         let mut m = HashMap::new();
         let mut pos = b.iter();
         while let Some((k, v)) = Self::fetch_name_value_pair(&mut pos)? {
-            log::debug!("Param: \"{}\" = \"{}\"", k,v);
+            log::debug!("Param: \"{}\" = \"{}\"", k, v);
             m.insert(k, v);
         }
         Ok(m)
@@ -485,7 +494,7 @@ impl Response {
 
 /// Read and run one transaction.
 /// Errors here result in a 500 error with a message.
-fn  run_one <T: Handler>(
+fn run_one<T: Handler>(
     instream: &mut impl BufRead,
     out: &mut dyn Write,
     request: &mut Request,
@@ -508,11 +517,11 @@ fn  run_one <T: Handler>(
 }
 
 /// Not the main program, but the main loop.
-pub fn run <T: Handler>(
+pub fn run<T: Handler>(
     instream: &mut impl BufRead,
     out: &mut dyn Write,
     handler: &mut T,
-    ) -> Result<(), Error> {
+) -> Result<(), Error> {
     let env = std::env::vars().map(|(k, v)| (k, v)).collect();
     let mut request = Request::new();
     loop {
@@ -547,13 +556,11 @@ fn basic_io() {
     use std::io::{BufReader, Write};
     //  Our data
     struct TestHandler {
-        cnt: usize
+        cnt: usize,
     }
     impl TestHandler {
         pub fn new() -> Self {
-            Self {
-                cnt: 0
-            }
+            Self { cnt: 0 }
         }
     }
     //  Our "handler"
@@ -617,5 +624,4 @@ fn basic_io() {
     let mut out = std::io::stdout();
     let mut test_handler = TestHandler::new();
     run(&mut instream, &mut out, &mut test_handler).expect("Run failed");
-
 }
