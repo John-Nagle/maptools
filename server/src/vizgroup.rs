@@ -39,6 +39,13 @@ pub struct RegionData {
     name: String,
 }
 
+impl std::fmt::Display for RegionData {
+    /// Just name and location, no size.
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "\"{}\" ({}, {})", self.name, self.region_coords_x, self.region_coords_y)
+    }
+}
+
 //  General concept of transitive closure algorithm.
 //  (Tenative)
 //
@@ -90,9 +97,8 @@ impl LiveBlock {
         //  Merge VizGroup data of the two LiveBlock items.
         //  At end, both share the same combined VizGroup, and the "other" VizGroup is dead, never to be used again.
         if !Rc::ptr_eq(&self.viz_group, &other.borrow().viz_group) {
-            println!("Blocks with different viz groups touch: ({},{}) and ({},{})", 
-                self.region_data.region_coords_x, self.region_data.region_coords_y,
-                other.borrow().region_data.region_coords_x, other.borrow().region_data.region_coords_y); // ***TEMP***
+            println!("Blocks with different viz groups touch: {} and {}", 
+                self.region_data, other.borrow().region_data); // ***TEMP***
             //  Merge the VizGroup sets.
             self.viz_group.borrow_mut().merge(&mut other.borrow().viz_group.borrow_mut());
 
@@ -174,7 +180,6 @@ pub struct VizGroup {
     pub grid: String,
     /// Regions
     /// Will probably change to a different data structure
-    /// This is inside an option so we can take it later.
     pub regions: Vec<RegionData>,
     /// Backlink to LiveBlocks that use this VizGroup.
     /// Used to tell the LiveBlock about a merge.
@@ -206,12 +211,13 @@ impl VizGroup {
         };
         Rc::new(RefCell::new(new_item))
     }
-    /// Merge another VizGroup into this one. The other group cannot be used again.
+    /// Merge another VizGroup into this one. The other group is drained and cannot be used again.
     pub fn merge(&mut self, other: &mut VizGroup) {
         assert_eq!(self.grid, other.grid);
         self.live_blocks_weak.append(&mut other.live_blocks_weak);
         //////self.regions.as_mut().append(&mut other.regions);
         <Vec<RegionData> as AsMut<Vec<RegionData>>>::as_mut(&mut self.regions).append(&mut other.regions);
+        println!("Merged: {} live blocks weak, {} regions", self.live_blocks_weak.len(), self.regions.len()); // ***TEMP***
     }
 }
 
@@ -284,9 +290,11 @@ impl VizGroups {
     /// Eacn new column entry creates a new VizGroup.
     /// Overlapped/touching groups get their VizGroups merged.
     fn end_column(&mut self) {
+/*
         for region_data in &self.column {
             println!("{:?}", region_data);  // ***TEMP*** 
         }
+*/
         //  If two live blocks in this list overlap, merge their viz groups.
         //  This is the check for overlap in Y.
         let mut prev_opt: Option<Rc<RefCell<LiveBlock>>> = None;
