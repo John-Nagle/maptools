@@ -13,6 +13,7 @@
 //! September, 2025
 //! License: LGPL.
 //!
+#![forbid(unsafe_code)]
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::rc::{Rc, Weak};
@@ -392,6 +393,10 @@ impl VizGroups {
                 self.end_column();
                 result = Some(self.end_grid());
             } else if region_data.region_coords_x != prev.region_coords_x {
+                assert!(
+                    region_data.region_coords_x >= prev.region_coords_x,
+                    "VizGroup data not sorted into increasing order in X"
+                );
                 self.end_column();
             }
         };
