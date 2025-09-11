@@ -337,7 +337,10 @@ impl VizGroups {
     }
     
     fn end_grid(&mut self) {
+        //  Finish last column
         self.end_column();
+        //  Flush all waiting live blocks.
+        self.live_blocks.purge_below_x_limit(u32::MAX);
         println!("End grid.");
     }
     
@@ -425,5 +428,9 @@ fn test_visgroup() {
     }
     viz_groups.end_grid();
     //  Display results
-    println!("Result: Viz groups: {:?}", viz_groups.completed_groups.borrow());               
+    println!("Result: Viz groups: {}", viz_groups.completed_groups.borrow().len());
+    for viz_group in viz_groups.completed_groups.borrow().iter() {
+        println!("Viz group: {:?}", viz_group);
+    }
+                  
 }
