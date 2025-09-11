@@ -175,24 +175,13 @@ pub struct VizGroup {
     /// Regions
     /// Will probably change to a different data structure
     /// This is inside an option so we can take it later.
-    pub regions: Option<Vec<RegionData>>,
+    pub regions: Vec<RegionData>,
     /// Backlink to LiveBlocks that use this VizGroup.
     /// Used to tell the LiveBlock about a merge.
     pub live_blocks_weak: Vec<Weak<RefCell<LiveBlock>>>,
     /// Backlink to completed groups so they can be updated from drop.
     completed_groups_weak: Weak<RefCell<CompletedGroups>>,
 }
-/*
-impl PartialEq for VizGroup {
-    /// Equality test.
-    //  ***TOO EXPENSIVE - scans entire region list.***
-    //  ***add a serial number or something.
-    fn eq(&self, other: &Self) -> bool {
-        self.grid == other.grid
-        && self.regions == other.regions
-    }
-}
-*/
 
 impl Drop for VizGroup {
 
@@ -200,10 +189,8 @@ impl Drop for VizGroup {
     /// Thus, that VizGroup is complete.
     /// The group is delivered to VizGroups as done.
     fn drop(&mut self) {
-        let mut completed_groups = self.completed_groups_weak.upgrade().expect("Unable to upgrade vizgroups");
-        if let Some(group) = self.regions.take() {
-            completed_groups.borrow_mut().push(group);
-        }
+        let completed_groups = self.completed_groups_weak.upgrade().expect("Unable to upgrade vizgroups");
+        completed_groups.borrow_mut().push(self.regions.clone());
     }
 }
 
@@ -213,7 +200,7 @@ impl VizGroup {
     pub fn new(region: RegionData, live_block_weak: WeakLiveBlockLink, completed_groups_weak: &Weak<RefCell<CompletedGroups>>) -> Rc<RefCell<Self>> {
         let new_item = Self {
             grid: region.grid.clone(),
-            regions: Some(vec![region]),
+            regions: vec![region],
             live_blocks_weak: vec![live_block_weak],
             completed_groups_weak: completed_groups_weak.clone()
         };
@@ -222,9 +209,9 @@ impl VizGroup {
     /// Merge another VizGroup into this one. The other group cannot be used again.
     pub fn merge(&mut self, other: &mut VizGroup) {
         assert_eq!(self.grid, other.grid);
-        //  ***NEED TO MERGE live_blocks_weak TOO ***
         self.live_blocks_weak.append(&mut other.live_blocks_weak);
-        self.regions.as_mut().expect("Regions should not be None").append(&mut other.regions.take().expect("Regions should not be none"));
+        //////self.regions.as_mut().append(&mut other.regions);
+        <Vec<RegionData> as AsMut<Vec<RegionData>>>::as_mut(&mut self.regions).append(&mut other.regions);
     }
 }
 
@@ -296,9 +283,7 @@ impl VizGroups {
     /// entries in the column to check for overlap/touching.
     /// Eacn new column entry creates a new VizGroup.
     /// Overlapped/touching groups get their VizGroups merged.
-    /// ***WHAT HAPPENS FOR EMPTY COLUMN?***
     fn end_column(&mut self) {
-        // ***MORE***
         for region_data in &self.column {
             println!("{:?}", region_data);  // ***TEMP*** 
         }
@@ -307,6 +292,8 @@ impl VizGroups {
         let mut prev_opt: Option<Rc<RefCell<LiveBlock>>> = None;
         for item in &mut self.column {
             if let Some(prev) = prev_opt {
+                assert!(prev.borrow().region_data.region_coords_y <= item.borrow().region_data.region_coords_y,
+                    "VizGroup data not sorted into increasing order in Y");
                 if prev.borrow().y_adjacent(item, self.tolerance) {
                     prev.borrow_mut().blocks_touch(item)
                 }
@@ -317,10 +304,6 @@ impl VizGroups {
         //  and new live blocks
         self.check_overlap_live_block_columns();
         
-        //  ***MORE***
-        //  Compare previous list of live blocks with this one. If there is
-        //  overlap, merge their viz groups.
-        //  ***MORE***
         //  Update the list of live blocks.
         //  Ones that ended at the column edge disappear.
         //  All new ones are added.
