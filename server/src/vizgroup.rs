@@ -93,26 +93,27 @@ impl LiveBlock {
             other.viz_group = self.viz_group.clone()
         }
 */
-        //  Merge into this live block.
+        //  Merge into this live block, if not merge with self.
         if !Rc::ptr_eq(&self.viz_group, &other.borrow().viz_group) {
             self.viz_group.borrow_mut().merge(&mut other.borrow().viz_group.borrow_mut());
-        }
-        //  Tell all other involved LiveBlock items about this merge.
-        //  Cloning here clones a vector, but we have to get out from under those borrows.
-        let self_shared_groups = self.viz_group.borrow().live_blocks_weak.clone();
-        let other_shared_groups = other.borrow().viz_group.borrow().live_blocks_weak.clone();
-        for weak_block in &self_shared_groups {
-            if !Weak::ptr_eq(&self.weak_link_to_self, weak_block) {
-                if let Some(block) = weak_block.upgrade() {
-                     block.borrow_mut().viz_group = self.viz_group.clone();
+
+            //  Tell all other involved LiveBlock items about this merge.
+            //  Cloning here clones a vector, but we have to get out from under those borrows.
+            let self_shared_groups = self.viz_group.borrow().live_blocks_weak.clone();
+            let other_shared_groups = other.borrow().viz_group.borrow().live_blocks_weak.clone();
+            for weak_block in &self_shared_groups {
+                if !Weak::ptr_eq(&self.weak_link_to_self, weak_block) {
+                    if let Some(block) = weak_block.upgrade() {
+                        block.borrow_mut().viz_group = self.viz_group.clone();
+                    }
                 }
             }
-        }
-        for weak_block in &other_shared_groups {
-            if !Weak::ptr_eq(&self.weak_link_to_self, weak_block) {
-                if let Some(block) = weak_block.upgrade() {
-                    //  ***NEED DOUBLE BORROW PREVENTION***
-                    block.borrow_mut().viz_group = self.viz_group.clone();
+            for weak_block in &other_shared_groups {
+                if !Weak::ptr_eq(&self.weak_link_to_self, weak_block) {
+                    if let Some(block) = weak_block.upgrade() {
+                        //  ***NEED DOUBLE BORROW PREVENTION***
+                        block.borrow_mut().viz_group = self.viz_group.clone();
+                    }
                 }
             }
         }
