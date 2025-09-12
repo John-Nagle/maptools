@@ -8,6 +8,7 @@
 //! It's a transitive closure on "adjacent".
 //!
 //! Corners are adjacent on Open Simulator but not Second Life.
+//! For Open Simulator, we add 1 to the size, to make corner contacts touch.
 //!
 //! Animats
 //! September, 2025
@@ -72,6 +73,7 @@ pub struct LiveBlock {
 
 /// So we can have backpointers.
 type LiveBlockLink = Rc<RefCell<LiveBlock>>;
+/// Backpointers for LiveBlocks, so we can update them after merges.
 type WeakLiveBlockLink = Weak<RefCell<LiveBlock>>;
 
 impl LiveBlock {
@@ -114,6 +116,8 @@ impl LiveBlock {
             //  Cloning here clones a vector, but we have to get out from under those borrows.
             let self_shared_groups = self.viz_group.borrow().live_blocks_weak.clone();
             let other_shared_groups = other.borrow().viz_group.borrow().live_blocks_weak.clone();
+            //  Now here we have to avoid a double mutable borrow. 
+            //  So there's a test to check that we're not trying to borrow the LiveBlock we are working on.
             for weak_block in &self_shared_groups {
                 if !Weak::ptr_eq(&self.weak_link_to_self, weak_block) {
                     if let Some(block) = weak_block.upgrade() {
@@ -149,7 +153,6 @@ impl LiveBlock {
                 <= b.region_data.region_coords_x
         ); // columns must be adjacent in X.
         //  True if overlaps in Y.
-        // ***NEED TO CHECK TOLERANCE***
         let a0 = self.region_data.region_coords_y;
         let a1 = a0 + self.region_data.size_y + tolerance;
         let b0 = b.region_data.region_coords_y;
@@ -238,6 +241,9 @@ impl VizGroup {
     /// Merge another VizGroup into this one. The other group is drained and cannot be used again.
     pub fn merge(&mut self, other: &mut VizGroup) {
         assert_eq!(self.grid, other.grid);
+        //  Drop all dead blocks before merging.
+        other.live_blocks_weak.retain(|v| v.upgrade().is_some());
+        //  Do the merge,
         self.live_blocks_weak.append(&mut other.live_blocks_weak);
         <Vec<RegionData> as AsMut<Vec<RegionData>>>::as_mut(&mut self.regions)
             .append(&mut other.regions);
@@ -359,10 +365,7 @@ impl VizGroups {
             let x_limit = self.column[0].borrow().region_data.region_coords_x;
             self.live_blocks.purge_below_x_limit(x_limit);
             //  Add new live blocks.
-            //////self.column.iter().map(|b| self.live_blocks.live_blocks.insert(b.region_data.region_coords_y, b));
-            //////let _  = self.column.drain(..).map(|b| self.live_blocks.live_blocks.insert(b.region_data.region_coords_y, b));
-            //  ***Proper way above does nothing***
-
+            //  Put all the blocks in the column into the B-tree of live blocks.
             while let Some(b) = self.column.pop() {
                 let y = b.borrow().region_data.region_coords_y;
                 self.live_blocks.live_blocks.insert(y, b);
@@ -386,6 +389,9 @@ impl VizGroups {
     }
 
     /// Add one item of region data.
+    /// Regions must be sorted by X, Y.
+    /// It is not correct to have two overlapping regions, but we don't consider that fatal
+    /// because sometimes the region database is temporarily inconsistent.
     pub fn add_region_data(&mut self, region_data: RegionData)  -> Option<CompletedGroups> {
         let mut result = None;
         if let Some(prev) = &self.prev_region_data {
