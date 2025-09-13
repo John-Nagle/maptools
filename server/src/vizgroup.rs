@@ -102,11 +102,11 @@ impl LiveBlock {
         //  Merge VizGroup data of the two LiveBlock items.
         //  At end, both share the same combined VizGroup, and the "other" VizGroup is dead, never to be used again.
         if !Rc::ptr_eq(&self.viz_group, &other.borrow().viz_group) {
-            println!(
+            log::debug!(
                 "Blocks with different viz groups touch: {} and {}",
                 self.region_data,
                 other.borrow().region_data
-            ); // ***TEMP***
+            );
             //  Merge the VizGroup sets.
             self.viz_group
                 .borrow_mut()
@@ -158,7 +158,7 @@ impl LiveBlock {
         let b0 = b.region_data.region_coords_y;
         let b1 = b0 + b.region_data.size_y + tolerance;
         let overlap = a0 < b1 && a1 >= b0;
-        println!(
+        log::trace!(
             "XY-adjacent test: overlap: ({}, {}) vs ({}, {}) overlap: {}",
             a0, a1, b0, b1, overlap
         );
@@ -216,7 +216,7 @@ impl Drop for VizGroup {
             .completed_groups_weak
             .upgrade()
             .expect("Unable to upgrade vizgroups");
-        println!("Drop of VizGroup: {} regions", self.regions.len()); // ***TEMP***
+        log::debug!("Drop of VizGroup: {} regions", self.regions.len());
         if !self.regions.is_empty() {
             completed_groups.borrow_mut().push(self.regions.clone());
         }
@@ -247,11 +247,11 @@ impl VizGroup {
         self.live_blocks_weak.append(&mut other.live_blocks_weak);
         <Vec<RegionData> as AsMut<Vec<RegionData>>>::as_mut(&mut self.regions)
             .append(&mut other.regions);
-        println!(
+        log::debug!(
             "Merged: {} live blocks weak, {} regions",
             self.live_blocks_weak.len(),
             self.regions.len()
-        ); // ***TEMP***
+        );
     }
 }
 
@@ -359,7 +359,7 @@ impl VizGroups {
         //  Update the list of live blocks.
         //  Ones that ended at the column edge disappear.
         //  All new ones are added.
-        println!("End column. {} regions.", self.column.len());
+        log::debug!("End column. {} regions.", self.column.len());
         if !self.column.is_empty() {
             //  Purge now-dead live blocks. This will be all of them on SL, but wide regions on OS may not be ready to die yet.
             let x_limit = self.column[0].borrow().region_data.region_coords_x;
@@ -370,7 +370,7 @@ impl VizGroups {
                 let y = b.borrow().region_data.region_coords_y;
                 self.live_blocks.live_blocks.insert(y, b);
             }
-            println!("{} live blocks", self.live_blocks.live_blocks.len()); // ***TEMP***
+            log::debug!("{} live blocks", self.live_blocks.live_blocks.len());
             assert!(self.column.is_empty());
         }
         self.column.clear();
@@ -382,7 +382,7 @@ impl VizGroups {
         self.end_column();
         //  Flush all waiting live blocks.
         self.live_blocks.purge_below_x_limit(u32::MAX);
-        println!("End grid.");
+        log::info!("End grid.");
         let result = self.completed_groups.take();
         self.clear();
         result
@@ -471,7 +471,13 @@ fn test_visgroup() {
             },
         )
         .collect();
-
+    //  All errors to console
+    simplelog::CombinedLogger::init(
+        vec![
+            simplelog::TermLogger::new(simplelog::LevelFilter::Trace, simplelog::Config::default(), 
+            simplelog::TerminalMode::Mixed, simplelog::ColorChoice::Auto),
+        ]
+    ).unwrap();
     let mut viz_groups = VizGroups::new(false);
     for item in test_data {
         let grid_break = viz_groups.add_region_data(item);
@@ -480,12 +486,12 @@ fn test_visgroup() {
     }
     let results = viz_groups.end_grid();
     //  Display results
-    println!(
+    log::info!(
         "Result: Viz groups: {}",
         results.len()
     );
     for viz_group in results.iter() {
-        println!("Viz group: {:?}", viz_group);
+        log::info!("Viz group: {:?}", viz_group);
     }
     assert_eq!(results.len(), 3); // 3 groups in this test case.
 }
