@@ -352,10 +352,27 @@ impl TerrainGenerator {
     }
     
     /// Which region impostors do we need to create? 
-    /// This filters the results of the transitive closure based on what's in the database.
-    pub fn needed_regions() {
+    /// This filters the results of the transitive closure based on what's in the database and the servers.
+    ///
+    /// Transitive closure tells us if regions are in the same VizGroup. 
+    /// Then we must check the database of impostored regions to tie VizGroups to viz_group IDs.
+    //  ***WE MAY HAVE TO MERGE AND SPLIT HERE***
+    //  ***NEED TO RUN ALL EXISTING REGIONS THROUGH TRANSITIVE CLOSURE***
+    pub fn needed_regions(&self, completed_groups: &Vec::<CompletedGroups>) -> Result<(), Error> {
         todo!();
     }
+    
+    /// Build impostor, either sculpt or mesh form.
+    /// This collects the elevation data needed to build the impostor geometry.
+    pub fn build_impostor(&self, region_data: &RegionData, use_mesh: bool) -> Result<(), Error> {
+        todo!();
+    }
+    
+    /// Build impostor, sculpt form.
+    pub fn build_impostor_sculpt(&self, region_data: &RegionData, conn: &mut PooledConn) {
+        todo!();
+    }
+    
 }
 
 /// Actually do the work
