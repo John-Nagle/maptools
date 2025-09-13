@@ -55,7 +55,7 @@ const OWNER_NAME: &str = "HTTP_X_SECONDLIFE_OWNER_NAME";
 fn logger() {
     //  Log file is openly visible as a web page.
     //  Only for debug tests.
-    const LOG_FILE_NAME: &str = "logs/gemeratelog.txt";
+    const LOG_FILE_NAME: &str = "logs/generatelog.txt";
     let _ = simplelog::CombinedLogger::init(vec![simplelog::WriteLogger::new(
         LevelFilter::Debug,
         simplelog::Config::default(),
@@ -308,14 +308,15 @@ pub fn run_responder() -> Result<(), Error> {
 }
 */
 
-/// Build from database
-pub fn transitive_closure(vizgroups: &mut VizGroups, conn: &mut PooledConn) -> Result<Vec<CompletedGroups>, Error> {
+/// Build visibility group info from database
+pub fn transitive_closure(vizgroups: &mut VizGroups, conn: &mut PooledConn, grid: &str) -> Result<Vec<CompletedGroups>, Error> {
     let mut grids = Vec::new();
     println!("Build start"); // ***TEMP***
-    //  The loop here is sequential data processing with control breaks when a field changes.
-    const SQL_SELECT: &str = r"SELECT grid, region_coords_x, region_coords_y, size_x, size_y, name FROM raw_terrain_heights ORDER BY grid, region_coords_x, region_coords_y";
-    let _all_regions = conn.query_map(
+    //  The loop here is sequential data processing with control breaks when an index field changes.
+    const SQL_SELECT: &str = r"SELECT grid, region_coords_x, region_coords_y, size_x, size_y, name FROM raw_terrain_heights WHERE LOWER(grid) = :grid ORDER BY grid, region_coords_x, region_coords_y ";
+    let _all_regions = conn.exec_map(
         SQL_SELECT,
+        params! { grid },
         |(grid, region_coords_x, region_coords_y, size_x, size_y, name)| {
             let region_data = RegionData {
                 grid,
@@ -335,12 +336,12 @@ pub fn transitive_closure(vizgroups: &mut VizGroups, conn: &mut PooledConn) -> R
 }
 
 /// Actually do the work
-fn run(pool: Pool, outdir: String, verbose: bool) -> Result<(), Error> {
+fn run(pool: Pool, outdir: String, grid: String, verbose: bool) -> Result<(), Error> {
     //////println!("{:?} {:?} {}", credsfile, outdir, verbose);
     let corners_touch_connects = false; // for now
     let mut vizgroups = VizGroups::new(corners_touch_connects);
     let mut conn = pool.get_conn()?;
-    let _results = transitive_closure(&mut vizgroups, &mut conn)?;
+    let _results = transitive_closure(&mut vizgroups, &mut conn, &grid)?;
     //  ***MORE***
     Ok(())
 }
@@ -351,25 +352,26 @@ fn print_usage(program: &str, opts: Options) {
 }
 
 /// Set up options, credentials, and database connection.
-fn setup() -> Result<(Pool, String, bool), Error> {
+fn setup() -> Result<(Pool, String, String, bool), Error> {
     //  Usual options processing
     let args: Vec<String> = std::env::args().collect();
     let program = args[0].clone();
     //  The options
     let mut opts = Options::new();
-    opts.optopt("o", "outdir", "Set output direcory name.", "NAME");
+    opts.optopt("o", "outdir", "Set output directory name.", "NAME");
     opts.optopt(
         "c",
         "credentials",
         "Get database credentials from this file.",
         "NAME",
     );
+    opts.optopt("g", "grid", "Only output for this grid", "NAME");
     opts.optflag("h", "help", "Print this help menu.");
     opts.optflag("v", "verbose", "Verbose mode.");
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
         Err(f) => {
-            panic!("{}", f.to_string())
+            panic!("{}", f.to_string());
         }
     };
     if matches.opt_present("h") {
@@ -379,12 +381,14 @@ fn setup() -> Result<(Pool, String, bool), Error> {
     let outdir = matches.opt_str("o");
     let credsfile = matches.opt_str("c");
     let verbose = matches.opt_present("v");
-    if outdir.is_none() || credsfile.is_none() {
+    let grid = matches.opt_str("g");
+    if outdir.is_none() || credsfile.is_none() || grid.is_none() {
         print_usage(&program, opts);
         return Err(anyhow!("Required command line options missing"));
     }
     let credsfile = credsfile.unwrap();
     let outdir = outdir.unwrap();
+    let grid = grid.unwrap().trim().to_lowercase();
     // Create the output directory, empty.
     //  ***MORE***
     // Connect to the database
@@ -422,14 +426,15 @@ fn setup() -> Result<(Pool, String, bool), Error> {
     }
     log::info!("Connected to database.");
     //  Setup complete. Return what's needed to run.
-    Ok((pool, outdir, verbose))
+    Ok((pool, outdir, grid, verbose))
 }
 
 /// Main program.
 /// Setup, then run.
 fn main() {
+    logger();
     match setup() {
-        Ok((pool, outdir, verbose)) => match run(pool, outdir, verbose) {
+        Ok((pool, outdir, grid, verbose)) => match run(pool, outdir, grid, verbose) {
             Ok(_) => {
                 if verbose {
                     println!("Done.");
