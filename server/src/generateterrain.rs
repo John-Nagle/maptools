@@ -53,8 +53,7 @@ const OWNER_NAME: &str = "HTTP_X_SECONDLIFE_OWNER_NAME";
 
 /// Debug logging
 fn logger() {
-    //  Log file is openly visible as a web page.
-    //  Only for debug tests.
+    //  Local log file.
     const LOG_FILE_NAME: &str = "logs/generatelog.txt";
     let _ = simplelog::CombinedLogger::init(vec![simplelog::WriteLogger::new(
         LevelFilter::Debug,
@@ -308,40 +307,64 @@ pub fn run_responder() -> Result<(), Error> {
 }
 */
 
-/// Build visibility group info from database
-pub fn transitive_closure(vizgroups: &mut VizGroups, conn: &mut PooledConn, grid: &str) -> Result<Vec<CompletedGroups>, Error> {
-    let mut grids = Vec::new();
-    println!("Build start"); // ***TEMP***
-    //  The loop here is sequential data processing with control breaks when an index field changes.
-    const SQL_SELECT: &str = r"SELECT grid, region_coords_x, region_coords_y, size_x, size_y, name FROM raw_terrain_heights WHERE LOWER(grid) = :grid ORDER BY grid, region_coords_x, region_coords_y ";
-    let _all_regions = conn.exec_map(
-        SQL_SELECT,
-        params! { grid },
-        |(grid, region_coords_x, region_coords_y, size_x, size_y, name)| {
-            let region_data = RegionData {
-                grid,
-                region_coords_x,
-                region_coords_y,
-                size_x,
-                size_y,
-                name,
-            };
-            if let Some(completed_groups) = vizgroups.add_region_data(region_data) {
-                grids.push(completed_groups);
-            }
-        },
-    )?;
-    grids.push(vizgroups.end_grid());
-    Ok(grids)
+/// The terrain object generator
+struct TerrainGenerator {
+    /// Are regions with only corners touching adjacent?
+    /// Set to true for Open Simulator grids
+    corners_touch_connects: bool,
+}
+
+impl TerrainGenerator {
+
+    pub fn new(corners_touch_connects: bool) -> Self {
+        Self {
+            corners_touch_connects
+        }
+    }
+
+    /// Build visibility group info from database
+    pub fn transitive_closure(&self, conn: &mut PooledConn, grid: &str) -> Result<Vec<CompletedGroups>, Error> {
+        let mut vizgroups = VizGroups::new(self.corners_touch_connects);
+        let mut grids = Vec::new();
+        log::info!("Build start"); // ***TEMP***
+        //  The loop here is sequential data processing with control breaks when an index field changes.
+        const SQL_SELECT: &str = 
+            r"SELECT grid, region_coords_x, region_coords_y, size_x, size_y, name FROM raw_terrain_heights WHERE LOWER(grid) = :grid ORDER BY grid, region_coords_x, region_coords_y ";
+        let _all_regions = conn.exec_map(
+            SQL_SELECT,
+            params! { grid },
+            |(grid, region_coords_x, region_coords_y, size_x, size_y, name)| {
+                let region_data = RegionData {
+                    grid,
+                    region_coords_x,
+                    region_coords_y,
+                    size_x,
+                    size_y,
+                    name,
+                };
+                if let Some(completed_groups) = vizgroups.add_region_data(region_data) {
+                    grids.push(completed_groups);
+                }
+            },
+        )?;
+        grids.push(vizgroups.end_grid());
+        Ok(grids)
+    }
+    
+    /// Which region impostors do we need to create? 
+    /// This filters the results of the transitive closure based on what's in the database.
+    pub fn needed_regions() {
+        todo!();
+    }
 }
 
 /// Actually do the work
 fn run(pool: Pool, outdir: String, grid: String, verbose: bool) -> Result<(), Error> {
     //////println!("{:?} {:?} {}", credsfile, outdir, verbose);
-    let corners_touch_connects = false; // for now
-    let mut vizgroups = VizGroups::new(corners_touch_connects);
+    let corners_touch_connects = false; // for now, SL only.
+    let terrain_generator = TerrainGenerator::new(corners_touch_connects);    
     let mut conn = pool.get_conn()?;
-    let _results = transitive_closure(&mut vizgroups, &mut conn, &grid)?;
+    let _results = terrain_generator.transitive_closure(&mut conn, &grid)?;
     //  ***MORE***
     Ok(())
 }
