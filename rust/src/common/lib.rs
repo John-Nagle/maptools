@@ -1,7 +1,7 @@
 mod credentials;
-//////mod fcgisocketsetup;
-//////mod minifcgi;
+mod fcgisocketsetup;
+mod minifcgi;
 
 pub use credentials::Credentials;
-//////pub use fcgisocketsetup::init_fcgi;
-//////pub use minifcgi::{Handler, Request, Response, run};
+pub use fcgisocketsetup::init_fcgi;
+pub use minifcgi::{Handler, Request, Response, run};

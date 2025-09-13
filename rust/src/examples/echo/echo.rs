@@ -5,9 +5,8 @@ use std::io::Write;
 //////use std::io::BufReader;
 use anyhow::Error;
 use log::LevelFilter;
-use minifcgi;
-use minifcgi::init_fcgi;
-use minifcgi::{Handler, Request, Response};
+use common::init_fcgi;
+use common::{Handler, Request, Response};
 
 /// Debug logging
 fn logger() {
@@ -91,5 +90,5 @@ pub fn main() {
     //  Dummy user data
     let mut echo_handler = EchoHandler::new();
     //  Run the FCGI server.
-    minifcgi::run(&mut instream, &mut outio, &mut echo_handler).expect("Run failed");
+    common::run(&mut instream, &mut outio, &mut echo_handler).expect("Run failed");
 }
