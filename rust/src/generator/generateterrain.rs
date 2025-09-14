@@ -26,6 +26,7 @@ use serde::Deserialize;
 use std::collections::HashMap;
 use std::io::Write;
 use common::Credentials;
+use common::{UploadedRegionInfo, ElevsJson};
 
 mod vizgroup;
 use vizgroup::{RegionData, VizGroups, CompletedGroups};
@@ -61,6 +62,7 @@ fn logger() {
     )]);
     log::warn!("Logging to {:?}", LOG_FILE_NAME); // where the log is going
 }
+/*
 ///  Our data as uploaded from SL/OS in JSON format
 // "{\"region\":\"Vallone\",\"scale\":1.092822,\"offset\":33.500740,\"waterlev\":20.000000,\"regioncoords\":[1807,1199],
 //  \"elevs\":[\"E7CAACA3A5A8ACAEB0B2B5B9BDC0C4C5C5C3C0BDB9B6B3B2B2B3B4B7BBBFC3C7CBCED1D3D5D5D4CFC4B5A4"";
@@ -150,6 +152,7 @@ impl UploadedRegionInfo {
         //////Ok(self.get_unscaled_elevs()?.iter().map(|&v| ((v as f32) / 256.0) * self.scale + self.offset).collect())
     }
 }
+*/
 /*
 ///  Our handler
 struct TerrainUploadHandler {
@@ -362,8 +365,31 @@ impl TerrainGenerator {
     }
     
     /// Build impostor, either sculpt or mesh form.
-    /// This collects the elevation data needed to build the impostor geometry.
-    pub fn build_impostor(&self, region_data: &RegionData, use_mesh: bool) -> Result<(), Error> {
+    /// This collects the elevation data needed to build the impostor geometry.//
+    //  ***NEED TO HANDLE MULTIPLE REGION IMPOSTORS.
+    pub fn build_impostor(&self, region_data: &RegionData, conn: &mut PooledConn, use_mesh: bool) -> Result<(), Error> {
+        log::info!("Building impostor for {}", region_data.name); // 
+        //  The loop here is sequential data processing with control breaks when an index field changes.
+        let grid = region_data.grid.clone();
+        let region_coords_x = region_data.region_coords_x;
+        let region_coords_y = region_data.region_coords_y;
+        const SQL_SELECT: &str = 
+            r"SELECT grid, region_coords_x, region_coords_y, size_x, size_y, name FROM raw_terrain_heights
+                WHERE LOWER(grid) = :grid, region_coords_x = : region_coords_x, region_coords_y = :region_data.region_coords_y";
+        let _all_regions = conn.exec_map(
+            SQL_SELECT,
+            params! { region_coords_x, region_coords_y, grid },
+            |(grid, region_coords_x, region_coords_y, size_x, size_y, name)| {
+                let region_data = RegionData {
+                    grid,
+                    region_coords_x,
+                    region_coords_y,
+                    size_x,
+                    size_y,
+                    name,
+                };
+            },
+        )?;
         todo!();
     }
     
