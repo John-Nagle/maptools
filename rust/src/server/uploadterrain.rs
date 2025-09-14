@@ -9,7 +9,8 @@
 //!     License: LGPL.
 //!     Animats
 //!     August, 2025.
-
+//
+#![forbid(unsafe_code)]
 use anyhow::{Error, anyhow};
 use chrono::{NaiveDateTime, Utc};
 use log::LevelFilter;
