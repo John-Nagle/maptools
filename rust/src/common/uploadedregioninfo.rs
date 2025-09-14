@@ -20,7 +20,7 @@ pub struct UploadedRegionInfo {
     /// Region name
     pub name: String,
     /// Height data, a long set of hex data.  
-    elevs: Vec<String>,
+    pub elevs: Vec<String>,
     /// Scale factor for elevs
     pub scale: f32,
     /// Offset factor for elevs

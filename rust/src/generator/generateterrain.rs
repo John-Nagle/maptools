@@ -365,6 +365,37 @@ impl TerrainGenerator {
         todo!();
     }
     
+    /// Get elevation data for one region.
+    pub fn get_elevs_one_region(&self, grid: String, region_coords_x: u32, region_coords_y: u32, conn: &mut PooledConn) -> Result<UploadedRegionInfo, Error> {
+        const SQL_SELECT: &str = 
+            r"SELECT grid, region_coords_x, region_coords_y, size_x, size_y, name, scale, offset, elevs,  water_level
+                FROM raw_terrain_heights
+                WHERE LOWER(grid) = :grid, region_coords_x = : region_coords_x, region_coords_y = :region_coords_y";
+        let grid_for_msg = grid.clone();
+        let regions = conn.exec_map(
+            SQL_SELECT,
+            params! { grid, region_coords_x, region_coords_y },
+            |(grid, region_coords_x, region_coords_y, size_x, size_y, name, scale, offset, elevs,  water_level)| {
+                let region_coords = [region_coords_x, region_coords_y];
+                let size = Some([size_x, size_y]);
+                let water_lev = water_level;
+                let _raw_elevs: Vec<u8> = elevs;
+                let elevs = vec![];// ***TEMP***
+                UploadedRegionInfo {
+                    grid, region_coords, size, name, scale, offset, elevs,  water_lev}
+            })?;
+        if regions.is_empty() {
+            return Err(anyhow!("No raw terrain data for region at ({},{}) on \"{}\"", region_coords_x, region_coords_y, grid_for_msg));
+        }
+        if regions.len() > 1 {
+            //  Duplicate data - warning 
+            //  SQL indices should make this impossible.
+            log::error!("More than one region data set for region at ({},{}) on \"{}\"", region_coords_x, region_coords_y, grid_for_msg);
+        }
+        let region: UploadedRegionInfo = regions[0].clone();
+        Ok(region)
+    }
+    
     /// Build impostor, either sculpt or mesh form.
     /// This collects the elevation data needed to build the impostor geometry.//
     //  ***NEED TO HANDLE MULTIPLE REGION IMPOSTORS.
