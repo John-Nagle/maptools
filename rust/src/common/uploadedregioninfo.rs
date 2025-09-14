@@ -53,6 +53,19 @@ impl ElevsJson {
 impl UploadedRegionInfo {
     /// Default region size, used on grids that don't do varregions.
     pub const DEFAULT_REGION_SIZE: u32 = 256;
+    
+    pub fn new(grid: String, region_coords_x: u32, region_coords_y: u32, size_x: u32, size_y: u32, name: String, elevs: Vec<String>, scale: f32, offset: f32, water_lev: f32) -> Self {
+        Self {
+            grid,
+            region_coords: [region_coords_x, region_coords_y],
+            size: Some([size_x, size_y]),
+            name,
+            elevs,
+            scale,
+            offset,
+            water_lev,
+        }               
+    }
 
     /// Parse from string
     pub fn parse(s: &str) -> Result<Self, Error> {
