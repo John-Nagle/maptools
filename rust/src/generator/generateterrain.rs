@@ -379,8 +379,7 @@ impl TerrainGenerator {
                 let region_coords = [region_coords_x, region_coords_y];
                 let size = Some([size_x, size_y]);
                 let water_lev = water_level;
-                let _raw_elevs: Vec<u8> = elevs;
-                let elevs = vec![];// ***TEMP***
+                let elevs = UploadedRegionInfo::elevs_blob_to_hex(elevs, size_x, size_y).expect("Elevs data has invalid length");
                 UploadedRegionInfo {
                     grid, region_coords, size, name, scale, offset, elevs,  water_lev}
             })?;

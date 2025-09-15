@@ -54,6 +54,7 @@ impl UploadedRegionInfo {
     /// Default region size, used on grids that don't do varregions.
     pub const DEFAULT_REGION_SIZE: u32 = 256;
     
+    /// Usual new. This takes elevations as hex strings.
     pub fn new(grid: String, region_coords_x: u32, region_coords_y: u32, size_x: u32, size_y: u32, name: String, elevs: Vec<String>, scale: f32, offset: f32, water_lev: f32) -> Self {
         Self {
             grid,
@@ -97,6 +98,25 @@ impl UploadedRegionInfo {
         let elevs_blob: Vec<_> = self.get_unscaled_elevs()?.into_iter().flatten().collect();
         Ok(elevs_blob)
     }
+    
+    /// Convert SQL blob to hex format.
+    /// We have to figure out the length of the strings from the length and aspect ratio.
+    pub fn elevs_blob_to_hex(elevs: Vec<u8>, size_x: u32, size_y: u32) -> Result<Vec<String>, Error> {
+        let n = elevs.len() as u32;
+        let gcd = num::integer::gcd(size_x, size_y) as u32;
+        let sx = size_x / gcd;
+        let sy = size_y / gcd;
+        if n % (sx*sy) != 0 {
+            return Err(anyhow!("Elevation data size incorrect: length {}, size ({}, {})", n, size_x, size_y));
+        }
+        let r = n / (sx*sy);
+        let elevs_x = size_x / r;
+        let elevs_y = size_y / r;
+        assert_eq!(n, elevs_x * elevs_y);
+        //  Now take slices of length elevs_x and make into hex.
+        Ok(elevs.chunks_exact(elevs_x as usize).map(|c|  hex::encode_upper(c)).collect())
+    }
+    
     /// Get elevations as numbers before offsetting.
     /// Input is a hex string representing one elev per byte
     /// Output is an array of hex strings.
