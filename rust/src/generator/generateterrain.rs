@@ -397,7 +397,7 @@ impl TerrainGenerator {
     
     /// Build impostor, either sculpt or mesh form.
     /// This collects the elevation data needed to build the impostor geometry.//
-    //  ***NEED TO HANDLE MULTIPLE REGION IMPOSTORS.
+    //  ***NEED TO HANDLE MULTIPLE-REGION IMPOSTORS.
     pub fn build_impostor(&self, region_data: &RegionData, conn: &mut PooledConn, use_mesh: bool) -> Result<(), Error> {
         log::info!("Building impostor for {}", region_data.name); // 
         //  The loop here is sequential data processing with control breaks when an index field changes.

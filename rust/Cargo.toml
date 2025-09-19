@@ -58,6 +58,7 @@ shellexpand = "3.1"
 num = "0.4"
 num-traits = "0.2"
 num-derive = "0.4"
+array2d = "0.3"
 
 #   Debug logging
 simplelog = "0.12"

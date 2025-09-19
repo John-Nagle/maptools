@@ -6,6 +6,7 @@
 //
 use anyhow::{Error, anyhow};
 use serde::Deserialize;
+use array2d::{Array2D};
 ///  Our data as uploaded from SL/OS in JSON format
 // "{\"region\":\"Vallone\",\"scale\":1.092822,\"offset\":33.500740,\"waterlev\":20.000000,\"regioncoords\":[1807,1199],
 //  \"elevs\":[\"E7CAACA3A5A8ACAEB0B2B5B9BDC0C4C5C5C3C0BDB9B6B3B2B2B3B4B7BBBFC3C7CBCED1D3D5D5D4CFC4B5A4"";
@@ -129,5 +130,41 @@ impl UploadedRegionInfo {
     pub fn get_scaled_elevs(&self) -> Result<Vec<Vec<f32>>, Error> {
         todo!();
         //////Ok(self.get_unscaled_elevs()?.iter().map(|&v| ((v as f32) / 256.0) * self.scale + self.offset).collect())
+    }
+}
+
+/// Height field.
+/// Always an odd number of rows and columns, because the right and top edges
+/// are supposed to be the edges adjacent regions.
+pub struct HeightField {
+    /// The heights
+    heights: Array2D<f32>,
+    /// size of region, X
+    pub size_x: u32,
+    /// size of region, Y
+    pub size_y: u32,
+}
+
+impl HeightField {
+    /// New from elevs blob, the form used in SQL
+    pub fn new_from_elevs_blob(elevs: Vec<u8>, size_x: u32, size_y: u32, scale: f32, offset: f32) -> Result<Self, Error> {
+        let n = elevs.len() as u32;
+        let gcd = num::integer::gcd(size_x, size_y) as u32;
+        let sx = size_x / gcd;
+        let sy = size_y / gcd;
+        if n % (sx*sy) != 0 {
+            return Err(anyhow!("Elevation data size incorrect: length {}, size ({}, {})", n, size_x, size_y));
+        }
+        let r = n / (sx*sy);
+        let elevs_x = size_x / r;
+        let elevs_y = size_y / r;
+        assert_eq!(n, elevs_x * elevs_y);
+        let iterator = (0..).map(|n| ((elevs[n] as f32) / 256.0) * scale + offset);
+        let heights = Array2D::from_iter_column_major(iterator, elevs_x as usize, elevs_y as usize)?;
+        Ok(Self {
+            heights, 
+            size_x,
+            size_y,
+        })
     }
 }
