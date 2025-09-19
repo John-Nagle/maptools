@@ -9,6 +9,8 @@ CREATE TABLE IF NOT EXISTS raw_terrain_heights (
     name VARCHAR(100) NOT NULL,
     scale FLOAT NOT NULL,
     offset FLOAT NOT NULL,
+    samples_x INT NOT NULL,
+    samples_y INT NOT NULL,
     elevs MEDIUMBLOB NOT NULL,   
     water_level FLOAT NOT NULL,
     creator VARCHAR(63) NOT NULL,

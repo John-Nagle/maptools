@@ -82,6 +82,21 @@ impl UploadedRegionInfo {
             [Self::DEFAULT_REGION_SIZE, Self::DEFAULT_REGION_SIZE]
         }
     }
+    
+    /// Get dimensions of elevation samples array
+    pub fn get_samples(&self) -> Result<[u32;2], Error> {
+        if self.elevs.is_empty() {
+            return Err(anyhow!("Elevation data is missing"));
+        }
+        //  Validate that all rows are the same length
+        let rowlen = self.elevs[0].len()/2;  // it's a hex string, we want the byte count
+        for row in &self.elevs {
+            if row.len() != rowlen*2 {
+                return Err(anyhow!("Elevation data has a row of the wrong length. Not {}", rowlen));
+            }
+        } 
+        Ok([self.elevs.len().try_into()?, rowlen.try_into()?])
+    }
 
     /// Get grid in canonial lowercase format
     pub fn get_grid(&self) -> String {
@@ -150,25 +165,13 @@ pub struct HeightField {
 impl HeightField {
     /// New from elevs blob, the form used in SQL. One big blob, a flattened 2D array.
     /// size_x and size_y are size of the region, not the elevs data.
-    pub fn new_from_elevs_blob(elevs: &Vec<u8>, size_x: u32, size_y: u32, scale: f32, offset: f32) -> Result<Self, Error> {
-        //  We have one big flattened array. We need to infer its dimensions from size_x, size_y, and the length of elevs.
-        //  So we get the aspect ratio from sixe_x and size_y.
-        //  Those are integers, and, if not powers of 2, multiples of 256.
-        //  ***WRONG***
-        let n = elevs.len() as u32;
-        let gcd = num::integer::gcd(size_x, size_y) as u32;
-        let sx = size_x / gcd;
-        let sy = size_y / gcd;
-        if n % (sx*sy) != 0 {
-            return Err(anyhow!("Elevation data size incorrect: length {}, size ({}, {})", n, size_x, size_y));
+    pub fn new_from_elevs_blob(elevs: &Vec<u8>, samples_x: u32, samples_y: u32, size_x: u32, size_y: u32, scale: f32, offset: f32) -> Result<Self, Error> {
+        if elevs.len() != (samples_x as usize) * (samples_y as usize) {
+            return Err(anyhow!("Elevations array data length {} does not match dimensions ({}, {})", 
+                elevs.len(), samples_x, samples_y));
         }
-        let r = n / (sx*sy);
-        println!("sx: {}, sy: {}, r: {}", sx, sy, r); // ***TEMP***
-        let elevs_x = size_x / r;
-        let elevs_y = size_y / r;
-        assert_eq!(n, elevs_x * elevs_y);
         let iterator = (0..).map(|n| ((elevs[n] as f32) / 256.0) * scale + offset);
-        let heights = Array2D::from_iter_column_major(iterator, elevs_x as usize, elevs_y as usize)?;
+        let heights = Array2D::from_iter_column_major(iterator, samples_x as usize, samples_y as usize)?;
         Ok(Self {
             heights, 
             size_x,
@@ -181,12 +184,12 @@ impl HeightField {
         if elevs.is_empty() {
             return Err(anyhow!("Elevs array is empty."));
         }
-        let col_length = elevs[0].len();
+        let row_length = elevs[0].len();
         let iterator = (0..).map(|n| {
-            let x = n % col_length;
-            let y = n / col_length;
+            let x = n % row_length;
+            let y = n / row_length;
             ((elevs[x][y] as f32) / 256.0) * scale + offset });
-        let heights = Array2D::from_iter_column_major(iterator, col_length, elevs.len())?;
+        let heights = Array2D::from_iter_row_major(iterator, row_length, elevs.len())?;
         Ok(Self {
             heights, 
             size_x,
@@ -201,7 +204,7 @@ fn test_height_field() {
     println!("Test height field.");
     let flattened: Vec<u8> = vec![0u8, 1u8, 2u8, 3u8, 4u8, 5u8, 6u8, 7u8, 8u8];
     let arrayform: Vec<Vec<u8>> = vec![vec![0u8, 1u8, 2u8], vec![3u8, 4u8, 5u8], vec![6u8, 7u8, 8u8]];
-    let hf_flat = HeightField::new_from_elevs_blob(&flattened, 256, 256, 256.0, 0.0).expect("New from blob failed");
+    let hf_flat = HeightField::new_from_elevs_blob(&flattened, 3, 3, 256, 256, 256.0, 0.0).expect("New from blob failed");
     let hf_arrayform = HeightField::new_from_unscaled_elevs(&arrayform, 256, 256, 256.0, 0.0).expect("New from unsscaled elevs failed");
     println!("hf_flat: {:?}", hf_flat);
     println!("hf_arrayform: {:?}", hf_arrayform);

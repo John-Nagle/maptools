@@ -143,6 +143,11 @@ Next steps:
        - Also at that time, purge dead weak links from the set of weak backlinks.
        
     This has tricky borrow plumbing.
+    
+2025-09-19
+
+   Above all works.
+   Must change database schema - keep samples_x and samples_y because big blob is a 2D array.
    
   
       

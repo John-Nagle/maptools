@@ -83,6 +83,7 @@ impl TerrainUploadHandler {
             .get(OWNER_NAME)
             .ok_or_else(|| anyhow!("This request is not from Second Life/Open Simulator"))?
             .trim();
+        let samples = region_info.get_samples()?;
         let values = params! {
         //////"table" => RAW_TERRAIN_HEIGHTS,
         "grid" => region_info.grid.clone(),
@@ -94,6 +95,8 @@ impl TerrainUploadHandler {
         "scale" => region_info.scale,
         "offset" => region_info.offset,
         "elevs" => region_info.get_elevs_as_blob()?,
+        "samples_x" => samples[0],
+        "samples_y" => samples[1],
         "water_level" => region_info.water_lev,
         "creator" => creator };
         log::debug!("SQL insert: {:?}", values);
