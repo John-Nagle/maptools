@@ -149,7 +149,12 @@ pub struct HeightField {
 //  ***CHECK COLUMN/ROW ORDER***
 impl HeightField {
     /// New from elevs blob, the form used in SQL. One big blob, a flattened 2D array.
+    /// size_x and size_y are size of the region, not the elevs data.
     pub fn new_from_elevs_blob(elevs: &Vec<u8>, size_x: u32, size_y: u32, scale: f32, offset: f32) -> Result<Self, Error> {
+        //  We have one big flattened array. We need to infer its dimensions from size_x, size_y, and the length of elevs.
+        //  So we get the aspect ratio from sixe_x and size_y.
+        //  Those are integers, and, if not powers of 2, multiples of 256.
+        //  ***WRONG***
         let n = elevs.len() as u32;
         let gcd = num::integer::gcd(size_x, size_y) as u32;
         let sx = size_x / gcd;
@@ -158,6 +163,7 @@ impl HeightField {
             return Err(anyhow!("Elevation data size incorrect: length {}, size ({}, {})", n, size_x, size_y));
         }
         let r = n / (sx*sy);
+        println!("sx: {}, sy: {}, r: {}", sx, sy, r); // ***TEMP***
         let elevs_x = size_x / r;
         let elevs_y = size_y / r;
         assert_eq!(n, elevs_x * elevs_y);
@@ -192,6 +198,7 @@ impl HeightField {
 #[test]
 /// Test height field column organization
 fn test_height_field() {
+    println!("Test height field.");
     let flattened: Vec<u8> = vec![0u8, 1u8, 2u8, 3u8, 4u8, 5u8, 6u8, 7u8, 8u8];
     let arrayform: Vec<Vec<u8>> = vec![vec![0u8, 1u8, 2u8], vec![3u8, 4u8, 5u8], vec![6u8, 7u8, 8u8]];
     let hf_flat = HeightField::new_from_elevs_blob(&flattened, 256, 256, 256.0, 0.0).expect("New from blob failed");
