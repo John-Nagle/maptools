@@ -136,6 +136,7 @@ impl UploadedRegionInfo {
 /// Height field.
 /// Always an odd number of rows and columns, because the right and top edges
 /// are supposed to be the edges adjacent regions.
+#[derive(Debug, Clone, PartialEq)]
 pub struct HeightField {
     /// The heights
     heights: Array2D<f32>,
@@ -145,9 +146,10 @@ pub struct HeightField {
     pub size_y: u32,
 }
 
+//  ***CHECK COLUMN/ROW ORDER***
 impl HeightField {
-    /// New from elevs blob, the form used in SQL
-    pub fn new_from_elevs_blob(elevs: Vec<u8>, size_x: u32, size_y: u32, scale: f32, offset: f32) -> Result<Self, Error> {
+    /// New from elevs blob, the form used in SQL. One big blob, a flattened 2D array.
+    pub fn new_from_elevs_blob(elevs: &Vec<u8>, size_x: u32, size_y: u32, scale: f32, offset: f32) -> Result<Self, Error> {
         let n = elevs.len() as u32;
         let gcd = num::integer::gcd(size_x, size_y) as u32;
         let sx = size_x / gcd;
@@ -167,4 +169,31 @@ impl HeightField {
             size_y,
         })
     }
+    
+    /// New from the 2D array of elevs we get from JSON
+    pub fn new_from_unscaled_elevs(elevs: &Vec<Vec<u8>>, size_x: u32, size_y: u32, scale: f32, offset: f32) -> Result<Self, Error> {  
+        if elevs.is_empty() {
+            return Err(anyhow!("Elevs array is empty."));
+        }
+        let col_length = elevs[0].len();
+        let iterator = (0..).map(|n| {
+            let x = n % col_length;
+            let y = n / col_length;
+            ((elevs[x][y] as f32) / 256.0) * scale + offset });
+        let heights = Array2D::from_iter_column_major(iterator, col_length, elevs.len())?;
+        Ok(Self {
+            heights, 
+            size_x,
+            size_y,
+        })
+    }
+}
+
+#[test]
+fn test_height_field() {
+    let flattened: Vec<u8> = vec![0u8, 1u8, 2u8, 3u8, 4u8, 5u8, 6u8, 7u8, 8u8];
+    let arrayform: Vec<Vec<u8>> = vec![vec![0u8, 1u8, 2u8], vec![3u8, 4u8, 5u8], vec![6u8, 7u8, 8u8]];
+    let hf_flat = HeightField::new_from_elevs_blob(&flattened, 256, 256, 256.0, 0.0).expect("New from blob failed");
+    let hf_arrayform = HeightField::new_from_unscaled_elevs(&arrayform, 256, 256, 256.0, 0.0).expect("New from unsscaled elevs failed");
+    assert_eq!(hf_flat, hf_arrayform);
 }
