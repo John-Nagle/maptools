@@ -190,10 +190,13 @@ impl HeightField {
 }
 
 #[test]
+/// Test height field column organization
 fn test_height_field() {
     let flattened: Vec<u8> = vec![0u8, 1u8, 2u8, 3u8, 4u8, 5u8, 6u8, 7u8, 8u8];
     let arrayform: Vec<Vec<u8>> = vec![vec![0u8, 1u8, 2u8], vec![3u8, 4u8, 5u8], vec![6u8, 7u8, 8u8]];
     let hf_flat = HeightField::new_from_elevs_blob(&flattened, 256, 256, 256.0, 0.0).expect("New from blob failed");
     let hf_arrayform = HeightField::new_from_unscaled_elevs(&arrayform, 256, 256, 256.0, 0.0).expect("New from unsscaled elevs failed");
+    println!("hf_flat: {:?}", hf_flat);
+    println!("hf_arrayform: {:?}", hf_arrayform);
     assert_eq!(hf_flat, hf_arrayform);
 }
