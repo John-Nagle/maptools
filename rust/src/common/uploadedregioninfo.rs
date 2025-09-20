@@ -197,6 +197,16 @@ impl HeightField {
             size_y,
         })
     }
+    
+    /// As one big flat u8 array.
+    /// Returns scale, offset, values
+    pub fn into_sculpt_array(&self) -> Result<(f32, f32, Vec<Vec<u8>>), Error> {
+        //  Calculate max and min.
+        
+        //  Scale into 0..255
+        todo!();
+    }
+   
 }
 
 #[test]

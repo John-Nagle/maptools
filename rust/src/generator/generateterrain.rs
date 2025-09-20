@@ -32,6 +32,9 @@ use common::{UploadedRegionInfo, HeightField};
 
 mod vizgroup;
 use vizgroup::{RegionData, VizGroups, CompletedGroups};
+mod sculptmaker;
+use sculptmaker::TerrainSculpt;
+use image::{GrayImage}
 
 /// MySQL Credentials for uploading.
 /// This filename will be searched for in parent directories,
@@ -211,6 +214,13 @@ impl TerrainGenerator {
     pub fn build_impostor_sculpt(&mut self, region_coords_x: u32, region_coords_y: u32, lod: u8, impostor_name: &str, height_field: &HeightField)
         -> Result<(), Error> {
          println!("Generate sculpt here for {}", impostor_name);  // ***TEMP***
+         // TerrainSculpt was translated from Python with an LLM. NEEDS WORK
+/* ***NOTYET***
+         let mut terrain_sculpt = TerrainSculpt::new(impostor_name);
+         let (scale, offset, elevs) = height_field.into_sculpt_array();
+         terrain_sculpt.setelev(elevs, scale as f64, offset as f64);
+         terrain_sculpt.makeimage();
+         let img = terrain_sculpt.image.unwrap();
          Ok(())
     }
     
