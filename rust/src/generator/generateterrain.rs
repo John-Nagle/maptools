@@ -424,6 +424,14 @@ impl TerrainGenerator {
         todo!();
     }
     
+    /// Process one grid, with multiple visibilty groups
+    pub fn process_grid(&self, completed_groups: CompletedGroups, pool: Pool, outdir: String) -> Result<(), Error> {
+        for group in &completed_groups {
+            println!("Group: {} entries.", group.len());  // ***TEMP***
+        }
+        Ok(())
+    }
+    
     /// Build impostor, sculpt form.
     pub fn build_impostor_sculpt(&self, region_data: &RegionData, conn: &mut PooledConn) {
         todo!();
@@ -437,8 +445,16 @@ fn run(pool: Pool, outdir: String, grid: String, verbose: bool) -> Result<(), Er
     let corners_touch_connects = false; // for now, SL only.
     let terrain_generator = TerrainGenerator::new(corners_touch_connects);    
     let mut conn = pool.get_conn()?;
-    let _results = terrain_generator.transitive_closure(&mut conn, &grid)?;
-    //  ***MORE***
+    let mut grids = terrain_generator.transitive_closure(&mut conn, &grid)?;
+    if grids.is_empty() {
+        return Err(anyhow!("Grid \"{}\" not found.", grid));
+    }
+    
+    if grids.len() != 1 {
+        return Err(anyhow!("More than one grid found but SQL should return only one grid."));
+    }
+    let grid_entry = grids.pop().unwrap();    // get the one grid
+    terrain_generator.process_grid(grid_entry, pool, outdir)?;
     Ok(())
 }
 

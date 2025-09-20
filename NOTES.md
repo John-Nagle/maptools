@@ -148,6 +148,7 @@ Next steps:
 
    Above all works.
    Must change database schema - keep samples_x and samples_y because big blob is a 2D array.
+   - Set all values to 64, but should be 65. FIX.
    
   
       
