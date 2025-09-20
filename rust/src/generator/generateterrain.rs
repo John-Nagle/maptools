@@ -430,7 +430,7 @@ impl TerrainGenerator {
         println!("Group: {} entries.", group.len());  // ***TEMP***
         //  Dump version, just do single-size regions.
         for region in group {
-            let height_field = self.get_height_field_one_region(region.name.clone(), region.region_coords_x, region.region_coords_y, conn)?;
+            let height_field = self.get_height_field_one_region(region.grid.clone(), region.region_coords_x, region.region_coords_y, conn)?;
             println!("Region \"{}\": {}", region.name, height_field);
         }
         Ok(())
