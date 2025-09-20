@@ -7,4 +7,4 @@ mod uploadedregioninfo;
 pub use credentials::Credentials;
 pub use fcgisocketsetup::init_fcgi;
 pub use minifcgi::{Handler, Request, Response, run};
-pub use uploadedregioninfo::{UploadedRegionInfo, ElevsJson};
+pub use uploadedregioninfo::{UploadedRegionInfo, ElevsJson, HeightField};

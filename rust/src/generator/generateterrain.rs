@@ -27,7 +27,7 @@ use serde::Deserialize;
 use std::collections::HashMap;
 use std::io::Write;
 use common::Credentials;
-use common::{UploadedRegionInfo, ElevsJson};
+use common::{UploadedRegionInfo, HeightField};
 
 mod vizgroup;
 use vizgroup::{RegionData, VizGroups, CompletedGroups};
@@ -366,33 +366,32 @@ impl TerrainGenerator {
     }
     
     /// Get elevation data for one region.
-    pub fn get_elevs_one_region(&self, grid: String, region_coords_x: u32, region_coords_y: u32, conn: &mut PooledConn) -> Result<UploadedRegionInfo, Error> {
+    pub fn get_height_field_one_region(&self, grid: String, region_coords_x: u32, region_coords_y: u32, conn: &mut PooledConn) -> Result<HeightField, Error> {
         const SQL_SELECT: &str = 
-            r"SELECT grid, region_coords_x, region_coords_y, size_x, size_y, name, scale, offset, elevs,  water_level
+            r"SELECT size_x, size_y, samples_x, samples_y, scale, offset, elevs, name, water_level
                 FROM raw_terrain_heights
-                WHERE LOWER(grid) = :grid, region_coords_x = : region_coords_x, region_coords_y = :region_coords_y";
+                WHERE LOWER(grid) = :grid, region_coords_x = :region_coords_x, region_coords_y = :region_coords_y";
         let grid_for_msg = grid.clone();
-        let regions = conn.exec_map(
+        let mut height_fields = conn.exec_map(
             SQL_SELECT,
             params! { grid, region_coords_x, region_coords_y },
-            |(grid, region_coords_x, region_coords_y, size_x, size_y, name, scale, offset, elevs,  water_level)| {
-                let region_coords = [region_coords_x, region_coords_y];
-                let size = Some([size_x, size_y]);
-                let water_lev = water_level;
-                let elevs = UploadedRegionInfo::elevs_blob_to_hex(elevs, size_x, size_y).expect("Elevs data has invalid length");
-                UploadedRegionInfo {
-                    grid, region_coords, size, name, scale, offset, elevs,  water_lev}
+            |(size_x, size_y, samples_x, samples_y, scale, offset, elevs, name, water_level)| {
+                let _name_v: String = name;
+                let _water_level_v: f32 = water_level;
+                let height_field = HeightField::new_from_elevs_blob(&elevs, samples_x, samples_y, size_x, size_y, scale, offset);
+                height_field
             })?;
-        if regions.is_empty() {
+        if height_fields.is_empty() {
             return Err(anyhow!("No raw terrain data for region at ({},{}) on \"{}\"", region_coords_x, region_coords_y, grid_for_msg));
         }
-        if regions.len() > 1 {
+        
+        if height_fields.len() > 1 {
             //  Duplicate data - warning 
             //  SQL indices should make this impossible.
             log::error!("More than one region data set for region at ({},{}) on \"{}\"", region_coords_x, region_coords_y, grid_for_msg);
         }
-        let region: UploadedRegionInfo = regions[0].clone();
-        Ok(region)
+        let height_field = height_fields.pop().unwrap()?;
+        Ok(height_field)
     }
     
     /// Build impostor, either sculpt or mesh form.
@@ -424,14 +423,21 @@ impl TerrainGenerator {
         todo!();
     }
     
-    /// Process one visibiilty group
-    pub fn process_group(&self, group: &Vec<RegionData>, conn: &PooledConn, outdir: &String) -> Result<(), Error> {
+    /// Process one visibiilty group.
+    /// There's a lot to do here.
+    /// Temp version - just generates impostors for all single regions.
+    pub fn process_group(&self, group: &Vec<RegionData>, conn: &mut PooledConn, outdir: &String) -> Result<(), Error> {
         println!("Group: {} entries.", group.len());  // ***TEMP***
+        //  Dump version, just do single-size regions.
+        for region in group {
+            let height_field = self.get_height_field_one_region(region.name.clone(), region.region_coords_x, region.region_coords_y, conn)?;
+            println!("Region \"{}\": {}", region.name, height_field);
+        }
         Ok(())
     }
     
     /// Process one grid, with multiple visibilty groups
-    pub fn process_grid(&self, mut completed_groups: CompletedGroups, conn: &PooledConn, outdir: &String) -> Result<(), Error> {
+    pub fn process_grid(&self, mut completed_groups: CompletedGroups, conn: &mut PooledConn, outdir: &String) -> Result<(), Error> {
         completed_groups.sort_by(|a, b| b.len().partial_cmp(&a.len()).unwrap());
         for group in &completed_groups {
            self.process_group(group, conn, outdir)?;

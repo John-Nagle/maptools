@@ -161,6 +161,13 @@ pub struct HeightField {
     pub size_y: u32,
 }
 
+impl std::fmt::Display for HeightField {
+    /// Usual display
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "HeightField samples ({}, {})  region ({}, {})", self.heights.num_rows(), self.heights.num_columns(), self.size_x, self.size_y)
+    }
+}
+
 //  ***CHECK COLUMN/ROW ORDER***
 impl HeightField {
     /// New from elevs blob, the form used in SQL. One big blob, a flattened 2D array.
