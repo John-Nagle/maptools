@@ -424,10 +424,17 @@ impl TerrainGenerator {
         todo!();
     }
     
+    /// Process one visibiilty group
+    pub fn process_group(&self, group: &Vec<RegionData>, conn: &PooledConn, outdir: &String) -> Result<(), Error> {
+        println!("Group: {} entries.", group.len());  // ***TEMP***
+        Ok(())
+    }
+    
     /// Process one grid, with multiple visibilty groups
-    pub fn process_grid(&self, completed_groups: CompletedGroups, pool: Pool, outdir: String) -> Result<(), Error> {
+    pub fn process_grid(&self, mut completed_groups: CompletedGroups, conn: &PooledConn, outdir: &String) -> Result<(), Error> {
+        completed_groups.sort_by(|a, b| b.len().partial_cmp(&a.len()).unwrap());
         for group in &completed_groups {
-            println!("Group: {} entries.", group.len());  // ***TEMP***
+           self.process_group(group, conn, outdir)?;
         }
         Ok(())
     }
@@ -454,7 +461,7 @@ fn run(pool: Pool, outdir: String, grid: String, verbose: bool) -> Result<(), Er
         return Err(anyhow!("More than one grid found but SQL should return only one grid."));
     }
     let grid_entry = grids.pop().unwrap();    // get the one grid
-    terrain_generator.process_grid(grid_entry, pool, outdir)?;
+    terrain_generator.process_grid(grid_entry, &mut conn, &outdir)?;
     Ok(())
 }
 
