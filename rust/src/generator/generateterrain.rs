@@ -370,7 +370,7 @@ impl TerrainGenerator {
         const SQL_SELECT: &str = 
             r"SELECT size_x, size_y, samples_x, samples_y, scale, offset, elevs, name, water_level
                 FROM raw_terrain_heights
-                WHERE LOWER(grid) = :grid, region_coords_x = :region_coords_x, region_coords_y = :region_coords_y";
+                WHERE LOWER(grid) = :grid AND region_coords_x = :region_coords_x AND region_coords_y = :region_coords_y";
         let grid_for_msg = grid.clone();
         let mut height_fields = conn.exec_map(
             SQL_SELECT,
