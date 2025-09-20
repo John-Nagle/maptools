@@ -135,16 +135,10 @@ impl UploadedRegionInfo {
     
     /// Get elevations as numbers before offsetting.
     /// Input is a hex string representing one elev per byte
-    /// Output is an array of hex strings.
+    /// Output is a 2D array of 8-bit values.
     pub fn get_unscaled_elevs(&self) -> Result<Vec<Vec<u8>>, Error> {
         let elevs: Result<Vec<_>, _> = self.elevs.iter().map(|s| hex::decode(s)).collect();
         Ok(elevs?)
-    }
-
-    /// Scale the elevations
-    pub fn get_scaled_elevs(&self) -> Result<Vec<Vec<f32>>, Error> {
-        todo!();
-        //////Ok(self.get_unscaled_elevs()?.iter().map(|&v| ((v as f32) / 256.0) * self.scale + self.offset).collect())
     }
 }
 
