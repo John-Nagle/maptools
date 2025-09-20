@@ -26,6 +26,7 @@ use mysql::{PooledConn, params};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::io::Write;
+use std::path::PathBuf;
 use common::Credentials;
 use common::{UploadedRegionInfo, HeightField};
 
@@ -69,20 +70,23 @@ struct TerrainGenerator {
     /// SQL connection
     conn: PooledConn,
     /// Output directory
-    outdir: String,
+    outdir: PathBuf,
     /// Are regions with only corners touching adjacent?
     /// Set to true for Open Simulator grids
     corners_touch_connects: bool,
+    /// Generate glTF mesh if on.
+    generate_mesh: bool,
 }
 
 impl TerrainGenerator {
 
     /// Usual new.
-    pub fn new(conn: PooledConn, outdir: String, corners_touch_connects: bool) -> Self {
+    pub fn new(conn: PooledConn, outdir: PathBuf, corners_touch_connects: bool, generate_mesh: bool) -> Self {
         Self {
             conn,
             outdir,
-            corners_touch_connects
+            corners_touch_connects,
+            generate_mesh,
         }
     }
 
@@ -184,9 +188,36 @@ impl TerrainGenerator {
         todo!();
     }
 */
+
+    /// Generate name for impostor asset file.
+    /// Format: R-x-y-lod-name
+    fn impostor_name(region_coords_x: u32, region_coords_y: u32, lod: u8, impostor_name: &str) -> String {
+        let x = region_coords_x;
+        let y = region_coords_y;
+        format!("R-{}-{}-{}-{}", x, y, lod, impostor_name)  
+    }
     
-    pub fn build_impostor(&self, region_coords_x: u32, region_coords_y: u32, lod: u8, height_field: &HeightField) -> Result<(), Error> {
-        todo!();
+    /// Build the impostor
+    pub fn build_impostor(&mut self, region_coords_x: u32, region_coords_y: u32, lod: u8, impostor_name: &str, height_field: &HeightField)
+        -> Result<(), Error> {
+         if self.generate_mesh {
+            self.build_impostor_mesh(region_coords_x, region_coords_y, lod, impostor_name, height_field)
+         } else {
+            self.build_impostor_sculpt(region_coords_x, region_coords_y, lod, impostor_name, height_field)
+         }
+    }
+    
+    /// Build the impostor as a sculpt.
+    pub fn build_impostor_sculpt(&mut self, region_coords_x: u32, region_coords_y: u32, lod: u8, impostor_name: &str, height_field: &HeightField)
+        -> Result<(), Error> {
+         println!("Generate sculpt here for {}", impostor_name);  // ***TEMP***
+         Ok(())
+    }
+    
+    /// Build the impostor as a glTF mesh.
+    pub fn build_impostor_mesh(&mut self, region_coords_x: u32, region_coords_y: u32, lod: u8, impostor_name: &str, height_field: &HeightField)
+        -> Result<(), Error> {
+         todo!("glTF mesh generation is not implemented yet");
     }
     
     /// Process one visibiilty group.
@@ -194,9 +225,12 @@ impl TerrainGenerator {
     /// Temp version - just generates impostors for all single regions.
     pub fn process_group(&mut self, group: &Vec<RegionData>) -> Result<(), Error> {
         println!("Group: {} entries.", group.len());  // ***TEMP***
-        //  Dump version, just do single-size regions.
+        //  Dumb version, just do single-size regions.
+        let lod = 0;    // single regions only
         for region in group {
             let height_field = self.get_height_field_one_region(region.grid.clone(), region.region_coords_x, region.region_coords_y)?;
+            let impostor_name = Self::impostor_name(region.region_coords_x, region.region_coords_y, lod, &region.name);
+            self.build_impostor(region.region_coords_x, region.region_coords_y, lod, &impostor_name, &height_field)?;
             println!("Region \"{}\": {}", region.name, height_field);
         }
         Ok(())
@@ -210,20 +244,14 @@ impl TerrainGenerator {
         }
         Ok(())
     }
-    
-    /// Build impostor, sculpt form.
-    pub fn build_impostor_sculpt(&self, region_data: &RegionData) {
-        todo!();
-    }
-    
 }
 
 /// Actually do the work
-fn run(pool: Pool, outdir: String, grid: String, verbose: bool) -> Result<(), Error> {
+fn run(pool: Pool, outdir: PathBuf, grid: String, generate_mesh: bool) -> Result<(), Error> {
     //////println!("{:?} {:?} {}", credsfile, outdir, verbose);
     let corners_touch_connects = false; // for now, SL only.
     let conn = pool.get_conn()?;
-    let mut terrain_generator = TerrainGenerator::new(conn, outdir, corners_touch_connects);    
+    let mut terrain_generator = TerrainGenerator::new(conn, outdir, generate_mesh, corners_touch_connects);    
     let mut grids = terrain_generator.transitive_closure(&grid)?;
     if grids.is_empty() {
         return Err(anyhow!("Grid \"{}\" not found.", grid));
@@ -243,7 +271,7 @@ fn print_usage(program: &str, opts: Options) {
 }
 
 /// Set up options, credentials, and database connection.
-fn setup() -> Result<(Pool, String, String, bool), Error> {
+fn setup() -> Result<(Pool, PathBuf, String, bool), Error> {
     //  Usual options processing
     let args: Vec<String> = std::env::args().collect();
     let program = args[0].clone();
@@ -256,7 +284,9 @@ fn setup() -> Result<(Pool, String, String, bool), Error> {
         "Get database credentials from this file.",
         "NAME",
     );
+    opts.optflag("m", "mesh", "Generate glTF mesh, not sculpt image");
     opts.optopt("g", "grid", "Only output for this grid", "NAME");
+    opts.optflag("m", "mesh", "Generate glTF mesh, not sculpt image");
     opts.optflag("h", "help", "Print this help menu.");
     opts.optflag("v", "verbose", "Verbose mode.");
     let matches = match opts.parse(&args[1..]) {
@@ -273,12 +303,13 @@ fn setup() -> Result<(Pool, String, String, bool), Error> {
     let credsfile = matches.opt_str("c");
     let verbose = matches.opt_present("v");
     let grid = matches.opt_str("g");
+    let generate_mesh = matches.opt_present("m");
     if outdir.is_none() || credsfile.is_none() || grid.is_none() {
         print_usage(&program, opts);
         return Err(anyhow!("Required command line options missing"));
     }
     let credsfile = credsfile.unwrap();
-    let outdir = outdir.unwrap();
+    let outdir = PathBuf::from(&outdir.unwrap());
     let grid = grid.unwrap().trim().to_lowercase();
     // Create the output directory, empty.
     //  ***MORE***
@@ -317,7 +348,7 @@ fn setup() -> Result<(Pool, String, String, bool), Error> {
     }
     log::info!("Connected to database.");
     //  Setup complete. Return what's needed to run.
-    Ok((pool, outdir, grid, verbose))
+    Ok((pool, outdir, grid, generate_mesh))
 }
 
 /// Main program.
@@ -325,11 +356,8 @@ fn setup() -> Result<(Pool, String, String, bool), Error> {
 fn main() {
     logger();
     match setup() {
-        Ok((pool, outdir, grid, verbose)) => match run(pool, outdir, grid, verbose) {
+        Ok((pool, outdir, grid, mesh)) => match run(pool, outdir, grid, mesh) {
             Ok(_) => {
-                if verbose {
-                    println!("Done.");
-                }
             }
             Err(e) => {
                 panic!("Failed: {:?}", e);
