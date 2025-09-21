@@ -4,9 +4,9 @@
 //! Animats
 //! August, 2025.
 //
-use anyhow::{Error, anyhow};
+use anyhow::{anyhow, Error};
+use array2d::Array2D;
 use serde::Deserialize;
-use array2d::{Array2D};
 ///  Our data as uploaded from SL/OS in JSON format
 // "{\"region\":\"Vallone\",\"scale\":1.092822,\"offset\":33.500740,\"waterlev\":20.000000,\"regioncoords\":[1807,1199],
 //  \"elevs\":[\"E7CAACA3A5A8ACAEB0B2B5B9BDC0C4C5C5C3C0BDB9B6B3B2B2B3B4B7BBBFC3C7CBCED1D3D5D5D4CFC4B5A4"";
@@ -54,9 +54,20 @@ impl ElevsJson {
 impl UploadedRegionInfo {
     /// Default region size, used on grids that don't do varregions.
     pub const DEFAULT_REGION_SIZE: u32 = 256;
-    
+
     /// Usual new. This takes elevations as hex strings.
-    pub fn new(grid: String, region_coords_x: u32, region_coords_y: u32, size_x: u32, size_y: u32, name: String, elevs: Vec<String>, scale: f32, offset: f32, water_lev: f32) -> Self {
+    pub fn new(
+        grid: String,
+        region_coords_x: u32,
+        region_coords_y: u32,
+        size_x: u32,
+        size_y: u32,
+        name: String,
+        elevs: Vec<String>,
+        scale: f32,
+        offset: f32,
+        water_lev: f32,
+    ) -> Self {
         Self {
             grid,
             region_coords: [region_coords_x, region_coords_y],
@@ -66,7 +77,7 @@ impl UploadedRegionInfo {
             scale,
             offset,
             water_lev,
-        }               
+        }
     }
 
     /// Parse from string
@@ -82,19 +93,22 @@ impl UploadedRegionInfo {
             [Self::DEFAULT_REGION_SIZE, Self::DEFAULT_REGION_SIZE]
         }
     }
-    
+
     /// Get dimensions of elevation samples array
-    pub fn get_samples(&self) -> Result<[u32;2], Error> {
+    pub fn get_samples(&self) -> Result<[u32; 2], Error> {
         if self.elevs.is_empty() {
             return Err(anyhow!("Elevation data is missing"));
         }
         //  Validate that all rows are the same length
-        let rowlen = self.elevs[0].len()/2;  // it's a hex string, we want the byte count
+        let rowlen = self.elevs[0].len() / 2; // it's a hex string, we want the byte count
         for row in &self.elevs {
-            if row.len() != rowlen*2 {
-                return Err(anyhow!("Elevation data has a row of the wrong length. Not {}", rowlen));
+            if row.len() != rowlen * 2 {
+                return Err(anyhow!(
+                    "Elevation data has a row of the wrong length. Not {}",
+                    rowlen
+                ));
             }
-        } 
+        }
         Ok([self.elevs.len().try_into()?, rowlen.try_into()?])
     }
 
@@ -114,25 +128,37 @@ impl UploadedRegionInfo {
         let elevs_blob: Vec<_> = self.get_unscaled_elevs()?.into_iter().flatten().collect();
         Ok(elevs_blob)
     }
-    
+
     /// Convert SQL blob to hex format.
     /// We have to figure out the length of the strings from the length and aspect ratio.
-    pub fn elevs_blob_to_hex(elevs: Vec<u8>, size_x: u32, size_y: u32) -> Result<Vec<String>, Error> {
+    pub fn elevs_blob_to_hex(
+        elevs: Vec<u8>,
+        size_x: u32,
+        size_y: u32,
+    ) -> Result<Vec<String>, Error> {
         let n = elevs.len() as u32;
         let gcd = num::integer::gcd(size_x, size_y) as u32;
         let sx = size_x / gcd;
         let sy = size_y / gcd;
-        if n % (sx*sy) != 0 {
-            return Err(anyhow!("Elevation data size incorrect: length {}, size ({}, {})", n, size_x, size_y));
+        if n % (sx * sy) != 0 {
+            return Err(anyhow!(
+                "Elevation data size incorrect: length {}, size ({}, {})",
+                n,
+                size_x,
+                size_y
+            ));
         }
-        let r = n / (sx*sy);
+        let r = n / (sx * sy);
         let elevs_x = size_x / r;
         let elevs_y = size_y / r;
         assert_eq!(n, elevs_x * elevs_y);
         //  Now take slices of length elevs_x and make into hex.
-        Ok(elevs.chunks_exact(elevs_x as usize).map(|c|  hex::encode_upper(c)).collect())
+        Ok(elevs
+            .chunks_exact(elevs_x as usize)
+            .map(|c| hex::encode_upper(c))
+            .collect())
     }
-    
+
     /// Get elevations as numbers before offsetting.
     /// Input is a hex string representing one elev per byte
     /// Output is a 2D array of 8-bit values.
@@ -158,7 +184,14 @@ pub struct HeightField {
 impl std::fmt::Display for HeightField {
     /// Usual display
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "HeightField samples ({}, {})  region ({}, {})", self.heights.num_rows(), self.heights.num_columns(), self.size_x, self.size_y)
+        write!(
+            f,
+            "HeightField samples ({}, {})  region ({}, {})",
+            self.heights.num_rows(),
+            self.heights.num_columns(),
+            self.size_x,
+            self.size_y
+        )
     }
 }
 
@@ -166,22 +199,41 @@ impl std::fmt::Display for HeightField {
 impl HeightField {
     /// New from elevs blob, the form used in SQL. One big blob, a flattened 2D array.
     /// size_x and size_y are size of the region, not the elevs data.
-    pub fn new_from_elevs_blob(elevs: &Vec<u8>, samples_x: u32, samples_y: u32, size_x: u32, size_y: u32, scale: f32, offset: f32) -> Result<Self, Error> {
+    pub fn new_from_elevs_blob(
+        elevs: &Vec<u8>,
+        samples_x: u32,
+        samples_y: u32,
+        size_x: u32,
+        size_y: u32,
+        scale: f32,
+        offset: f32,
+    ) -> Result<Self, Error> {
         if elevs.len() != (samples_x as usize) * (samples_y as usize) {
-            return Err(anyhow!("Elevations array data length {} does not match dimensions ({}, {})", 
-                elevs.len(), samples_x, samples_y));
+            return Err(anyhow!(
+                "Elevations array data length {} does not match dimensions ({}, {})",
+                elevs.len(),
+                samples_x,
+                samples_y
+            ));
         }
         let iterator = (0..).map(|n| ((elevs[n] as f32) / 256.0) * scale + offset);
-        let heights = Array2D::from_iter_column_major(iterator, samples_x as usize, samples_y as usize)?;
+        let heights =
+            Array2D::from_iter_column_major(iterator, samples_x as usize, samples_y as usize)?;
         Ok(Self {
-            heights, 
+            heights,
             size_x,
             size_y,
         })
     }
-    
+
     /// New from the 2D array of elevs we get from JSON
-    pub fn new_from_unscaled_elevs(elevs: &Vec<Vec<u8>>, size_x: u32, size_y: u32, scale: f32, offset: f32) -> Result<Self, Error> {  
+    pub fn new_from_unscaled_elevs(
+        elevs: &Vec<Vec<u8>>,
+        size_x: u32,
+        size_y: u32,
+        scale: f32,
+        offset: f32,
+    ) -> Result<Self, Error> {
         if elevs.is_empty() {
             return Err(anyhow!("Elevs array is empty."));
         }
@@ -189,15 +241,16 @@ impl HeightField {
         let iterator = (0..).map(|n| {
             let x = n % row_length;
             let y = n / row_length;
-            ((elevs[x][y] as f32) / 256.0) * scale + offset });
+            ((elevs[x][y] as f32) / 256.0) * scale + offset
+        });
         let heights = Array2D::from_iter_row_major(iterator, row_length, elevs.len())?;
         Ok(Self {
-            heights, 
+            heights,
             size_x,
             size_y,
         })
     }
-    
+
     /// As one big flat u8 array.
     /// Returns scale, offset, values
     pub fn into_sculpt_array(&self) -> Result<(f32, f32, Vec<Vec<u8>>), Error> {
@@ -205,18 +258,32 @@ impl HeightField {
         if self.heights.column_len() == 0 {
             return Err(anyhow!("Height field has no entries."));
         }
-        let max = self.heights.elements_row_major_iter().max_by(|a, b| a.total_cmp(b)).unwrap();
-        let min = self.heights.elements_row_major_iter().min_by(|a, b| a.total_cmp(b)).unwrap();
+        let max = self
+            .heights
+            .elements_row_major_iter()
+            .max_by(|a, b| a.total_cmp(b))
+            .unwrap();
+        let min = self
+            .heights
+            .elements_row_major_iter()
+            .min_by(|a, b| a.total_cmp(b))
+            .unwrap();
         //  Scale into 0..255
         let range = (max - min).max(0.001);
-        let height_array = self.heights.as_rows().into_iter()
-            .map(|r| r.into_iter()
-            .map(|v| ((((v - min)/range) / 256.0).round() as usize).clamp(0, 255) as u8).collect()).collect();
-        let scale = 1.0/range;
+        let height_array = self
+            .heights
+            .as_rows()
+            .into_iter()
+            .map(|r| {
+                r.into_iter()
+                    .map(|v| ((((v - min) / range) / 256.0).round() as usize).clamp(0, 255) as u8)
+                    .collect()
+            })
+            .collect();
+        let scale = 1.0 / range;
         let offset = min;
         Ok((scale, *offset, height_array))
     }
-   
 }
 
 #[test]
@@ -224,9 +291,15 @@ impl HeightField {
 fn test_height_field() {
     println!("Test height field.");
     let flattened: Vec<u8> = vec![0u8, 1u8, 2u8, 3u8, 4u8, 5u8, 6u8, 7u8, 8u8];
-    let arrayform: Vec<Vec<u8>> = vec![vec![0u8, 1u8, 2u8], vec![3u8, 4u8, 5u8], vec![6u8, 7u8, 8u8]];
-    let hf_flat = HeightField::new_from_elevs_blob(&flattened, 3, 3, 256, 256, 256.0, 0.0).expect("New from blob failed");
-    let hf_arrayform = HeightField::new_from_unscaled_elevs(&arrayform, 256, 256, 256.0, 0.0).expect("New from unsscaled elevs failed");
+    let arrayform: Vec<Vec<u8>> = vec![
+        vec![0u8, 1u8, 2u8],
+        vec![3u8, 4u8, 5u8],
+        vec![6u8, 7u8, 8u8],
+    ];
+    let hf_flat = HeightField::new_from_elevs_blob(&flattened, 3, 3, 256, 256, 256.0, 0.0)
+        .expect("New from blob failed");
+    let hf_arrayform = HeightField::new_from_unscaled_elevs(&arrayform, 256, 256, 256.0, 0.0)
+        .expect("New from unsscaled elevs failed");
     println!("hf_flat: {:?}", hf_flat);
     println!("hf_arrayform: {:?}", hf_arrayform);
     assert_eq!(hf_flat, hf_arrayform);
