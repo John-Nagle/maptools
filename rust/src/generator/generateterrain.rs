@@ -15,26 +15,26 @@
 //!     August, 2025.
 //
 #![forbid(unsafe_code)]
-use anyhow::{Error, anyhow};
+use anyhow::{anyhow, Error};
 use chrono::{NaiveDateTime, Utc};
+use common::Credentials;
+use common::{HeightField, UploadedRegionInfo};
 use envie::Envie;
 use getopts::Options;
 use log::LevelFilter;
 use mysql::prelude::{AsStatement, Queryable};
+use mysql::{params, PooledConn};
 use mysql::{Conn, Opts, OptsBuilder, Pool};
-use mysql::{PooledConn, params};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::io::Write;
 use std::path::PathBuf;
-use common::Credentials;
-use common::{UploadedRegionInfo, HeightField};
 
 mod vizgroup;
-use vizgroup::{RegionData, VizGroups, CompletedGroups};
+use vizgroup::{CompletedGroups, RegionData, VizGroups};
 mod sculptmaker;
+use image::GrayImage;
 use sculptmaker::TerrainSculpt;
-use image::{GrayImage};
 
 /// MySQL Credentials for uploading.
 /// This filename will be searched for in parent directories,
@@ -82,9 +82,13 @@ struct TerrainGenerator {
 }
 
 impl TerrainGenerator {
-
     /// Usual new.
-    pub fn new(conn: PooledConn, outdir: PathBuf, corners_touch_connects: bool, generate_mesh: bool) -> Self {
+    pub fn new(
+        conn: PooledConn,
+        outdir: PathBuf,
+        corners_touch_connects: bool,
+        generate_mesh: bool,
+    ) -> Self {
         Self {
             conn,
             outdir,
@@ -98,9 +102,8 @@ impl TerrainGenerator {
         let mut vizgroups = VizGroups::new(self.corners_touch_connects);
         let mut grids = Vec::new();
         log::info!("Build start"); // ***TEMP***
-        //  The loop here is sequential data processing with control breaks when an index field changes.
-        const SQL_SELECT: &str = 
-            r"SELECT grid, region_coords_x, region_coords_y, size_x, size_y, name FROM raw_terrain_heights WHERE LOWER(grid) = :grid ORDER BY grid, region_coords_x, region_coords_y ";
+                                   //  The loop here is sequential data processing with control breaks when an index field changes.
+        const SQL_SELECT: &str = r"SELECT grid, region_coords_x, region_coords_y, size_x, size_y, name FROM raw_terrain_heights WHERE LOWER(grid) = :grid ORDER BY grid, region_coords_x, region_coords_y ";
         let _all_regions = self.conn.exec_map(
             SQL_SELECT,
             params! { grid },
@@ -121,22 +124,26 @@ impl TerrainGenerator {
         grids.push(vizgroups.end_grid());
         Ok(grids)
     }
-    
-    /// Which region impostors do we need to create? 
+
+    /// Which region impostors do we need to create?
     /// This filters the results of the transitive closure based on what's in the database and the servers.
     ///
-    /// Transitive closure tells us if regions are in the same VizGroup. 
+    /// Transitive closure tells us if regions are in the same VizGroup.
     /// Then we must check the database of impostored regions to tie VizGroups to viz_group IDs.
     //  ***WE MAY HAVE TO MERGE AND SPLIT HERE***
     //  ***NEED TO RUN ALL EXISTING REGIONS THROUGH TRANSITIVE CLOSURE***
-    pub fn needed_regions(&self, completed_groups: &Vec::<CompletedGroups>) -> Result<(), Error> {
+    pub fn needed_regions(&self, completed_groups: &Vec<CompletedGroups>) -> Result<(), Error> {
         todo!();
     }
-    
+
     /// Get elevation data for one region.
-    pub fn get_height_field_one_region(&mut self, grid: String, region_coords_x: u32, region_coords_y: u32) -> Result<HeightField, Error> {
-        const SQL_SELECT: &str = 
-            r"SELECT size_x, size_y, samples_x, samples_y, scale, offset, elevs, name, water_level
+    pub fn get_height_field_one_region(
+        &mut self,
+        grid: String,
+        region_coords_x: u32,
+        region_coords_y: u32,
+    ) -> Result<HeightField, Error> {
+        const SQL_SELECT: &str = r"SELECT size_x, size_y, samples_x, samples_y, scale, offset, elevs, name, water_level
                 FROM raw_terrain_heights
                 WHERE LOWER(grid) = :grid AND region_coords_x = :region_coords_x AND region_coords_y = :region_coords_y";
         let grid_for_msg = grid.clone();
@@ -146,112 +153,175 @@ impl TerrainGenerator {
             |(size_x, size_y, samples_x, samples_y, scale, offset, elevs, name, water_level)| {
                 let _name_v: String = name;
                 let _water_level_v: f32 = water_level;
-                let height_field = HeightField::new_from_elevs_blob(&elevs, samples_x, samples_y, size_x, size_y, scale, offset);
+                let height_field = HeightField::new_from_elevs_blob(
+                    &elevs, samples_x, samples_y, size_x, size_y, scale, offset,
+                );
                 height_field
-            })?;
+            },
+        )?;
         if height_fields.is_empty() {
-            return Err(anyhow!("No raw terrain data for region at ({},{}) on \"{}\"", region_coords_x, region_coords_y, grid_for_msg));
+            return Err(anyhow!(
+                "No raw terrain data for region at ({},{}) on \"{}\"",
+                region_coords_x,
+                region_coords_y,
+                grid_for_msg
+            ));
         }
-        
+
         if height_fields.len() > 1 {
-            //  Duplicate data - warning 
+            //  Duplicate data - warning
             //  SQL indices should make this impossible.
-            log::error!("More than one region data set for region at ({},{}) on \"{}\"", region_coords_x, region_coords_y, grid_for_msg);
+            log::error!(
+                "More than one region data set for region at ({},{}) on \"{}\"",
+                region_coords_x,
+                region_coords_y,
+                grid_for_msg
+            );
         }
         let height_field = height_fields.pop().unwrap()?;
         Ok(height_field)
     }
-/*    
-    /// Build impostor, either sculpt or mesh form.
-    /// This collects the elevation data needed to build the impostor geometry.//
-    //  ***NEED TO HANDLE MULTIPLE-REGION IMPOSTORS.
-    pub fn build_impostor(&self, region_data: &RegionData, conn: &mut PooledConn, use_mesh: bool) -> Result<(), Error> {
-        log::info!("Building impostor for {}", region_data.name); // 
-        //  The loop here is sequential data processing with control breaks when an index field changes.
-        let grid = region_data.grid.clone();
-        let region_coords_x = region_data.region_coords_x;
-        let region_coords_y = region_data.region_coords_y;
-        const SQL_SELECT: &str = 
-            r"SELECT grid, region_coords_x, region_coords_y, size_x, size_y, name FROM raw_terrain_heights
-                WHERE LOWER(grid) = :grid, region_coords_x = : region_coords_x, region_coords_y = :region_data.region_coords_y";
-        let _all_regions = conn.exec_map(
-            SQL_SELECT,
-            params! { region_coords_x, region_coords_y, grid },
-            |(grid, region_coords_x, region_coords_y, size_x, size_y, name)| {
-                let region_data = RegionData {
-                    grid,
-                    region_coords_x,
-                    region_coords_y,
-                    size_x,
-                    size_y,
-                    name,
-                };
-            },
-        )?;
-        todo!();
-    }
-*/
+    /*
+        /// Build impostor, either sculpt or mesh form.
+        /// This collects the elevation data needed to build the impostor geometry.//
+        //  ***NEED TO HANDLE MULTIPLE-REGION IMPOSTORS.
+        pub fn build_impostor(&self, region_data: &RegionData, conn: &mut PooledConn, use_mesh: bool) -> Result<(), Error> {
+            log::info!("Building impostor for {}", region_data.name); //
+            //  The loop here is sequential data processing with control breaks when an index field changes.
+            let grid = region_data.grid.clone();
+            let region_coords_x = region_data.region_coords_x;
+            let region_coords_y = region_data.region_coords_y;
+            const SQL_SELECT: &str =
+                r"SELECT grid, region_coords_x, region_coords_y, size_x, size_y, name FROM raw_terrain_heights
+                    WHERE LOWER(grid) = :grid, region_coords_x = : region_coords_x, region_coords_y = :region_data.region_coords_y";
+            let _all_regions = conn.exec_map(
+                SQL_SELECT,
+                params! { region_coords_x, region_coords_y, grid },
+                |(grid, region_coords_x, region_coords_y, size_x, size_y, name)| {
+                    let region_data = RegionData {
+                        grid,
+                        region_coords_x,
+                        region_coords_y,
+                        size_x,
+                        size_y,
+                        name,
+                    };
+                },
+            )?;
+            todo!();
+        }
+    */
 
     /// Generate name for impostor asset file.
     /// Format: R-x-y-lod-name
-    fn impostor_name(region_coords_x: u32, region_coords_y: u32, lod: u8, impostor_name: &str) -> String {
+    fn impostor_name(
+        region_coords_x: u32,
+        region_coords_y: u32,
+        lod: u8,
+        impostor_name: &str,
+    ) -> String {
         let x = region_coords_x;
         let y = region_coords_y;
-        format!("R-{}-{}-{}-{}", x, y, lod, impostor_name)  
+        format!("R-{}-{}-{}-{}", x, y, lod, impostor_name)
     }
-    
+
     /// Build the impostor
-    pub fn build_impostor(&mut self, region_coords_x: u32, region_coords_y: u32, lod: u8, impostor_name: &str, height_field: &HeightField)
-        -> Result<(), Error> {
-         if self.generate_mesh {
-            self.build_impostor_mesh(region_coords_x, region_coords_y, lod, impostor_name, height_field)
-         } else {
-            self.build_impostor_sculpt(region_coords_x, region_coords_y, lod, impostor_name, height_field)
-         }
+    pub fn build_impostor(
+        &mut self,
+        region_coords_x: u32,
+        region_coords_y: u32,
+        lod: u8,
+        impostor_name: &str,
+        height_field: &HeightField,
+    ) -> Result<(), Error> {
+        if self.generate_mesh {
+            self.build_impostor_mesh(
+                region_coords_x,
+                region_coords_y,
+                lod,
+                impostor_name,
+                height_field,
+            )
+        } else {
+            self.build_impostor_sculpt(
+                region_coords_x,
+                region_coords_y,
+                lod,
+                impostor_name,
+                height_field,
+            )
+        }
     }
-    
+
     /// Build the impostor as a sculpt.
-    pub fn build_impostor_sculpt(&mut self, region_coords_x: u32, region_coords_y: u32, lod: u8, impostor_name: &str, height_field: &HeightField)
-        -> Result<(), Error> {
-         println!("Generate sculpt here for {}", impostor_name);  // ***TEMP***
-         // TerrainSculpt was translated from Python with an LLM. NEEDS WORK
-/* ***NOTYET***
-         let mut terrain_sculpt = TerrainSculpt::new(impostor_name);
-         let (scale, offset, elevs) = height_field.into_sculpt_array();
-         terrain_sculpt.setelev(elevs, scale as f64, offset as f64);
-         terrain_sculpt.makeimage();
-         let img = terrain_sculpt.image.unwrap();
-*/
-         Ok(())
+    pub fn build_impostor_sculpt(
+        &mut self,
+        region_coords_x: u32,
+        region_coords_y: u32,
+        lod: u8,
+        impostor_name: &str,
+        height_field: &HeightField,
+    ) -> Result<(), Error> {
+        println!("Generate sculpt here for {}", impostor_name); // ***TEMP***
+                                                                // TerrainSculpt was translated from Python with an LLM. NEEDS WORK
+                                                                /* ***NOTYET***
+                                                                         let mut terrain_sculpt = TerrainSculpt::new(impostor_name);
+                                                                         let (scale, offset, elevs) = height_field.into_sculpt_array();
+                                                                         terrain_sculpt.setelev(elevs, scale as f64, offset as f64);
+                                                                         terrain_sculpt.makeimage();
+                                                                         let img = terrain_sculpt.image.unwrap();
+                                                                */
+        Ok(())
     }
-    
+
     /// Build the impostor as a glTF mesh.
-    pub fn build_impostor_mesh(&mut self, region_coords_x: u32, region_coords_y: u32, lod: u8, impostor_name: &str, height_field: &HeightField)
-        -> Result<(), Error> {
-         todo!("glTF mesh generation is not implemented yet");
+    pub fn build_impostor_mesh(
+        &mut self,
+        region_coords_x: u32,
+        region_coords_y: u32,
+        lod: u8,
+        impostor_name: &str,
+        height_field: &HeightField,
+    ) -> Result<(), Error> {
+        todo!("glTF mesh generation is not implemented yet");
     }
-    
+
     /// Process one visibiilty group.
     /// There's a lot to do here.
     /// Temp version - just generates impostors for all single regions.
     pub fn process_group(&mut self, group: &Vec<RegionData>) -> Result<(), Error> {
-        println!("Group: {} entries.", group.len());  // ***TEMP***
-        //  Dumb version, just do single-size regions.
-        let lod = 0;    // single regions only
+        println!("Group: {} entries.", group.len()); // ***TEMP***
+                                                     //  Dumb version, just do single-size regions.
+        let lod = 0; // single regions only
         for region in group {
-            let height_field = self.get_height_field_one_region(region.grid.clone(), region.region_coords_x, region.region_coords_y)?;
-            let impostor_name = Self::impostor_name(region.region_coords_x, region.region_coords_y, lod, &region.name);
-            self.build_impostor(region.region_coords_x, region.region_coords_y, lod, &impostor_name, &height_field)?;
+            let height_field = self.get_height_field_one_region(
+                region.grid.clone(),
+                region.region_coords_x,
+                region.region_coords_y,
+            )?;
+            let impostor_name = Self::impostor_name(
+                region.region_coords_x,
+                region.region_coords_y,
+                lod,
+                &region.name,
+            );
+            self.build_impostor(
+                region.region_coords_x,
+                region.region_coords_y,
+                lod,
+                &impostor_name,
+                &height_field,
+            )?;
             println!("Region \"{}\": {}", region.name, height_field);
         }
         Ok(())
     }
-    
+
     /// Process one grid, with multiple visibilty groups
     pub fn process_grid(&mut self, mut completed_groups: CompletedGroups) -> Result<(), Error> {
         completed_groups.sort_by(|a, b| b.len().partial_cmp(&a.len()).unwrap());
         for group in &completed_groups {
-           self.process_group(group)?;
+            self.process_group(group)?;
         }
         Ok(())
     }
@@ -262,16 +332,19 @@ fn run(pool: Pool, outdir: PathBuf, grid: String, generate_mesh: bool) -> Result
     //////println!("{:?} {:?} {}", credsfile, outdir, verbose);
     let corners_touch_connects = false; // for now, SL only.
     let conn = pool.get_conn()?;
-    let mut terrain_generator = TerrainGenerator::new(conn, outdir, generate_mesh, corners_touch_connects);    
+    let mut terrain_generator =
+        TerrainGenerator::new(conn, outdir, generate_mesh, corners_touch_connects);
     let mut grids = terrain_generator.transitive_closure(&grid)?;
     if grids.is_empty() {
         return Err(anyhow!("Grid \"{}\" not found.", grid));
     }
-    
+
     if grids.len() != 1 {
-        return Err(anyhow!("More than one grid found but SQL should return only one grid."));
+        return Err(anyhow!(
+            "More than one grid found but SQL should return only one grid."
+        ));
     }
-    let grid_entry = grids.pop().unwrap();    // get the one grid
+    let grid_entry = grids.pop().unwrap(); // get the one grid
     terrain_generator.process_grid(grid_entry)?;
     Ok(())
 }
@@ -368,8 +441,7 @@ fn main() {
     logger();
     match setup() {
         Ok((pool, outdir, grid, mesh)) => match run(pool, outdir, grid, mesh) {
-            Ok(_) => {
-            }
+            Ok(_) => {}
             Err(e) => {
                 panic!("Failed: {:?}", e);
             }

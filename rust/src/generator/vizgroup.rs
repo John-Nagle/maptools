@@ -116,7 +116,7 @@ impl LiveBlock {
             //  Cloning here clones a vector, but we have to get out from under those borrows.
             let self_shared_groups = self.viz_group.borrow().live_blocks_weak.clone();
             let other_shared_groups = other.borrow().viz_group.borrow().live_blocks_weak.clone();
-            //  Now here we have to avoid a double mutable borrow. 
+            //  Now here we have to avoid a double mutable borrow.
             //  So there's a test to check that we're not trying to borrow the LiveBlock we are working on.
             for weak_block in &self_shared_groups {
                 if !Weak::ptr_eq(&self.weak_link_to_self, weak_block) {
@@ -152,7 +152,7 @@ impl LiveBlock {
             self.region_data.region_coords_x + self.region_data.size_x
                 <= b.region_data.region_coords_x
         ); // columns must be adjacent in X.
-        //  True if overlaps in Y.
+           //  True if overlaps in Y.
         let a0 = self.region_data.region_coords_y;
         let a1 = a0 + self.region_data.size_y + tolerance;
         let b0 = b.region_data.region_coords_y;
@@ -160,7 +160,11 @@ impl LiveBlock {
         let overlap = a0 < b1 && a1 >= b0;
         log::trace!(
             "XY-adjacent test: overlap: ({}, {}) vs ({}, {}) overlap: {}",
-            a0, a1, b0, b1, overlap
+            a0,
+            a1,
+            b0,
+            b1,
+            overlap
         );
         overlap
     }
@@ -286,7 +290,7 @@ impl VizGroups {
             tolerance: if detect_corners_touching { 1 } else { 0 },
         }
     }
-    
+
     /// Reset to ground state.
     /// Done after each grid.
     pub fn clear(&mut self) {
@@ -392,7 +396,7 @@ impl VizGroups {
     /// Regions must be sorted by X, Y.
     /// It is not correct to have two overlapping regions, but we don't consider that fatal
     /// because sometimes the region database is temporarily inconsistent.
-    pub fn add_region_data(&mut self, region_data: RegionData)  -> Option<CompletedGroups> {
+    pub fn add_region_data(&mut self, region_data: RegionData) -> Option<CompletedGroups> {
         let mut result = None;
         if let Some(prev) = &self.prev_region_data {
             if region_data.grid != prev.grid {
@@ -472,12 +476,13 @@ fn test_visgroup() {
         )
         .collect();
     //  All errors to console
-    simplelog::CombinedLogger::init(
-        vec![
-            simplelog::TermLogger::new(simplelog::LevelFilter::Trace, simplelog::Config::default(), 
-            simplelog::TerminalMode::Mixed, simplelog::ColorChoice::Auto),
-        ]
-    ).unwrap();
+    simplelog::CombinedLogger::init(vec![simplelog::TermLogger::new(
+        simplelog::LevelFilter::Trace,
+        simplelog::Config::default(),
+        simplelog::TerminalMode::Mixed,
+        simplelog::ColorChoice::Auto,
+    )])
+    .unwrap();
     let mut viz_groups = VizGroups::new(false);
     for item in test_data {
         let grid_break = viz_groups.add_region_data(item);
@@ -486,10 +491,7 @@ fn test_visgroup() {
     }
     let results = viz_groups.end_grid();
     //  Display results
-    log::info!(
-        "Result: Viz groups: {}",
-        results.len()
-    );
+    log::info!("Result: Viz groups: {}", results.len());
     for viz_group in results.iter() {
         log::info!("Viz group: {:?}", viz_group);
     }

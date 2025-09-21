@@ -5,15 +5,15 @@
 // License: GPL
 
 use image::{Rgb, RgbImage};
+use serde::Deserialize;
+use serde_json;
+use std::cmp::{max, min};
+use std::env;
+use std::f64;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::Path;
-use std::env;
 use std::process;
-use serde::Deserialize;
-use serde_json;
-use std::cmp::{min, max};
-use std::f64;
 
 const SCULPTDIM: usize = 64; // Sculpt textures are always 64x64
 
@@ -60,11 +60,7 @@ impl TerrainSculpt {
 
                     // Elevs is ordered with +Y as north, but sculpt images have to be flipped in Y
                     let flipped_y = elevs[0].len() - y - 1;
-                    img.put_pixel(
-                        x as u32,
-                        flipped_y as u32,
-                        Rgb([xpixel, ypixel, zpixel]),
-                    );
+                    img.put_pixel(x as u32, flipped_y as u32, Rgb([xpixel, ypixel, zpixel]));
                 }
             }
             self.image = Some(img);
