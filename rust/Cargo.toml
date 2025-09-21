@@ -46,14 +46,14 @@ serde = { version = "1.0", features = ["derive"] }
 json = "0.12"
 serde_json = "1.0"
 chrono = "0.4"
-#### thiserror = "1"
 envie = "0.2"
 getopts = "0.2"
+image = "0.25"
 
 outer_cgi = "0.3.1"
 sha1 = "0.10"
 hex = "0.4"
-shellexpand = "3.1"
+#### shellexpand = "3.1"
 
 num = "0.4"
 num-traits = "0.2"

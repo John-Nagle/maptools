@@ -18,7 +18,7 @@ use std::f64;
 const SCULPTDIM: usize = 64; // Sculpt textures are always 64x64
 
 #[derive(Debug)]
-struct TerrainSculpt {
+pub struct TerrainSculpt {
     region: String,
     image: Option<RgbImage>,
     elevs: Option<Vec<Vec<f64>>>,

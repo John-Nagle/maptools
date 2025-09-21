@@ -34,7 +34,7 @@ mod vizgroup;
 use vizgroup::{RegionData, VizGroups, CompletedGroups};
 mod sculptmaker;
 use sculptmaker::TerrainSculpt;
-use image::{GrayImage}
+use image::{GrayImage};
 
 /// MySQL Credentials for uploading.
 /// This filename will be searched for in parent directories,
@@ -221,6 +221,7 @@ impl TerrainGenerator {
          terrain_sculpt.setelev(elevs, scale as f64, offset as f64);
          terrain_sculpt.makeimage();
          let img = terrain_sculpt.image.unwrap();
+*/
          Ok(())
     }
     

@@ -202,9 +202,19 @@ impl HeightField {
     /// Returns scale, offset, values
     pub fn into_sculpt_array(&self) -> Result<(f32, f32, Vec<Vec<u8>>), Error> {
         //  Calculate max and min.
-        
+        if self.heights.column_len() == 0 {
+            return Err(anyhow!("Height field has no entries."));
+        }
+        let max = self.heights.elements_row_major_iter().max_by(|a, b| a.total_cmp(b)).unwrap();
+        let min = self.heights.elements_row_major_iter().min_by(|a, b| a.total_cmp(b)).unwrap();
         //  Scale into 0..255
-        todo!();
+        let range = (max - min).max(0.001);
+        let scale = 1.0/range;
+        let offset = min;
+        let height_array = self.heights.as_rows().into_iter()
+            .map(|r| r.into_iter()
+            .map(|v| ((v / 256.0).round() as usize).clamp(0, 255) as u8).collect()).collect();
+        Ok((scale, *offset, height_array))
     }
    
 }
