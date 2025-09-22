@@ -217,6 +217,7 @@ impl HeightField {
                 samples_y
             ));
         }
+        let scale = if scale > 0.0 { 1.0 / scale } else {0.0};
         let iterator = (0..).map(|n| ((elevs[n] as f32) / 256.0) * scale + offset);
         let heights =
             Array2D::from_iter_column_major(iterator, samples_x as usize, samples_y as usize)?;
@@ -286,6 +287,31 @@ impl HeightField {
         let offset = min;
         Ok((scale, *offset, height_array))
     }
+}
+
+/// Conversions -- elevation min and max to scale and offset.
+pub fn elev_min_max_to_scale_offset(zmin: f32, zmax: f32) -> (f32, f32) {
+    let zoffset = zmin;
+    let zrange = zmax - zmin;
+    let zscale = if zrange > 0.0001
+    {   1.0/zrange }                             // scale factor for elevs
+    else 
+    {   0.0 };
+    (zscale, zoffset)
+}             
+
+/// Conversions -- z as f32 to scaled elevation as u8.
+pub fn elev_to_u8(z: f32, scale: f32, offset: f32) -> u8 {
+    let z = (z-offset)*scale;                                   // scale into 0..1
+    let zint = ((z*256.0).floor() as usize).clamp(0, 255);
+    zint as u8
+}
+
+/// Conversions -- scaled elevation as u8 to z as f32.
+/// Inverse of above.
+pub fn u8_to_elev(z: u8, scale: f32, offset: f32) -> f32 {
+    let z = (z as f32) / 256.0; // into 0..1
+    z*scale + offset
 }
 
 #[test]
