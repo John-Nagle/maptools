@@ -20,7 +20,7 @@ const SCULPTDIM: usize = 64; // Sculpt textures are always 64x64
 #[derive(Debug)]
 pub struct TerrainSculpt {
     region: String,
-    image: Option<RgbImage>,
+    pub image: Option<RgbImage>,
     elevs: Option<Vec<Vec<f64>>>,
     zheight: Option<f64>,
     zoffset: Option<f64>,
@@ -28,7 +28,7 @@ pub struct TerrainSculpt {
 }
 
 impl TerrainSculpt {
-    fn new(region: &str) -> Self {
+    pub fn new(region: &str) -> Self {
         TerrainSculpt {
             region: region.to_string(),
             image: None,
@@ -39,7 +39,7 @@ impl TerrainSculpt {
         }
     }
 
-    fn makeimage(&mut self) {
+    pub fn makeimage(&mut self) {
         if let Some(elevs) = &self.elevs {
             let maxz = elevs.iter().flatten().cloned().fold(f64::MIN, f64::max);
             let minz = elevs.iter().flatten().cloned().fold(f64::MAX, f64::min);
@@ -67,7 +67,7 @@ impl TerrainSculpt {
         }
     }
 
-    fn setelevs(&mut self, elevs: Vec<Vec<u8>>, inputscale: f64, inputoffset: f64) {
+    pub fn setelevs(&mut self, elevs: Vec<Vec<u8>>, inputscale: f64, inputoffset: f64) {
         if elevs.len() == SCULPTDIM && elevs[0].len() == SCULPTDIM {
             // Directly convert to f64
             let elevs_f64: Vec<Vec<f64>> = elevs
