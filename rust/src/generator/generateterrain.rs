@@ -262,7 +262,7 @@ impl TerrainGenerator {
         impostor_name: &str,
         height_field: &HeightField,
     ) -> Result<(), Error> {
-        println!("Generate sculpt here for {}", impostor_name);
+        log::info!("Generating sculpt for \"{}\": {}", impostor_name, height_field);
         // TerrainSculpt was translated from Python with an LLM. NEEDS WORK
         let mut terrain_sculpt = TerrainSculpt::new(impostor_name);
         let (scale, offset, elevs) = height_field.into_sculpt_array()?;

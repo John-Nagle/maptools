@@ -208,6 +208,7 @@ impl HeightField {
         scale: f32,
         offset: f32,
     ) -> Result<Self, Error> {
+        log::debug!("New height field, scale {:5}, offset {:5}", scale, offset);
         if elevs.len() != (samples_x as usize) * (samples_y as usize) {
             return Err(anyhow!(
                 "Elevations array data length {} does not match dimensions ({}, {})",
@@ -269,6 +270,7 @@ impl HeightField {
             .min_by(|a, b| a.total_cmp(b))
             .unwrap();
         //  Scale into 0..255
+        log::debug!("Into sculpt array, range {:5} .. {:5}", min, max);
         let range = (max - min).max(0.001);
         let height_array = self
             .heights
