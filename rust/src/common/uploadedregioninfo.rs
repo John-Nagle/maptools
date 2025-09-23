@@ -217,8 +217,9 @@ impl HeightField {
                 samples_y
             ));
         }
-        let scale = if scale > 0.0 { 1.0 / scale } else {0.0};
-        let iterator = (0..).map(|n| ((elevs[n] as f32) / 256.0) * scale + offset);
+        //////let scale = if scale > 0.0 { 1.0 / scale } else {0.0};
+        //////let iterator = (0..).map(|n| ((elevs[n] as f32) / 256.0) * scale + offset);
+        let iterator = (0..).map(|n| { u8_to_elev(elevs[n], scale, offset) });
         let heights =
             Array2D::from_iter_column_major(iterator, samples_x as usize, samples_y as usize)?;
         Ok(Self {
@@ -243,7 +244,7 @@ impl HeightField {
         let iterator = (0..).map(|n| {
             let x = n % row_length;
             let y = n / row_length;
-            ((elevs[x][y] as f32) / 256.0) * scale + offset
+            u8_to_elev(elevs[x][y], scale, offset)
         });
         let heights = Array2D::from_iter_row_major(iterator, row_length, elevs.len())?;
         Ok(Self {
@@ -272,18 +273,20 @@ impl HeightField {
             .unwrap();
         //  Scale into 0..255
         log::debug!("Into sculpt array, range {:5} .. {:5}", min, max);
-        let range = (max - min).max(0.001);
+        //////let range = (max - min).max(0.001);
+        let (scale, offset) = elev_min_max_to_scale_offset(*min, *max);
         let height_array = self
             .heights
             .as_rows()
             .into_iter()
             .map(|r| {
                 r.into_iter()
-                    .map(|v| ((((v - min) / range) / 256.0).round() as usize).clamp(0, 255) as u8)
+                    //////.map(|v| ((((v - min) / range) / 256.0).round() as usize).clamp(0, 255) as u8)
+                    .map(|v| elev_to_u8(v, scale, offset))
                     .collect()
             })
             .collect();
-        let scale = 1.0 / range;
+        ////////////let scale = 1.0 / range;
         let offset = min;
         Ok((scale, *offset, height_array))
     }
