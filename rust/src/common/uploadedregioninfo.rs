@@ -314,7 +314,11 @@ pub fn elev_to_u8(z: f32, scale: f32, offset: f32) -> u8 {
 /// Inverse of above.
 pub fn u8_to_elev(z: u8, scale: f32, offset: f32) -> f32 {
     let z = (z as f32) / 256.0; // into 0..1
-    z*scale + offset
+    if scale > 0.0001 {
+        z / scale + offset
+    } else {
+        0.0
+    }
 }
 
 #[test]
@@ -334,4 +338,21 @@ fn test_height_field() {
     println!("hf_flat: {:?}", hf_flat);
     println!("hf_arrayform: {:?}", hf_arrayform);
     assert_eq!(hf_flat, hf_arrayform);
+}
+
+#[test]
+fn test_conversions() {
+    let min = 100.0;
+    let max = 300.0;
+    let (scale, offset) = elev_min_max_to_scale_offset(min, max);
+    println!("Scale: {:.5}  offset: {:.5}", scale, offset);
+    for zindex in 0..100 {
+        let z = zindex as f32 + min;
+        let zu8 = elev_to_u8(z, scale, offset);
+        let znew = u8_to_elev(zu8, scale, offset);
+        //  There's some error in reducing to u8, but not too much.
+        if (z-znew).abs() > 0.75 {
+            panic!("Conversions failed: {:.5} -> {} -> {:.5}",  z, zu8, znew);
+        }
+    }    
 }
