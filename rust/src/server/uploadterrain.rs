@@ -76,8 +76,9 @@ impl TerrainUploadHandler {
         region_info: UploadedRegionInfo,
         params: &HashMap<String, String>,
     ) -> Result<(), Error> {
-        const SQL_INSERT: &str = r"INSERT INTO raw_terrain_heights (grid, region_coords_x, region_coords_y, size_x, size_y, name, scale, offset, elevs,  water_level, creator) 
-            VALUES (:grid, :region_coords_x, :region_coords_y, :size_x, :size_y, :name, :scale, :offset, :elevs, :water_level, :creator)";
+        const SQL_INSERT: &str = r"INSERT INTO raw_terrain_heights (grid, region_coords_x, region_coords_y, samples_x, samples_y, size_x, size_y, name, scale, offset, elevs,  water_level, creator) 
+            VALUES
+            (:grid, :region_coords_x, :region_coords_y, :samples_x, :samples_y, :size_x, :size_y, :name, :scale, :offset, :elevs, :water_level, :creator)";
         //  ***NEED TO FIX THIS FOR Open Simulator***
         let creator = params
             .get(OWNER_NAME)
