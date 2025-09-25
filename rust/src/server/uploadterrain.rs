@@ -132,19 +132,7 @@ impl TerrainUploadHandler {
         let is_sames = self.conn.exec_map(
             SQL_SELECT,
             params! { grid, region_coords_x, region_coords_y },
-            |(size_x, size_y, samples_x, samples_y, scale, offset, elevs, name, water_level)| {
-                //  Type inference from "==" could not resolve this.
-                let size_x: u32 = size_x;
-                let size_y: u32 = size_y;
-                let samples_x: u32 = samples_x;
-                let samples_y: u32 = samples_y;
-                let scale: f32 = scale;
-                let offset: f32 = offset;
-                let elevs: [u8;64] = elevs;
-                let name: String = name;
-                let water_level: f32 = water_level;
-                //////let _name_v: String = name;
-                //////let _water_level_v: f32 = water_level;
+            |(size_x, size_y, samples_x, samples_y, scale, offset, elevs, name, water_level) : (u32, u32, u32, u32, f32, f32, [u8;64], String, f32)| {
                 //  Is the stored data identical to what we just read from the region?
                 let is_same = 
                     size_x == region_info.get_size()[0] && 
