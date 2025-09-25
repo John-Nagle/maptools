@@ -126,16 +126,16 @@ impl TerrainUploadHandler {
         let grid = &region_info.grid;
         let region_coords_x = region_info.region_coords[0];
         let region_coords_y = region_info.region_coords[1];
-        let new_elevs_hash = hex::encode_upper(Sha256::digest(region_info.get_elevs_as_blob()?));
+        let new_elevs_sha2 = hex::encode(Sha256::digest(region_info.get_elevs_as_blob()?));
         const SQL_SELECT: &str = r"SELECT size_x, size_y, samples_x, samples_y, scale, offset, SHA2(elevs, 256), name, water_level
             FROM raw_terrain_heights
             WHERE LOWER(grid) = :grid AND region_coords_x = :region_coords_x AND region_coords_y = :region_coords_y";
         let is_sames = self.conn.exec_map(
             SQL_SELECT,
             params! { grid, region_coords_x, region_coords_y },
-            |(size_x, size_y, samples_x, samples_y, scale, offset, elevs, name, water_level) : (u32, u32, u32, u32, f32, f32, String, String, f32)| {
+            |(size_x, size_y, samples_x, samples_y, scale, offset, elevs_sha2, name, water_level) : (u32, u32, u32, u32, f32, f32, String, String, f32)| {
                 //  Is the stored data identical to what we just read from the region?
-                log::warn!("Elevs hasn: {} vs {}", elevs, new_elevs_hash); // ***TEMP***
+                log::warn!("Elevs hash: {} vs {}", elevs_sha2, new_elevs_sha2); // ***TEMP***
                 let is_same = 
                     size_x == region_info.get_size()[0] && 
                     size_y == region_info.get_size()[1] &&
@@ -143,7 +143,7 @@ impl TerrainUploadHandler {
                     samples_y == samples[1] &&
                     scale == region_info.scale &&
                     offset == region_info.offset &&
-                    elevs == *new_elevs_hash &&
+                    elevs_sha2 == *new_elevs_sha2 &&
                     name == region_info.name &&
                     water_level == region_info.water_lev;                    
                 is_same
