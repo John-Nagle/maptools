@@ -295,17 +295,17 @@ impl HeightField {
 /// Conversions -- elevation min and max to scale and offset.
 pub fn elev_min_max_to_scale_offset(zmin: f32, zmax: f32) -> (f32, f32) {
     let zoffset = zmin;
-    let zrange = zmax - zmin;
-    let zscale = if zrange > 0.0001
-    {   1.0/zrange }                             // scale factor for elevs
-    else 
-    {   0.0 };
+    let zscale = zmax - zmin;
     (zscale, zoffset)
 }             
 
 /// Conversions -- z as f32 to scaled elevation as u8.
 pub fn elev_to_u8(z: f32, scale: f32, offset: f32) -> u8 {
-    let z = (z-offset)*scale;                                   // scale into 0..1
+    let z = if scale > 0.001 {
+        (z-offset)/scale
+    } else {
+        0.0
+    };
     let zint = ((z*256.0).floor() as usize).clamp(0, 255);
     zint as u8
 }
@@ -314,11 +314,7 @@ pub fn elev_to_u8(z: f32, scale: f32, offset: f32) -> u8 {
 /// Inverse of above.
 pub fn u8_to_elev(z: u8, scale: f32, offset: f32) -> f32 {
     let z = (z as f32) / 256.0; // into 0..1
-    if scale > 0.0001 {
-        z / scale + offset
-    } else {
-        0.0
-    }
+    z * scale + offset
 }
 
 #[test]

@@ -154,6 +154,10 @@ Next steps:
 
    Uploaded data for Blake Sea seems to be wrong. Recheck upload side.
    
+2025-09-23
+
+   Generated a valid impostor sculpt. Now need to generate JSON file.
+   Also need to re-capture all the elevs; the data is bad.
   
       
       
