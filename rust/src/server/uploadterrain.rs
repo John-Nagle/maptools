@@ -24,6 +24,7 @@ use mysql::{PooledConn, params};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::io::Write;
+use sha2::{Sha256, Digest};
 
 /// MySQL Credentials for uploading.
 /// This filename will be searched for in parent directories,
@@ -54,6 +55,13 @@ fn logger() {
         std::fs::File::create(LOG_FILE_NAME).expect("Unable to create log file"),
     )]);
     log::warn!("Logging to {:?}", LOG_FILE_NAME); // where the log is going
+}
+
+/// Change status for region data
+enum ChangeStatus {
+    None, 
+    NoChange,
+    Changed 
 }
 
 ///  Our handler
@@ -105,7 +113,67 @@ impl TerrainUploadHandler {
         log::debug!("SQL insert succeeded.");
         Ok(())
     }
+    
+    /// Is this a duplicate?
+    fn do_sql_unchanged_check(
+        &mut self,
+        region_info: UploadedRegionInfo,
+        params: &HashMap<String, String>,
+    ) -> Result<ChangeStatus, Error> {
+        //  Need SHA256 of blob as dup check. Don't have to download the whole blob from server.
+        let samples = region_info.get_samples()?;
+        let grid = &region_info.grid;
+        let region_coords_x = region_info.region_coords[0];
+        let region_coords_y = region_info.region_coords[1];
+        let new_elevs_hash = Sha256::digest(region_info.get_elevs_as_blob()?);
+        const SQL_SELECT: &str = r"SELECT size_x, size_y, samples_x, samples_y, scale, offset, SHA256(elevs), name, water_level
+            FROM raw_terrain_heights
+            WHERE LOWER(grid) = :grid AND region_coords_x = :region_coords_x AND region_coords_y = :region_coords_y";
+        let is_sames = self.conn.exec_map(
+            SQL_SELECT,
+            params! { grid, region_coords_x, region_coords_y },
+            |(size_x, size_y, samples_x, samples_y, scale, offset, elevs, name, water_level)| {
+                //  Type inference from "==" could not resolve this.
+                let size_x: u32 = size_x;
+                let size_y: u32 = size_y;
+                let samples_x: u32 = samples_x;
+                let samples_y: u32 = samples_y;
+                let scale: f32 = scale;
+                let offset: f32 = offset;
+                let elevs: [u8;64] = elevs;
+                let name: String = name;
+                let water_level: f32 = water_level;
+                //////let _name_v: String = name;
+                //////let _water_level_v: f32 = water_level;
+                //  Is the stored data identical to what we just read from the region?
+                let is_same = 
+                    size_x == region_info.get_size()[0] && 
+                    size_y == region_info.get_size()[1] &&
+                    samples_x == samples[0] && 
+                    samples_y == samples[1] &&
+                    scale == region_info.scale &&
+                    offset == region_info.offset &&
+                    elevs == *new_elevs_hash &&
+                    name == region_info.name &&
+                    water_level == region_info.water_lev;                    
+                is_same
+            },
+        )?;
+        //  Changed?
+        Ok(if is_sames.is_empty() {
+            ChangeStatus::None
+        } else {
+            //  Must be 1, because of SELECT on unique key.
+            assert!(is_sames.len() == 1);
+            if is_sames[0] {
+                ChangeStatus::NoChange
+            } else {
+                ChangeStatus::Changed
+            }
+        })
+    }
 
+    // ***NOT WORKING***
     fn do_sql_update(
         &mut self,
         region_info: UploadedRegionInfo,
