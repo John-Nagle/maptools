@@ -58,6 +58,7 @@ fn logger() {
 }
 
 /// Change status for region data
+#[derive(Debug)]
 enum ChangeStatus {
     None, 
     NoChange,
@@ -81,7 +82,7 @@ impl TerrainUploadHandler {
     /// SQL insert for new item
     fn do_sql_insert(
         &mut self,
-        region_info: UploadedRegionInfo,
+        region_info: &UploadedRegionInfo,
         params: &HashMap<String, String>,
     ) -> Result<(), Error> {
         const SQL_INSERT: &str = r"INSERT INTO raw_terrain_heights (grid, region_coords_x, region_coords_y, samples_x, samples_y, size_x, size_y, name, scale, offset, elevs,  water_level, creator) 
@@ -117,7 +118,7 @@ impl TerrainUploadHandler {
     /// Is this a duplicate?
     fn do_sql_unchanged_check(
         &mut self,
-        region_info: UploadedRegionInfo,
+        region_info: &UploadedRegionInfo,
         params: &HashMap<String, String>,
     ) -> Result<ChangeStatus, Error> {
         //  Need SHA256 of blob as dup check. Don't have to download the whole blob from server.
@@ -125,15 +126,16 @@ impl TerrainUploadHandler {
         let grid = &region_info.grid;
         let region_coords_x = region_info.region_coords[0];
         let region_coords_y = region_info.region_coords[1];
-        let new_elevs_hash = Sha256::digest(region_info.get_elevs_as_blob()?);
-        const SQL_SELECT: &str = r"SELECT size_x, size_y, samples_x, samples_y, scale, offset, SHA256(elevs), name, water_level
+        let new_elevs_hash = hex::encode_upper(Sha256::digest(region_info.get_elevs_as_blob()?));
+        const SQL_SELECT: &str = r"SELECT size_x, size_y, samples_x, samples_y, scale, offset, SHA2(elevs, 256), name, water_level
             FROM raw_terrain_heights
             WHERE LOWER(grid) = :grid AND region_coords_x = :region_coords_x AND region_coords_y = :region_coords_y";
         let is_sames = self.conn.exec_map(
             SQL_SELECT,
             params! { grid, region_coords_x, region_coords_y },
-            |(size_x, size_y, samples_x, samples_y, scale, offset, elevs, name, water_level) : (u32, u32, u32, u32, f32, f32, [u8;64], String, f32)| {
+            |(size_x, size_y, samples_x, samples_y, scale, offset, elevs, name, water_level) : (u32, u32, u32, u32, f32, f32, String, String, f32)| {
                 //  Is the stored data identical to what we just read from the region?
+                log::warn!("Elevs hasn: {} vs {}", elevs, new_elevs_hash); // ***TEMP***
                 let is_same = 
                     size_x == region_info.get_size()[0] && 
                     size_y == region_info.get_size()[1] &&
@@ -220,8 +222,10 @@ impl TerrainUploadHandler {
         params: &HashMap<String, String>,
     ) -> Result<String, Error> {
         let msg = format!("Region info:\n{:?}", region_info);
+        let changed_status = self.do_sql_unchanged_check(&region_info, params)?;
+        log::warn!("Changed status for region {}: {:?}", region_info.name, changed_status);
         //  Initial test of SQL
-        self.do_sql_insert(region_info, params)?; // ***TEMP***
+        self.do_sql_insert(&region_info, params)?; // ***TEMP***
 
         //////let msg = "Test OK".to_string(); // ***TEMP***
         Ok(msg)
