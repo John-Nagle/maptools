@@ -92,7 +92,6 @@ impl TerrainUploadHandler {
         const SQL_INSERT: &str = r"INSERT INTO raw_terrain_heights (grid, region_coords_x, region_coords_y, samples_x, samples_y, size_x, size_y, name, scale, offset, elevs,  water_level, creator) 
             VALUES
             (:grid, :region_coords_x, :region_coords_y, :samples_x, :samples_y, :size_x, :size_y, :name, :scale, :offset, :elevs, :water_level, :creator)";
-        //  ***NEED TO FIX THIS FOR Open Simulator***
         let creator = params
             .get(OWNER_NAME)
             .ok_or_else(|| anyhow!("This request is not from Second Life/Open Simulator"))?
@@ -119,6 +118,41 @@ impl TerrainUploadHandler {
         Ok(())
     }
     
+    /// SQL insert for new item. Replaces entire record
+    fn do_sql_full_update(
+        &mut self,
+        region_info: &UploadedRegionInfo,
+        params: &HashMap<String, String>,
+    ) -> Result<(), Error> {
+        const SQL_FULL_UPDATE: &str = r"UPDATE raw_terrain_heights 
+            SET samples_x = :samples_x, samples_y = :samples_y, scale = :scale, offset = :offset, elevs = :elevs, water_level = :water_level, creator = :creator,
+                size_x = :size_x, size_y = :size_y, name = :name, confirmation_time = NOW(), confirmer = NULL
+            WHERE LOWER(grid) = :grid AND region_coords_x = :region_coords_x AND region_coords_y = :region_coords_y";           
+        let creator = params
+            .get(OWNER_NAME)
+            .ok_or_else(|| anyhow!("This request is not from Second Life/Open Simulator"))?
+            .trim();
+        let samples = region_info.get_samples()?;
+        let values = params! {
+        "grid" => region_info.grid.clone(),
+        "region_coords_x" => region_info.region_coords[0],
+        "region_coords_y" => region_info.region_coords[1],
+        "size_x" => region_info.get_size()[0],
+        "size_y" => region_info.get_size()[1],
+        "name" => region_info.name.clone(),
+        "scale" => region_info.scale,
+        "offset" => region_info.offset,	
+        "elevs" => region_info.get_elevs_as_blob()?,
+        "samples_x" => samples[0],
+        "samples_y" => samples[1],
+        "water_level" => region_info.water_lev,
+        "creator" => creator };
+        log::debug!("SQL update: {:?}", values);
+        self.conn.exec_drop(SQL_FULL_UPDATE, values)?;
+        log::debug!("SQL update succeeded.");
+        Ok(())
+    }
+    
     /// Compare elevations within tolerance.
     /// LSL llGround is not totally repeatable.  We have to allow some error.
     fn check_elev_err_within_tolerance(elevs0: &[u8], elevs1: &[u8], scale: f32, offset: f32, tolerance: f32) -> bool {
@@ -140,11 +174,34 @@ impl TerrainUploadHandler {
         }
     }
     
+    fn do_sql_confirmation_update(
+        &mut self,
+        region_info: &UploadedRegionInfo,
+        params: &HashMap<String, String>,
+    ) -> Result<(), Error> {
+        const SQL_CONFIRMATION_UPDATE: &str = r"UPDATE raw_terrain_heights
+            SET confirmation_time = NOW(), confirmer = :confirmer
+            WHERE LOWER(grid) = :grid AND region_coords_x = :region_coords_x AND region_coords_y = :region_coords_y";           
+        let confirmer = params
+            .get(OWNER_NAME)
+            .ok_or_else(|| anyhow!("This request is not from Second Life/Open Simulator"))?
+            .trim();
+        let samples = region_info.get_samples()?;
+        let values = params! {
+        "grid" => region_info.grid.clone(),
+        "region_coords_x" => region_info.region_coords[0],
+        "region_coords_y" => region_info.region_coords[1],
+        "confirmer" => confirmer };
+        log::debug!("SQL confirmation update: {:?}", values);
+        self.conn.exec_drop(SQL_CONFIRMATION_UPDATE, values)?;
+        log::debug!("SQL confirmation update succeeded.");
+        Ok(())
+    }
+    
     /// Is this a duplicate?
     fn do_sql_unchanged_check(
         &mut self,
         region_info: &UploadedRegionInfo,
-        params: &HashMap<String, String>,
     ) -> Result<ChangeStatus, Error> {
         
         let samples = region_info.get_samples()?;
@@ -186,39 +243,7 @@ impl TerrainUploadHandler {
                 ChangeStatus::Changed
             }
         })
-    }
-
-    // ***NOT WORKING***
-    fn do_sql_update(
-        &mut self,
-        region_info: UploadedRegionInfo,
-        params: &HashMap<String, String>,
-    ) -> Result<(), Error> {
-        const SQL_INSERT: &str = r"INSERT INTO raw_terrain_heights (grid, region_coords_x, region_coords_y, size_x, size_y, name, scale, offset, elevs,  water_level, creator) 
-            VALUES (:grid, :region_coords_x, :region_coords_y, :size_x, :size_y, :name, :scale, :offset, :elevs, :water_level, :creator)";
-        //  ***NEED TO FIX THIS FOR Open Simulator***
-        let creator = params
-            .get(OWNER_NAME)
-            .ok_or_else(|| anyhow!("This request is not from Second Life/Open Simulator"))?
-            .trim();
-        let values = params! {
-        //////"table" => RAW_TERRAIN_HEIGHTS,
-        "grid" => region_info.grid.clone(),
-        "region_coords_x" => region_info.region_coords[0],
-        "region_coords_y" => region_info.region_coords[1],
-        "size_x" => region_info.get_size()[0],
-        "size_y" => region_info.get_size()[1],
-        "name" => region_info.name.clone(),
-        "scale" => region_info.scale,
-        "offset" => region_info.offset,
-        "elevs" => region_info.get_elevs_as_blob()?,
-        "water_level" => region_info.water_lev,
-        "creator" => creator };
-        log::debug!("SQL insert: {:?}", values);
-        self.conn.exec_drop(SQL_INSERT, values)?;
-        log::debug!("SQL insert succeeded.");
-        Ok(())
-    }
+    }  
 
     /// Parse a request
     fn parse_request(
@@ -247,12 +272,24 @@ impl TerrainUploadHandler {
         params: &HashMap<String, String>,
     ) -> Result<String, Error> {
         let msg = format!("Region info:\n{:?}", region_info);
-        let changed_status = self.do_sql_unchanged_check(&region_info, params)?;
-        log::warn!("Changed status for region {}: {:?}", region_info.name, changed_status);
-        //  Initial test of SQL
-        self.do_sql_insert(&region_info, params)?; // ***TEMP***
-
-        //////let msg = "Test OK".to_string(); // ***TEMP***
+        let change_status = self.do_sql_unchanged_check(&region_info)?;
+        log::warn!("Changed status for region {}: {:?}", region_info.name, change_status);
+        match change_status {
+            ChangeStatus::None => {
+                //  New region, add region
+                log::info!("Region \"{}\") is new.", region_info.name);
+                self.do_sql_insert(&region_info, params)?;        
+            }
+            ChangeStatus::NoChange  => {
+                //  Existing region, same values as last time
+                log::info!("Region \"{}\") is unchanged.", region_info.name);
+                self.do_sql_confirmation_update(&region_info, params)?; 
+            }
+            ChangeStatus::Changed => {
+                log::info!("Region \"{}\") changed", region_info.name);
+                self.do_sql_full_update(&region_info, params)?; 
+            }
+        }
         Ok(msg)
     }
 }
