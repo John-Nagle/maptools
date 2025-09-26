@@ -18,10 +18,10 @@ use common::Credentials;
 use common::init_fcgi;
 use common::{Handler, Request, Response};
 use common::{UploadedRegionInfo, ElevsJson};
+use common::u8_to_elev;
 use mysql::prelude::{AsStatement, Queryable};
 use mysql::{Conn, Opts, OptsBuilder, Pool};
 use mysql::{PooledConn, params};
-use serde::Deserialize;
 use std::collections::HashMap;
 use std::io::Write;
 use sha2::{Sha256, Digest};
@@ -73,6 +73,10 @@ struct TerrainUploadHandler {
     conn: PooledConn,
 }
 impl TerrainUploadHandler {
+    /// Elevation error tolerance. Elevations are equal if within this tolerance.
+    /// LSL llGround is slightly noisy.
+    const ELEV_ERROR_TOLERANCE: f32 = 0.5;
+
     /// Usual new. Saves connection pool for use.
     pub fn new(pool: Pool) -> Result<Self, Error> {
         let conn = pool.get_conn()?;
@@ -103,7 +107,7 @@ impl TerrainUploadHandler {
         "size_y" => region_info.get_size()[1],
         "name" => region_info.name.clone(),
         "scale" => region_info.scale,
-        "offset" => region_info.offset,
+        "offset" => region_info.offset,	
         "elevs" => region_info.get_elevs_as_blob()?,
         "samples_x" => samples[0],
         "samples_y" => samples[1],
@@ -115,28 +119,48 @@ impl TerrainUploadHandler {
         Ok(())
     }
     
+    /// Compare elevations within tolerance.
+    /// LSL llGround is not totally repeatable.  We have to allow some error.
+    fn check_elev_err_within_tolerance(elevs0: &[u8], elevs1: &[u8], scale: f32, offset: f32, tolerance: f32) -> bool {
+        let elev_err = |a: u8, b: u8| (u8_to_elev(a, scale, offset) - u8_to_elev(b, scale, offset)).abs();
+        let max_err_item_opt = elevs0.iter().zip(elevs1).max_by(|(a0, b0), (a1, b1)| {
+            let aerr = elev_err(**a0, **b0);
+            let berr = elev_err(**a1, **b1);
+            aerr.total_cmp(&berr)
+        });
+        if let Some(max_err_item) = max_err_item_opt {
+            let max_err = elev_err(*max_err_item.0, *max_err_item.1);
+            if max_err > tolerance {
+                log::warn!("Elevations differ by {:5}", max_err);
+            }
+            max_err < tolerance
+        } else {
+            // Not equal
+            false 
+        }
+    }
+    
     /// Is this a duplicate?
     fn do_sql_unchanged_check(
         &mut self,
         region_info: &UploadedRegionInfo,
         params: &HashMap<String, String>,
     ) -> Result<ChangeStatus, Error> {
-        //  Need SHA256 of blob as dup check. Don't have to download the whole blob from server.
+        
         let samples = region_info.get_samples()?;
         let grid = &region_info.grid;
         let region_coords_x = region_info.region_coords[0];
         let region_coords_y = region_info.region_coords[1];
-        let new_elevs_sha2 = hex::encode(Sha256::digest(region_info.get_elevs_as_blob()?));
-        const SQL_SELECT: &str = r"SELECT size_x, size_y, samples_x, samples_y, scale, offset, SHA2(elevs, 256), elevs, name, water_level
+        let new_elevs= region_info.get_elevs_as_blob()?;
+        const SQL_SELECT: &str = r"SELECT size_x, size_y, samples_x, samples_y, scale, offset, elevs, name, water_level
             FROM raw_terrain_heights
             WHERE LOWER(grid) = :grid AND region_coords_x = :region_coords_x AND region_coords_y = :region_coords_y";
         let is_sames = self.conn.exec_map(
             SQL_SELECT,
             params! { grid, region_coords_x, region_coords_y },
-            |(size_x, size_y, samples_x, samples_y, scale, offset, elevs_sha2, elevs, name, water_level) : (u32, u32, u32, u32, f32, f32, String, Vec<u8>, String, f32)| {
+            |(size_x, size_y, samples_x, samples_y, scale, offset, elevs, name, water_level) : (u32, u32, u32, u32, f32, f32, Vec<u8>, String, f32)| {
                 //  Is the stored data identical to what we just read from the region?
-                log::warn!("Elevs hash: {} vs {}", elevs_sha2, new_elevs_sha2); // ***TEMP***
-                log::warn!("Elevs:\n{:?} vs\n{:?}", elevs, region_info.get_elevs_as_blob()); // ***TEMP***
+                log::trace!("Elevs:\n{:?} vs\n{:?}", elevs, new_elevs); // ***TEMP***
                 let is_same = 
                     size_x == region_info.get_size()[0] && 
                     size_y == region_info.get_size()[1] &&
@@ -144,7 +168,7 @@ impl TerrainUploadHandler {
                     samples_y == samples[1] &&
                     scale == region_info.scale &&
                     offset == region_info.offset &&
-                    elevs_sha2 == *new_elevs_sha2 &&
+                    Self::check_elev_err_within_tolerance(&elevs, &new_elevs, scale, offset, Self::ELEV_ERROR_TOLERANCE) &&
                     name == region_info.name &&
                     water_level == region_info.water_lev;                    
                 is_same
