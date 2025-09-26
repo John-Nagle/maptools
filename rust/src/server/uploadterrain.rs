@@ -270,7 +270,7 @@ impl TerrainUploadHandler {
         &mut self,
         region_info: UploadedRegionInfo,
         params: &HashMap<String, String>,
-    ) -> Result<String, Error> {
+    ) -> Result<(usize, String), Error> {
         let msg = format!("Region info:\n{:?}", region_info);
         let change_status = self.do_sql_unchanged_check(&region_info)?;
         log::warn!("Changed status for region {}: {:?}", region_info.name, change_status);
@@ -278,19 +278,21 @@ impl TerrainUploadHandler {
             ChangeStatus::None => {
                 //  New region, add region
                 log::info!("Region \"{}\") is new.", region_info.name);
-                self.do_sql_insert(&region_info, params)?;        
+                self.do_sql_insert(&region_info, params)?; 
+                Ok((201, "Added region".to_string()))    
             }
             ChangeStatus::NoChange  => {
                 //  Existing region, same values as last time
                 log::info!("Region \"{}\") is unchanged.", region_info.name);
                 self.do_sql_confirmation_update(&region_info, params)?; 
+                Ok((204, "No change to region".to_string()))
             }
             ChangeStatus::Changed => {
                 log::info!("Region \"{}\") changed", region_info.name);
                 self.do_sql_full_update(&region_info, params)?; 
+                Ok((200, "Change to region".to_string()))
             }
         }
-        Ok(msg)
     }
 }
 //  Our "handler"
@@ -312,9 +314,9 @@ impl Handler for TerrainUploadHandler {
                     .ok_or_else(|| anyhow!("No HTTP parameters found"))?;
                 //  Process. Error 500 if fail.
                 match self.process_request(req, &params) {
-                    Ok(msg) => {
+                    Ok((status, msg)) => {
                         //  Success. Send a plain "OK"
-                        let http_response = Response::http_response("text/plain", 200, "OK");
+                        let http_response = Response::http_response("text/plain", status, "OK");
                         //  Return something useful.
                         let b = msg.into_bytes();
                         Response::write_response(out, request, http_response.as_slice(), &b)?;
