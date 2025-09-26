@@ -223,8 +223,8 @@ impl TerrainUploadHandler {
                     size_y == region_info.get_size()[1] &&
                     samples_x == samples[0] && 
                     samples_y == samples[1] &&
-                    scale == region_info.scale &&
-                    offset == region_info.offset &&
+                    (scale - region_info.scale).abs() < Self::ELEV_ERROR_TOLERANCE  &&
+                    (offset - region_info.offset).abs() < Self::ELEV_ERROR_TOLERANCE &&
                     Self::check_elev_err_within_tolerance(&elevs, &new_elevs, scale, offset, Self::ELEV_ERROR_TOLERANCE) &&
                     name == region_info.name &&
                     water_level == region_info.water_lev;                    
