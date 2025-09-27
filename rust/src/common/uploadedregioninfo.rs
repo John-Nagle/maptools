@@ -20,7 +20,7 @@ pub struct UploadedRegionInfo {
     pub size: Option<[u32; 2]>,
     /// Region name
     pub name: String,
-    /// Height data, a long set of hex data.  
+    /// Height data, a long set of hex data. Each string is one set of Y values.
     pub elevs: Vec<String>,
     /// Scale factor for elevs
     pub scale: f32,
@@ -29,26 +29,6 @@ pub struct UploadedRegionInfo {
     pub offset: f32,
     //  Water level
     pub water_lev: f32,
-}
-
-/// Elevations as JSON data
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-pub struct ElevsJson {
-    /// Offset and scale for elevation data
-    offset: f32,
-    /// Apply scale first, then offset.
-    scale: f32,
-    /// Height data, a long set of hex data.  
-    elevs: Vec<String>,
-}
-
-impl ElevsJson {
-    /// Get elevations as numbers before offsetting.
-    /// Input is a hex string representing one elev per byte.
-    pub fn get_unscaled_elevs(&self) -> Result<Vec<Vec<u8>>, Error> {
-        let elevs: Result<Vec<_>, _> = self.elevs.iter().map(|s| hex::decode(s)).collect();
-        Ok(elevs?)
-    }
 }
 
 impl UploadedRegionInfo {
@@ -199,6 +179,7 @@ impl std::fmt::Display for HeightField {
 impl HeightField {
     /// New from elevs blob, the form used in SQL. One big blob, a flattened 2D array.
     /// size_x and size_y are size of the region, not the elevs data.
+    /// In the elevs blob, the X subscript goes fastest. 
     pub fn new_from_elevs_blob(
         elevs: &Vec<u8>,
         samples_x: u32,

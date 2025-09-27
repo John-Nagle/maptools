@@ -159,5 +159,18 @@ Next steps:
    Generated a valid impostor sculpt. Now need to generate JSON file.
    Also need to re-capture all the elevs; the data is bad.
   
+2023-09-26
+
+   Data collection looks good. Manually generated sculpts look good.
+   Need some kind of authentication for the capture script.
+   
+   Next steps: generate a JSON file for the viewer automatically.
+   - Need a database first.
+   - Where do we get UUIDs?
+     - Upload script - finds all sculpt images and adds their UUIDs.
+   - Generate large-area merged sculpts.
+   
+   - Got sculpt display into Sharpview.
+   - Sculpts are being generated with X and Y exchanged.
       
       

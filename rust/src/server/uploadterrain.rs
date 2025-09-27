@@ -17,14 +17,13 @@ use log::LevelFilter;
 use common::Credentials;
 use common::init_fcgi;
 use common::{Handler, Request, Response};
-use common::{UploadedRegionInfo, ElevsJson};
+use common::{UploadedRegionInfo};
 use common::u8_to_elev;
 use mysql::prelude::{AsStatement, Queryable};
 use mysql::{Conn, Opts, OptsBuilder, Pool};
 use mysql::{PooledConn, params};
 use std::collections::HashMap;
 use std::io::Write;
-use sha2::{Sha256, Digest};
 
 /// MySQL Credentials for uploading.
 /// This filename will be searched for in parent directories,
@@ -38,8 +37,6 @@ use sha2::{Sha256, Digest};
 ///     DB_NAME = databasename
 ///
 const UPLOAD_CREDS_FILE: &str = "upload_credentials.txt";
-/// Table name
-const RAW_TERRAIN_HEIGHTS: &str = "raw_terrain_heights";
 /// Environment variables for obtaining owner info.
 /// ***ADD VALUES FOR OPEN SIMULATOR***
 const OWNER_NAME: &str = "HTTP_X_SECONDLIFE_OWNER_NAME";
