@@ -12,15 +12,14 @@
 //
 #![forbid(unsafe_code)]
 use anyhow::{Error, anyhow};
-use chrono::{NaiveDateTime, Utc};
 use log::LevelFilter;
 use common::Credentials;
 use common::init_fcgi;
 use common::{Handler, Request, Response};
 use common::{UploadedRegionInfo};
 use common::u8_to_elev;
-use mysql::prelude::{AsStatement, Queryable};
-use mysql::{Conn, Opts, OptsBuilder, Pool};
+use mysql::prelude::{Queryable};
+use mysql::{Pool};
 use mysql::{PooledConn, params};
 use std::collections::HashMap;
 use std::io::Write;
@@ -183,7 +182,6 @@ impl TerrainUploadHandler {
             .get(OWNER_NAME)
             .ok_or_else(|| anyhow!("This request is not from Second Life/Open Simulator"))?
             .trim();
-        let samples = region_info.get_samples()?;
         let values = params! {
         "grid" => region_info.grid.clone(),
         "region_coords_x" => region_info.region_coords[0],
@@ -268,7 +266,6 @@ impl TerrainUploadHandler {
         region_info: UploadedRegionInfo,
         params: &HashMap<String, String>,
     ) -> Result<(usize, String), Error> {
-        let msg = format!("Region info:\n{:?}", region_info);
         let change_status = self.do_sql_unchanged_check(&region_info)?;
         log::warn!("Changed status for region {}: {:?}", region_info.name, change_status);
         match change_status {
