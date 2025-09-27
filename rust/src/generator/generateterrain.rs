@@ -214,7 +214,7 @@ impl TerrainGenerator {
 
     /// Generate name for impostor asset file.
     /// Format: R-x-y-lod-name
-    fn impostor_name(
+    fn old_impostor_name(
         region_coords_x: u32,
         region_coords_y: u32,
         lod: u8,
@@ -223,6 +223,24 @@ impl TerrainGenerator {
         let x = region_coords_x;
         let y = region_coords_y;
         format!("R-{}-{}-{}-{}", x, y, lod, impostor_name)
+    }
+    
+    /// Generate name for impostor asset file.
+    /// The name contains all the info we need to generate the impostor.
+    /// Format: R-x-y-sx-sy-sz-offset_lod-waterheight-name
+    fn impostor_name(
+        region: &RegionData,
+        height_field: &HeightField,
+        lod: u8,
+        name: &str,
+    ) -> Result<String, Error> {
+        let x = region.region_coords_x;
+        let y = region.region_coords_y;
+        let (scale, offset) = height_field.get_scale_offset()?;
+        let sx = region.size_x;
+        let sy = region.size_y;
+        let sz = scale;
+        Ok(format!("R-{}-{}-{}-{}-{:.2}-{:.2}-{}-{}", x, y, sx, sy, sz, offset, lod, name))
     }
 
     /// Build the impostor
@@ -302,11 +320,11 @@ impl TerrainGenerator {
                 region.region_coords_y,
             )?;
             let impostor_name = Self::impostor_name(
-                region.region_coords_x,
-                region.region_coords_y,
+                region,
+                &height_field,
                 lod,
                 &region.name,
-            );
+            )?;
             self.build_impostor(
                 region.region_coords_x,
                 region.region_coords_y,

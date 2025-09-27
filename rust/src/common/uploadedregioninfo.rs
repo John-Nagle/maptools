@@ -236,10 +236,32 @@ impl HeightField {
             size_y,
         })
     }
+    
+    /// Get scale and offset from heights
+    pub fn get_scale_offset(&self) -> Result<(f32, f32), Error> {
+        //  Calculate max and min.
+        if self.heights.column_len() == 0 {
+            return Err(anyhow!("Height field has no entries."));
+        }
+        let max = self
+            .heights
+            .elements_row_major_iter()
+            .max_by(|a, b| a.total_cmp(b))
+            .unwrap();
+        let min = self
+            .heights
+            .elements_row_major_iter()
+            .min_by(|a, b| a.total_cmp(b))
+            .unwrap();
+        //  Scale into 0..255
+        log::debug!("Height range:  {:5} .. {:5}", min, max);
+        Ok(elev_min_max_to_scale_offset(*min, *max))
+    }
 
     /// As one big flat u8 array.
     /// Returns scale, offset, values
     pub fn into_sculpt_array(&self) -> Result<(f32, f32, Vec<Vec<u8>>), Error> {
+/*
         //  Calculate max and min.
         if self.heights.column_len() == 0 {
             return Err(anyhow!("Height field has no entries."));
@@ -258,6 +280,8 @@ impl HeightField {
         log::debug!("Into sculpt array, range {:5} .. {:5}", min, max);
         //////let range = (max - min).max(0.001);
         let (scale, offset) = elev_min_max_to_scale_offset(*min, *max);
+*/
+        let (scale, offset) = self.get_scale_offset()?;
         let height_array = self
             .heights
             .as_rows()
@@ -270,8 +294,8 @@ impl HeightField {
             })
             .collect();
         ////////////let scale = 1.0 / range;
-        let offset = min;
-        Ok((scale, *offset, height_array))
+        //////let offset = min;
+        Ok((scale, offset, height_array))
     }
 }
 
