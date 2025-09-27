@@ -20,7 +20,7 @@ pub struct UploadedRegionInfo {
     pub size: Option<[u32; 2]>,
     /// Region name
     pub name: String,
-    /// Height data, a long set of hex data. Each string is one set of Y values.
+    /// Height data, a long set of hex data. Each string is one set of Y values. The outer array is indexed by X.
     pub elevs: Vec<String>,
     /// Scale factor for elevs
     pub scale: f32,
@@ -74,12 +74,12 @@ impl UploadedRegionInfo {
         }
     }
 
-    /// Get dimensions of elevation samples array
+    /// Get dimensions of elevation samples array. Result is X,Y
     pub fn get_samples(&self) -> Result<[u32; 2], Error> {
         if self.elevs.is_empty() {
             return Err(anyhow!("Elevation data is missing"));
         }
-        //  Validate that all rows are the same length
+        //  Validate that all rows are the same length. This is the number of Y entries.
         let rowlen = self.elevs[0].len() / 2; // it's a hex string, we want the byte count
         for row in &self.elevs {
             if row.len() != rowlen * 2 {
@@ -179,7 +179,8 @@ impl std::fmt::Display for HeightField {
 impl HeightField {
     /// New from elevs blob, the form used in SQL. One big blob, a flattened 2D array.
     /// size_x and size_y are size of the region, not the elevs data.
-    /// In the elevs blob, the X subscript goes fastest. 
+    /// In the elevs blob, the X subscript goes fastest. ***WRONG***
+    /// In the elevs blob, the Y subscript goes fastest.
     pub fn new_from_elevs_blob(
         elevs: &Vec<u8>,
         samples_x: u32,
@@ -202,7 +203,7 @@ impl HeightField {
         //////let iterator = (0..).map(|n| ((elevs[n] as f32) / 256.0) * scale + offset);
         let iterator = (0..).map(|n| { u8_to_elev(elevs[n], scale, offset) });
         let heights =
-            Array2D::from_iter_column_major(iterator, samples_x as usize, samples_y as usize)?;
+            Array2D::from_iter_row_major(iterator, samples_x as usize, samples_y as usize)?;
         Ok(Self {
             heights,
             size_x,
@@ -210,7 +211,7 @@ impl HeightField {
         })
     }
 
-    /// New from the 2D array of elevs we get from JSON
+    /// New from the 2D array of elevs we get from JSON - test only
     pub fn new_from_unscaled_elevs(
         elevs: &Vec<Vec<u8>>,
         size_x: u32,
@@ -221,10 +222,11 @@ impl HeightField {
         if elevs.is_empty() {
             return Err(anyhow!("Elevs array is empty."));
         }
+        //  Get Y length
         let row_length = elevs[0].len();
         let iterator = (0..).map(|n| {
-            let x = n % row_length;
-            let y = n / row_length;
+            let x = n / row_length;
+            let y = n % row_length;
             u8_to_elev(elevs[x][y], scale, offset)
         });
         let heights = Array2D::from_iter_row_major(iterator, row_length, elevs.len())?;
