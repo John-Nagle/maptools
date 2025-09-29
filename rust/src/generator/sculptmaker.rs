@@ -5,37 +5,37 @@
 // License: GPL
 
 use image::{Rgb, RgbImage};
-use serde::Deserialize;
-use serde_json;
+//////use serde::Deserialize;
+//////use serde_json;
 use std::cmp::{max, min};
-use std::env;
+//////use std::env;
 use std::f64;
-use std::fs::File;
-use std::io::{BufReader, Read};
-use std::path::Path;
-use std::process;
+//////use std::fs::File;
+//////use std::io::{BufReader, Read};
+//////use std::path::Path;
+//////use std::process;
 
 const SCULPTDIM: usize = 64; // Sculpt textures are always 64x64
 
 #[derive(Debug)]
 pub struct TerrainSculpt {
-    region: String,
+    //////region: String,
     pub image: Option<RgbImage>,
     elevs: Option<Vec<Vec<f64>>>,
     zheight: Option<f64>,
     zoffset: Option<f64>,
-    waterheight: Option<f64>,
+    //////waterheight: Option<f64>,
 }
 
 impl TerrainSculpt {
-    pub fn new(region: &str) -> Self {
+    pub fn new(_region: &str) -> Self {
         TerrainSculpt {
-            region: region.to_string(),
+            //////region: region.to_string(),
             image: None,
             elevs: None,
             zheight: None,
             zoffset: None,
-            waterheight: None,
+            //////waterheight: None,
         }
     }
 
@@ -99,14 +99,14 @@ impl TerrainSculpt {
                 let z2 = elevs[x1][y0];
                 let z3 = elevs[x1][y1];
 
-                let z = min(z0, min(z1, min(z2, z3))) as f64;
+                let z = max(z0, max(z1, max(z2, z3))) as f64;
                 newelevs[x][y] = z * (inputscale / 256.0) + inputoffset;
             }
         }
         self.elevs = Some(newelevs);
     }
 
-    fn pyramidtest(&mut self) {
+    fn _pyramidtest(&mut self) {
         let mut elevs = vec![vec![0.0; SCULPTDIM]; SCULPTDIM];
         let halfway = (SCULPTDIM as f64) * 0.5;
         for x in 0..SCULPTDIM {
@@ -120,7 +120,7 @@ impl TerrainSculpt {
         self.elevs = Some(elevs);
     }
 }
-
+/*
 fn unpackelev(elev: &str) -> Vec<u8> {
     (0..(elev.len() / 2))
         .map(|n| u8::from_str_radix(&elev[n * 2..n * 2 + 2], 16).unwrap())
@@ -192,3 +192,4 @@ fn main() {
 //         println!("Wrote {}", fname);
 //     }
 // }
+*/

@@ -172,5 +172,11 @@ Next steps:
    
    - Got sculpt display into Sharpview.
    - Sculpts are being generated with X and Y exchanged.
+   
+2023-09-29
+
+   Sculpt impostors working.
+   Need to generate sculpts with max, instead of min, so rocks
+   in water are above the water line.
       
       

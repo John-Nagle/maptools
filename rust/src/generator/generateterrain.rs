@@ -228,6 +228,7 @@ impl TerrainGenerator {
     /// Generate name for impostor asset file.
     /// The name contains all the info we need to generate the impostor.
     /// Format: R-x-y-sx-sy-sz-offset_lod-waterheight-name
+    //  ***ADD WATER HEIGHT***
     fn impostor_name(
         region: &RegionData,
         height_field: &HeightField,
