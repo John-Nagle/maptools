@@ -49,10 +49,12 @@ impl TerrainSculpt {
             println!("Z bounds: {:.2} to {:.2}", minz, maxz);
 
             let mut img = RgbImage::new(elevs.len() as u32, elevs[0].len() as u32);
-
+            let range = maxz - minz;
+            let range = range.max(0.001);   // avoid divide by 0 for flat terrain
             for x in 0..elevs.len() {
                 for y in 0..elevs[0].len() {
-                    let zscaled = (elevs[x][y] - minz) / (maxz - minz);
+                    //////let zscaled = (elevs[x][y] - minz) / (maxz - minz);
+                    let zscaled = (elevs[x][y] - minz) / range;
                     assert!(zscaled >= 0.0 && zscaled <= 1.0);
                     let zpixel = max(0, min(255, (zscaled * 256.0).floor() as i32)) as u8;
                     let xpixel = ((x as f64 * 256.0) / elevs.len() as f64).round() as u8;

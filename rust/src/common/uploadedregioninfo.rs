@@ -159,6 +159,8 @@ pub struct HeightField {
     pub size_x: u32,
     /// size of region, Y
     pub size_y: u32,
+    /// Water level for region. Here because of where the data comes from.
+    pub water_level: f32,
 }
 
 impl std::fmt::Display for HeightField {
@@ -189,6 +191,7 @@ impl HeightField {
         size_y: u32,
         scale: f32,
         offset: f32,
+        water_level: f32,
     ) -> Result<Self, Error> {
         log::debug!("New height field, scale {:5}, offset {:5}", scale, offset);
         if elevs.len() != (samples_x as usize) * (samples_y as usize) {
@@ -208,6 +211,7 @@ impl HeightField {
             heights,
             size_x,
             size_y,
+            water_level,
         })
     }
 
@@ -218,6 +222,7 @@ impl HeightField {
         size_y: u32,
         scale: f32,
         offset: f32,
+        water_level: f32,
     ) -> Result<Self, Error> {
         if elevs.is_empty() {
             return Err(anyhow!("Elevs array is empty."));
@@ -234,6 +239,7 @@ impl HeightField {
             heights,
             size_x,
             size_y,
+            water_level,
         })
     }
     
@@ -334,9 +340,9 @@ fn test_height_field() {
         vec![3u8, 4u8, 5u8],
         vec![6u8, 7u8, 8u8],
     ];
-    let hf_flat = HeightField::new_from_elevs_blob(&flattened, 3, 3, 256, 256, 256.0, 0.0)
+    let hf_flat = HeightField::new_from_elevs_blob(&flattened, 3, 3, 256, 256, 256.0, 0.0, 1.0)
         .expect("New from blob failed");
-    let hf_arrayform = HeightField::new_from_unscaled_elevs(&arrayform, 256, 256, 256.0, 0.0)
+    let hf_arrayform = HeightField::new_from_unscaled_elevs(&arrayform, 256, 256, 256.0, 0.0, 1.0)
         .expect("New from unsscaled elevs failed");
     println!("hf_flat: {:?}", hf_flat);
     println!("hf_arrayform: {:?}", hf_arrayform);

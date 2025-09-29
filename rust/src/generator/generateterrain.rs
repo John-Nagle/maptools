@@ -47,11 +47,9 @@ use sculptmaker::TerrainSculpt;
 ///     DB_PORT = portnumber (optional, defaults to 3306)
 ///     DB_NAME = databasename
 ///
+/// The table name is hard-coded.
+///
 const UPLOAD_CREDS_FILE: &str = "generate_credentials.txt";
-/// Default region size, used on grids that don't do varregions.
-const DEFAULT_REGION_SIZE: u32 = 256;
-/// Table name
-const RAW_TERRAIN_HEIGHTS: &str = "raw_terrain_heights";
 /// Environment variables for obtaining owner info.
 /// ***ADD VALUES FOR OPEN SIMULATOR***
 const OWNER_NAME: &str = "HTTP_X_SECONDLIFE_OWNER_NAME";
@@ -154,7 +152,7 @@ impl TerrainGenerator {
                 let _name_v: String = name;
                 let _water_level_v: f32 = water_level;
                 let height_field = HeightField::new_from_elevs_blob(
-                    &elevs, samples_x, samples_y, size_x, size_y, scale, offset,
+                    &elevs, samples_x, samples_y, size_x, size_y, scale, offset, water_level,
                 );
                 height_field
             },
@@ -210,8 +208,8 @@ impl TerrainGenerator {
             )?;
             todo!();
         }
-    */
-
+*/
+/*
     /// Generate name for impostor asset file.
     /// Format: R-x-y-lod-name
     fn old_impostor_name(
@@ -224,10 +222,10 @@ impl TerrainGenerator {
         let y = region_coords_y;
         format!("R-{}-{}-{}-{}", x, y, lod, impostor_name)
     }
-    
+*/    
     /// Generate name for impostor asset file.
     /// The name contains all the info we need to generate the impostor.
-    /// Format: R-x-y-sx-sy-sz-offset_lod-waterheight-name
+    /// Format: R_x_y_sx_sy_sz_offset_lod_waterlevel-name
     //  ***ADD WATER HEIGHT***
     fn impostor_name(
         region: &RegionData,
@@ -241,7 +239,8 @@ impl TerrainGenerator {
         let sx = region.size_x;
         let sy = region.size_y;
         let sz = scale;
-        Ok(format!("R-{}-{}-{}-{}-{:.2}-{:.2}-{}-{}", x, y, sx, sy, sz, offset, lod, name))
+        let water_level = height_field.water_level;
+        Ok(format!("R_{}_{}_{}_{}_{:.2}_{:.2}_{}_{:.2}_{}", x, y, sx, sy, sz, offset, lod, water_level, name))
     }
 
     /// Build the impostor
