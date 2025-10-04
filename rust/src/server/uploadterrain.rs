@@ -23,6 +23,8 @@ use mysql::{Pool};
 use mysql::{PooledConn, params};
 use std::collections::HashMap;
 use std::io::Write;
+mod auth;
+use auth::{Authorizer, AuthorizeType};
 
 /// MySQL Credentials for uploading.
 /// This filename will be searched for in parent directories,
@@ -306,6 +308,8 @@ impl Handler for TerrainUploadHandler {
                     .params
                     .as_ref()
                     .ok_or_else(|| anyhow!("No HTTP parameters found"))?;
+                //  Authorize
+                Authorizer::authorize(AuthorizeType::UploadTerrain, env, params)?;
                 //  Process. Error 500 if fail.
                 match self.process_request(req, &params) {
                     Ok((status, msg)) => {

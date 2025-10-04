@@ -177,6 +177,18 @@ Next steps:
 
    Sculpt impostors working.
    Need to generate sculpts with max, instead of min, so rocks
-   in water are above the water line.
+   in water are above the water line. [DONE]
+   
+2023-10-02
+
+   Wrote LSL script to look at uploaded sculpt textures and collect
+   info to send to server. Wrote SQL for region_impostor table.
+   Need to write Rust server to handle uploads and queries.
+   - Queries needed "what viz_group is this region in", 
+     "give me all JSON for this viz_group", and "give me all JSON".
+   - Upload needs some thought.
+     - Need authentication for upload.
+   
+   
       
       
