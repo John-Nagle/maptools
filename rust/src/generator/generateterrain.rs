@@ -240,7 +240,7 @@ impl TerrainGenerator {
         let sy = region.size_y;
         let sz = scale;
         let water_level = height_field.water_level;
-        Ok(format!("R_{}_{}_{}_{}_{:.2}_{:.2}_{}_{:.2}_{}", x, y, sx, sy, sz, offset, lod, water_level, name))
+        Ok(format!("RS_{}_{}_{}_{}_{:.2}_{:.2}_{}_{:.2}_{}", x, y, sx, sy, sz, offset, lod, water_level, name))
     }
 
     /// Build the impostor
