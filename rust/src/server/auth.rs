@@ -42,10 +42,10 @@ pub struct Authorizer {
 
 impl Authorizer {
     /// External caller requests permission to do something.
-    pub fn authorize(auth_type: AuthorizeType, env: &HashMap<String, String>, params: &HashMap<String, String>) -> Result<(), Error> {
+    pub fn authorize(auth_type: AuthorizeType, env: &HashMap<String, String>, params: &HashMap<String, String>) -> Result<String, Error> {
         if let Some(owner_name) =  OWNER_NAME_PARAMS.iter().find_map(|&s| params.get(s)) {
             log::info!("Request is from an object owned by {}", owner_name);
-            Ok(())   
+            Ok(owner_name.trim().to_string())   
         } else {
             Err(anyhow!("This request is not from Second Life/Open Simulator"))
         }

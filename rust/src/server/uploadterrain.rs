@@ -38,9 +38,6 @@ use auth::{Authorizer, AuthorizeType};
 ///     DB_NAME = databasename
 ///
 const UPLOAD_CREDS_FILE: &str = "upload_credentials.txt";
-/// Environment variables for obtaining owner info.
-/// ***ADD VALUES FOR OPEN SIMULATOR***
-const OWNER_NAME: &str = "HTTP_X_SECONDLIFE_OWNER_NAME";
 
 /// Debug logging
 fn logger() {
@@ -69,6 +66,8 @@ struct TerrainUploadHandler {
     pool: Pool,
     /// Active MySQL connection.
     conn: PooledConn,
+    /// Owner of object at other end
+    owner_name: Option<String>,
 }
 impl TerrainUploadHandler {
     /// Elevation error tolerance. Elevations are equal if within this tolerance.
@@ -78,7 +77,7 @@ impl TerrainUploadHandler {
     /// Usual new. Saves connection pool for use.
     pub fn new(pool: Pool) -> Result<Self, Error> {
         let conn = pool.get_conn()?;
-        Ok(Self { pool, conn })
+        Ok(Self { pool, conn, owner_name: None  })
     }
 
     /// SQL insert for new item
@@ -90,10 +89,9 @@ impl TerrainUploadHandler {
         const SQL_INSERT: &str = r"INSERT INTO raw_terrain_heights (grid, region_coords_x, region_coords_y, samples_x, samples_y, size_x, size_y, name, scale, offset, elevs,  water_level, creator) 
             VALUES
             (:grid, :region_coords_x, :region_coords_y, :samples_x, :samples_y, :size_x, :size_y, :name, :scale, :offset, :elevs, :water_level, :creator)";
-        let creator = params
-            .get(OWNER_NAME)
-            .ok_or_else(|| anyhow!("This request is not from Second Life/Open Simulator"))?
-            .trim();
+        let creator = &self.owner_name
+            .as_ref()
+            .ok_or_else(|| anyhow!("No owner name from auth"))?;    // should fail upstream, not here.
         let samples = region_info.get_samples()?;
         let values = params! {
         //////"table" => RAW_TERRAIN_HEIGHTS,
@@ -126,10 +124,9 @@ impl TerrainUploadHandler {
             SET samples_x = :samples_x, samples_y = :samples_y, scale = :scale, offset = :offset, elevs = :elevs, water_level = :water_level, creator = :creator,
                 size_x = :size_x, size_y = :size_y, name = :name, confirmation_time = NOW(), confirmer = NULL
             WHERE LOWER(grid) = :grid AND region_coords_x = :region_coords_x AND region_coords_y = :region_coords_y";           
-        let creator = params
-            .get(OWNER_NAME)
-            .ok_or_else(|| anyhow!("This request is not from Second Life/Open Simulator"))?
-            .trim();
+        let creator = &self.owner_name
+            .as_ref()
+            .ok_or_else(|| anyhow!("No owner name from auth"))?;    // should fail upstream, not here.
         let samples = region_info.get_samples()?;
         let values = params! {
         "grid" => region_info.grid.clone(),
@@ -180,10 +177,9 @@ impl TerrainUploadHandler {
         const SQL_CONFIRMATION_UPDATE: &str = r"UPDATE raw_terrain_heights
             SET confirmation_time = NOW(), confirmer = :confirmer
             WHERE LOWER(grid) = :grid AND region_coords_x = :region_coords_x AND region_coords_y = :region_coords_y";           
-        let confirmer = params
-            .get(OWNER_NAME)
-            .ok_or_else(|| anyhow!("This request is not from Second Life/Open Simulator"))?
-            .trim();
+        let confirmer = &self.owner_name
+            .as_ref()
+            .ok_or_else(|| anyhow!("No owner name from auth"))?;    // should fail upstream, not here.
         let values = params! {
         "grid" => region_info.grid.clone(),
         "region_coords_x" => region_info.region_coords[0],
@@ -309,7 +305,7 @@ impl Handler for TerrainUploadHandler {
                     .as_ref()
                     .ok_or_else(|| anyhow!("No HTTP parameters found"))?;
                 //  Authorize
-                Authorizer::authorize(AuthorizeType::UploadTerrain, env, params)?;
+                self.owner_name = Some(Authorizer::authorize(AuthorizeType::UploadTerrain, env, params)?);
                 //  Process. Error 500 if fail.
                 match self.process_request(req, &params) {
                     Ok((status, msg)) => {
