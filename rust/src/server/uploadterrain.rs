@@ -304,6 +304,12 @@ impl Handler for TerrainUploadHandler {
                     .params
                     .as_ref()
                     .ok_or_else(|| anyhow!("No HTTP parameters found"))?;
+                //  This must be a POST
+                if let Some(request_method) = params.get("REQUEST_METHOD") {               
+                    return Err(anyhow!("Request method \"{}\" was not POST.", request_method));
+                } else {
+                    return Err(anyhow!("No HTTP request method."));
+                }
                 //  Authorize
                 self.owner_name = Some(Authorizer::authorize(AuthorizeType::UploadTerrain, env, params)?);
                 //  Process. Error 500 if fail.
