@@ -188,6 +188,11 @@ Next steps:
      "give me all JSON for this viz_group", and "give me all JSON".
    - Upload needs some thought.
      - Need authentication for upload.
+     
+2023-10-04
+
+   Beginning of impostor upload code.
+   Find out why "Siren's Isle" came through as "Sirens".
    
    
       
