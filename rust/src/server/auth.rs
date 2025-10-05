@@ -25,6 +25,11 @@ use mysql::{PooledConn, params};
 
 */
 
+/// Environment variables for obtaining owner info.
+/// ***ADD VALUES FOR OPEN SIMULATOR***
+const OWNER_NAME_PARAMS: [&str;1] = ["HTTP_X_SECONDLIFE_OWNER_NAME"];
+
+
 pub enum AuthorizeType {
     /// Upload terrain. Can add and update terrain data.
     UploadTerrain,
@@ -38,6 +43,11 @@ pub struct Authorizer {
 impl Authorizer {
     /// External caller requests permission to do something.
     pub fn authorize(auth_type: AuthorizeType, env: &HashMap<String, String>, params: &HashMap<String, String>) -> Result<(), Error> {
-        Ok(())  // ***TEMP***
+        if let Some(owner_name) =  OWNER_NAME_PARAMS.iter().find_map(|&s| params.get(s)) {
+            log::info!("Request is from an object owned by {}", owner_name);
+            Ok(())   
+        } else {
+            Err(anyhow!("This request is not from Second Life/Open Simulator"))
+        }
     }
 }
