@@ -36,5 +36,39 @@ mod auth;
 use auth::{Authorizer, AuthorizeType};
 */
 
+/*
+CREATE TABLE IF NOT EXISTS region_impostors (
+    grid VARCHAR(40) NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    region_loc_x INT NOT NULL,
+    region_loc_y INT NOT NULL,
+    region_size_x INT NOT NULL,
+    region_size_y INT NOT NULL,
+    scale_x INT NOT NULL,
+    scale_y INT NOT NULL,
+    scale_z FLOAT NOT NULL,
+    elevation_offset FLOAT NOT NULL,
+    impostor_lod TINYINT NOT NULL,
+    viz_group INT NOT NULL,
+    mesh_uuid CHAR(40) DEFAULT NULL,
+    sculpt_uuid CHAR(36) DEFAULT NULL,
+    water_height FLOAT NOT NULL,
+    creator VARCHAR(63) NOT NULL,
+    creation_time TIMESTAMP NOT NULL,
+    faces_json JSON NOT NULL,
+    UNIQUE INDEX (grid, region_loc_x, region_loc_y, impostor_lod),
+    INDEX(grid, viz_group),
+    INDEX(name)
+)
+
+-- What to do about faces? Another table? Or 8 slots here?
+-- "faces": [ 
+-- { "base_texture_uuid": "acde070d-8c4c-4f0d-9d8a-162843c10333",
+-- "emissive_texture_uuid": null
+ }
+ 
+ Use struct from https://github.com/John-Nagle/SL-test-viewer/blob/main/libclient/src/impostor/regionimpostor.rs#L480
+ */
+ 
 
 

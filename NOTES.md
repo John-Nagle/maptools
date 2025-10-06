@@ -193,6 +193,7 @@ Next steps:
 
    Beginning of impostor upload code.
    Find out why "Siren's Isle" came through as "Sirens".
+   Parse enums like this: https://play.rust-lang.org/?version=stable&mode=debug&edition=2024&gist=3c43bd9041eb567dbf974c8519ef10d7
    
    
       
