@@ -31,7 +31,7 @@ use common::Credentials;
 use common::init_fcgi;
 use common::{Handler, Request, Response};
 use common::{UploadedRegionInfo};
-use common::{RegionImpostorData, RegionImpostorFaceData, RegionImpostorLod};
+use common::{RegionImpostorData, RegionImpostorLod};
 use common::u8_to_elev;
 use mysql::prelude::{Queryable};
 use mysql::{Pool};
