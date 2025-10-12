@@ -58,15 +58,15 @@ pub struct RegionImpostorData {
     pub water_height: Option<f32>,
     /// Grid -- name of associated grid
     pub grid: String,
-    /// Faces
-    pub faces: Vec<RegionImpostorFaceData>,
+    /// Faces (as JSON)
+    pub faces: String, //////Vec<RegionImpostorFaceData>,
 }
 
 pub type RegionImpostorLod = u8;
 
 impl RegionImpostorData {
 }
-
+/*
 /// Data for each face.
 #[derive(Deserialize, Debug, Clone)]
 pub struct RegionImpostorFaceData {
@@ -80,3 +80,4 @@ pub struct RegionImpostorFaceData {
 impl RegionImpostorFaceData {
 
 }
+*/

@@ -31,6 +31,7 @@ use common::Credentials;
 use common::init_fcgi;
 use common::{Handler, Request, Response};
 use common::{UploadedRegionInfo};
+use common::{RegionImpostorData, RegionImpostorFaceData, RegionImpostorLod};
 use common::u8_to_elev;
 use mysql::prelude::{Queryable};
 use mysql::{Pool};
@@ -266,7 +267,7 @@ impl TerrainDownloadHandler {
     }
     
     /// Build the SQL query statement.
-    fn build_sql_query(params: &HashMap<String, String>) -> Result<String, Error> {
+    fn build_sql_query(params: &HashMap<String, String>) -> Result<(String, String, Option<(u32, u32)>, Option<u32>), Error> {
         //  Parse URL parameters.  Build WHILE part.
         let query_string = params.get("QUERY_STRING").ok_or_else(|| anyhow!("No QUERY_STRING from FCGI"))?;
         let query_vec = querystring::querify(query_string);
@@ -308,7 +309,25 @@ impl TerrainDownloadHandler {
         const SELECT_PART: &str = "grid, region_loc_x, region_loc_y, name, region_size_x, region_size_y, scale_x, scale_y, scale_z, \
         elevation_offset, impostor_lod, viz_group, mesh_uuid, sculpt_uuid, water_height, creator, creation_time, faces_json FROM region_impostors ";
         let priority = if where_clause.is_empty() { " LOW PRIORITY ". to_string() } else { "".to_string() };
-        Ok(format!("SELECT {}{} WHERE {} ORDER BY grid, region_loc_x, region_loc_y", SELECT_PART, priority, where_clause))
+        let stmt = format!("SELECT {}{} WHERE {} ORDER BY grid, region_loc_x, region_loc_y", SELECT_PART, priority, where_clause);
+        Ok((stmt, grid.clone(), coords_opt, viz_group_opt))
+    }
+    
+    /// Select the desired items and generate JSON.
+    fn do_select(&mut self, params: &HashMap<String, String>) -> Result<(), Error> {
+        // Build SELECT statement and get params
+        let (stmt, grid, coords_opt, viz_group_opt) = Self::build_sql_query(params)?;
+        let viz_group = if let Some(viz_group) = viz_group_opt { viz_group } else { 0 };
+        let (region_coords_x, region_coords_y) = if let Some(coords) = coords_opt { (coords.0, coords.1) } else { (0, 0) };
+        let _all_regions = self.conn.exec_map(
+            stmt,
+            params! { grid, region_coords_x, region_coords_y, viz_group },
+            |(grid, region_loc_x, region_loc_y, name, region_size_x, region_size_y, scale_x, scale_y, scale_z,
+                elevation_offset, impostor_lod, viz_group, mesh_uuid, sculpt_uuid, water_height, creator, creation_time, faces_json)| {
+                // ***MORE***
+            },
+        )?;
+        todo!();
     }
 
     /// Handle request.
