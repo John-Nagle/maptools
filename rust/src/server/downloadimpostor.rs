@@ -297,16 +297,15 @@ impl TerrainDownloadHandler {
         
         //  There are three cases.
         let where_clause = if let Some(viz_group) = viz_group_opt {
-            format!("WHERE viz_group = {}", viz_group)
+            "grid = : grid AND viz_group = : viz_group"
         } else if let Some(coords) = coords_opt {
-            format!("WHERE region_loc_x = {} AND region_loc_y = {}", coords.0, coords.1)
+            "grid = : grid AND region_loc_x = :region_loc_x AND region_loc_y = : region_loc_y"
         }
         else {
-            "".to_string()      
+            ""   
         };
         log::info!("Query: grid: {} coords {:?}  viz_group: {:?}, WHERE clause: {}", grid, coords_opt, viz_group_opt, where_clause);
-        //  ***VULNERABLE TO SQL INJECTION IN GRID***
-        const SELECT_PART: &str = "SELECT grid, region_loc_x, region_loc_y, name, region_size_x, region_size_y, scale_x, scale_y, scale_z, \
+        const SELECT_PART: &str = "grid, region_loc_x, region_loc_y, name, region_size_x, region_size_y, scale_x, scale_y, scale_z, \
         elevation_offset, impostor_lod, viz_group, mesh_uuid, sculpt_uuid, water_height, creator, creation_time, faces_json FROM region_impostors ";
         let priority = if where_clause.is_empty() { " LOW PRIORITY ". to_string() } else { "".to_string() };
         Ok(format!("SELECT {}{} WHERE {} ORDER BY grid, region_loc_x, region_loc_y", SELECT_PART, priority, where_clause))
