@@ -37,8 +37,6 @@ use mysql::{Pool};
 use mysql::{PooledConn, params};
 use std::collections::HashMap;
 use std::io::Write;
-mod auth;
-use auth::{Authorizer, AuthorizeType};
 
 /// MySQL Credentials for uploading.
 /// This filename will be searched for in parent directories,
@@ -265,6 +263,53 @@ impl TerrainDownloadHandler {
         log::info!("Uploaded JSON:\n{}", s);
         //  Should be valid JSON
         Ok(UploadedRegionInfo::parse(s)?)
+    }
+    
+    /// Build the SQL query statement.
+    fn build_sql_query(params: &HashMap<String, String>) -> Result<String, Error> {
+        //  Parse URL parameters.  Build WHILE part.
+        let query_string = params.get("QUERY_STRING").ok_or_else(|| anyhow!("No QUERY_STRING from FCGI"))?;
+        let query_vec = querystring::querify(query_string);
+        let query_params: HashMap<String, String> = query_vec.iter().map(|(k, v)| (k.to_lowercase().trim().to_string(), v.to_string())).collect();
+        //  Parameters are
+        //      grid
+        //      x
+        //      y
+        //      viz_group
+        //  Grid is mandatory, others are optional.
+        let grid = query_params.get("grid").ok_or_else(|| anyhow!("No \"grid\" parameter in HTTP request"))?;
+        let coords_opt: Option<(u32, u32)> = {
+            if let Some(x) = query_params.get("x") {            
+                if let Some(y) = query_params.get("y") {
+                    Some((x.parse()?, y.parse()?))
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        };
+        let viz_group_opt: Option<u32> = if let Some(vg) = query_params.get("viz_group") {
+            Some(vg.parse()?)
+        } else {
+            None
+        };
+        
+        //  There are three cases.
+        let where_clause = if let Some(viz_group) = viz_group_opt {
+            format!("WHERE viz_group = {}", viz_group)
+        } else if let Some(coords) = coords_opt {
+            format!("WHERE region_loc_x = {} AND region_loc_y = {}", coords.0, coords.1)
+        }
+        else {
+            "".to_string()      
+        };
+        log::info!("Query: grid: {} coords {:?}  viz_group: {:?}, WHERE clause: {}", grid, coords_opt, viz_group_opt, where_clause);
+        //  ***VULNERABLE TO SQL INJECTION IN GRID***
+        const SELECT_PART: &str = "SELECT grid, region_loc_x, region_loc_y, name, region_size_x, region_size_y, scale_x, scale_y, scale_z, \
+        elevation_offset, impostor_lod, viz_group, mesh_uuid, sculpt_uuid, water_height, creator, creation_time, faces_json FROM region_impostors ";
+        let priority = if where_clause.is_empty() { " LOW PRIORITY ". to_string() } else { "".to_string() };
+        Ok(format!("SELECT {}{} WHERE {} ORDER BY grid, region_loc_x, region_loc_y", SELECT_PART, priority, where_clause))
     }
 
     /// Handle request.
