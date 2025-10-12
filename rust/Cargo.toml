@@ -16,6 +16,17 @@ harness = true         # Use libtest harness.
 required-features = [] # Features required to build this target (N/A for lib).
 
 [[bin]]
+name = "downloadimpostor"           # The name of the target.
+path = "src/server/downloadimpostor.rs"    # The source file of the target.
+# description = "This becomes downloadimpostor.fcgi and runs on an Apache server under mod_fcgid"
+test = true            # Is tested by default.
+doctest = true         # Documentation examples are tested by default.
+doc = true             # Is documented by default.
+proc-macro = false     # Set to `true` for a proc-macro library.
+harness = true         # Use libtest harness.
+required-features = [] # Features required to build this target (N/A for lib).
+
+[[bin]]
 name = "generateterrain"           # The name of the target.
 path = "src/generator/generateterrain.rs"    # The source file of the target.
 # description = "This is a command line client which builds a directory of images and meshes to be uploaded to Second Life/Open Simulator"
