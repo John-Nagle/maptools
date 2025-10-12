@@ -57,7 +57,7 @@ const DOWNLOAD_CREDS_FILE: &str = "download_credentials.txt";
 fn logger() {
     //  Log file is openly visible as a web page.
     //  Only for debug tests.
-    const LOG_FILE_NAME: &str = "logs/updatelog.txt";
+    const LOG_FILE_NAME: &str = "logs/downloadlog.txt";
     let _ = simplelog::CombinedLogger::init(vec![simplelog::WriteLogger::new(
         LevelFilter::Debug,
         simplelog::Config::default(),
@@ -278,6 +278,22 @@ impl TerrainDownloadHandler {
         region_info: UploadedRegionInfo,
         params: &HashMap<String, String>,
     ) -> Result<(usize, String), Error> {
+        //  Parse URL parameters.
+        let query_string = params.get("QUERY_STRING").ok_or_else(|| anyhow!("No QUERY_STRING from FCGI"))?;
+        let query_vec = querystring::querify(query_string);
+        let query_params: HashMap<String, String> = query_vec.iter().map(|(k, v)| (k.to_lowercase().trim().to_string(), v.to_string())).collect();
+        //  Parameters are
+        //      grid
+        //      x
+        //      y
+        //      viz_group
+        //  Grid is mandatory
+        let grid = query_params.get("grid").ok_or_else(|| anyhow!("No \"grid\" parameter in HTTP request"))?;
+        let x = query_params.get("x");
+        let y = query_params.get("y");
+        let viz_group = query_params.get("viz_group");
+        log::info!("Query: grid: {} x: {:?}  y: {:?}  viz_group: {:?}", grid, x, y, viz_group);
+/*
         let change_status = self.do_sql_unchanged_check(&region_info)?;
         log::warn!("Changed status for region {}: {:?}", region_info.name, change_status);
         match change_status {
@@ -299,6 +315,8 @@ impl TerrainDownloadHandler {
                 Ok((200, "Change to region".to_string()))
             }
         }
+ */
+    todo!();
     }
 }
 //  Our "handler"
@@ -318,14 +336,14 @@ impl Handler for TerrainDownloadHandler {
                     .params
                     .as_ref()
                     .ok_or_else(|| anyhow!("No HTTP parameters found"))?;
-                //  This must be a POST
-                if let Some(request_method) = params.get("REQUEST_METHOD") {               
-                    return Err(anyhow!("Request method \"{}\" was not POST.", request_method));
+                //  This must be a GET
+                if let Some(request_method) = params.get("REQUEST_METHOD") {   
+                    if request_method.to_uppercase().trim() != "GET" {             
+                        return Err(anyhow!("Request method \"{}\" was not GET.", request_method));
+                    }            
                 } else {
                     return Err(anyhow!("No HTTP request method."));
                 }
-                //  Authorize
-                self.owner_name = Some(Authorizer::authorize(AuthorizeType::UploadTerrain, env, params)?);
                 //  Process. Error 500 if fail.
                 match self.process_request(req, &params) {
                     Ok((status, msg)) => {
@@ -414,11 +432,3 @@ pub fn main() {
     }
 }
 
-#[test]
-fn parse_terrain() {
-    const TEST_JSON: &str = "{\"grid\":\"agni\",\"name\":\"Vallone\",\"scale\":1.092822,\"offset\":33.500740,\"water_lev\":20.000000,\"region_coords\":[1807,1199],\"elevs\":[\"E7CAACA3A5A8ACAEB0B2B5B9BDC0C4C5C5C3C0BDB9B6B3B2B2B3B4B7BBBFC3C7CBCED1D3\"]}";
-    println!("TEST_JSON: {}", TEST_JSON);
-    let parsed = UploadedRegionInfo::parse(TEST_JSON).expect("JSON misparsed");
-    println!("Parsed JSON: {:?}", parsed);
-    println!("Elevs: {:?}", parsed.get_unscaled_elevs());
-}

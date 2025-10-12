@@ -305,8 +305,10 @@ impl Handler for TerrainUploadHandler {
                     .as_ref()
                     .ok_or_else(|| anyhow!("No HTTP parameters found"))?;
                 //  This must be a POST
-                if let Some(request_method) = params.get("REQUEST_METHOD") {               
-                    return Err(anyhow!("Request method \"{}\" was not POST.", request_method));
+                if let Some(request_method) = params.get("REQUEST_METHOD") {  
+                    if request_method.to_uppercase().trim() != "POST" {             
+                        return Err(anyhow!("Request method \"{}\" was not POST.", request_method));
+                    }
                 } else {
                     return Err(anyhow!("No HTTP request method."));
                 }
