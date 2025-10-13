@@ -317,11 +317,12 @@ impl TerrainDownloadHandler {
     /// Select the desired items and generate JSON.
     fn do_select(&mut self, params: &HashMap<String, String>) -> Result<(), Error> {
         //  Convert UUIDs, return None if fail.
-        fn convert_uuid(s_opt: Option<String>) -> Uuid {
+        fn convert_uuid(s_opt: Option<String>) -> Option<Uuid> {
             if let Some(s) = s_opt {
-                match try_parse(s) {
-                    Ok(u) => Some(uuid),
+                match Uuid::try_parse(&s) {
+                    Ok(u) => Some(u),
                     Err(_) => None
+                }
             } else {
                 None
             }
@@ -336,6 +337,7 @@ impl TerrainDownloadHandler {
             |(grid, region_loc_x, region_loc_y, name, region_size_x, region_size_y, scale_x, scale_y, scale_z,
                 elevation_offset, impostor_lod, viz_group, mesh_uuid, sculpt_uuid, water_height, creator, creation_time, faces_json)| {
                 // ***MORE***
+                let faces_json: String = faces_json;    // type info
                 let rd = RegionImpostorData {
                     grid,
                     region_loc: [region_loc_x, region_loc_y],
@@ -348,7 +350,8 @@ impl TerrainDownloadHandler {
                     mesh_uuid: convert_uuid(mesh_uuid),
                     sculpt_uuid: convert_uuid(sculpt_uuid),
                     water_height,
-                    faces_json,            
+                    faces: "".to_string(), // ***TEMP***
+                    //////faces_json,            
                 };
             },
         )?;
