@@ -199,6 +199,7 @@ Next steps:
 
    Doing read from database for impostor data.
    - Fix length of uuid field in "regionimpostors" in database.
+   - "MySQL" statement generator only allows up to 12 fields, and I have 18. Bleah.
    
       
       

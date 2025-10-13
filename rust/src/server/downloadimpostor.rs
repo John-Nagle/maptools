@@ -84,173 +84,12 @@ struct TerrainDownloadHandler {
     owner_name: Option<String>,
 }
 impl TerrainDownloadHandler {
-    /// Elevation error tolerance. Elevations are equal if within this tolerance.
-    /// LSL llGround is slightly noisy.
-    const ELEV_ERROR_TOLERANCE: f32 = 0.5;
 
     /// Usual new. Saves connection pool for use.
     pub fn new(pool: Pool) -> Result<Self, Error> {
         let conn = pool.get_conn()?;
         Ok(Self { pool, conn, owner_name: None  })
     }
-
-    /// SQL insert for new item
-    fn do_sql_insert(
-        &mut self,
-        region_info: &UploadedRegionInfo,
-        params: &HashMap<String, String>,
-    ) -> Result<(), Error> {
-        const SQL_INSERT: &str = r"INSERT INTO raw_terrain_heights (grid, region_coords_x, region_coords_y, samples_x, samples_y, size_x, size_y, name, scale, offset, elevs,  water_level, creator) 
-            VALUES
-            (:grid, :region_coords_x, :region_coords_y, :samples_x, :samples_y, :size_x, :size_y, :name, :scale, :offset, :elevs, :water_level, :creator)";
-        let creator = &self.owner_name
-            .as_ref()
-            .ok_or_else(|| anyhow!("No owner name from auth"))?;    // should fail upstream, not here.
-        let samples = region_info.get_samples()?;
-        let values = params! {
-        //////"table" => RAW_TERRAIN_HEIGHTS,
-        "grid" => region_info.grid.clone(),
-        "region_coords_x" => region_info.region_coords[0],
-        "region_coords_y" => region_info.region_coords[1],
-        "size_x" => region_info.get_size()[0],
-        "size_y" => region_info.get_size()[1],
-        "name" => region_info.name.clone(),
-        "scale" => region_info.scale,
-        "offset" => region_info.offset,	
-        "elevs" => region_info.get_elevs_as_blob()?,
-        "samples_x" => samples[0],
-        "samples_y" => samples[1],
-        "water_level" => region_info.water_lev,
-        "creator" => creator };
-        log::debug!("SQL insert: {:?}", values);
-        self.conn.exec_drop(SQL_INSERT, values)?;
-        log::debug!("SQL insert succeeded.");
-        Ok(())
-    }
-    
-    /// SQL insert for new item. Replaces entire record
-    fn do_sql_full_update(
-        &mut self,
-        region_info: &UploadedRegionInfo,
-        params: &HashMap<String, String>,
-    ) -> Result<(), Error> {
-        const SQL_FULL_UPDATE: &str = r"UPDATE raw_terrain_heights 
-            SET samples_x = :samples_x, samples_y = :samples_y, scale = :scale, offset = :offset, elevs = :elevs, water_level = :water_level, creator = :creator,
-                size_x = :size_x, size_y = :size_y, name = :name, confirmation_time = NOW(), confirmer = NULL
-            WHERE LOWER(grid) = :grid AND region_coords_x = :region_coords_x AND region_coords_y = :region_coords_y";           
-        let creator = &self.owner_name
-            .as_ref()
-            .ok_or_else(|| anyhow!("No owner name from auth"))?;    // should fail upstream, not here.
-        let samples = region_info.get_samples()?;
-        let values = params! {
-        "grid" => region_info.grid.clone(),
-        "region_coords_x" => region_info.region_coords[0],
-        "region_coords_y" => region_info.region_coords[1],
-        "size_x" => region_info.get_size()[0],
-        "size_y" => region_info.get_size()[1],
-        "name" => region_info.name.clone(),
-        "scale" => region_info.scale,
-        "offset" => region_info.offset,	
-        "elevs" => region_info.get_elevs_as_blob()?,
-        "samples_x" => samples[0],
-        "samples_y" => samples[1],
-        "water_level" => region_info.water_lev,
-        "creator" => creator };
-        log::debug!("SQL update: {:?}", values);
-        self.conn.exec_drop(SQL_FULL_UPDATE, values)?;
-        log::debug!("SQL update succeeded.");
-        Ok(())
-    }
-    
-    /// Compare elevations within tolerance.
-    /// LSL llGround is not totally repeatable.  We have to allow some error.
-    fn check_elev_err_within_tolerance(elevs0: &[u8], elevs1: &[u8], scale: f32, offset: f32, tolerance: f32) -> bool {
-        let elev_err = |a: u8, b: u8| (u8_to_elev(a, scale, offset) - u8_to_elev(b, scale, offset)).abs();
-        let max_err_item_opt = elevs0.iter().zip(elevs1).max_by(|(a0, b0), (a1, b1)| {
-            let aerr = elev_err(**a0, **b0);
-            let berr = elev_err(**a1, **b1);
-            aerr.total_cmp(&berr)
-        });
-        if let Some(max_err_item) = max_err_item_opt {
-            let max_err = elev_err(*max_err_item.0, *max_err_item.1);
-            if max_err > tolerance {
-                log::warn!("Elevations differ by {:5}", max_err);
-            }
-            max_err < tolerance
-        } else {
-            // Not equal
-            false 
-        }
-    }
-    
-    fn do_sql_confirmation_update(
-        &mut self,
-        region_info: &UploadedRegionInfo,
-        params: &HashMap<String, String>,
-    ) -> Result<(), Error> {
-        const SQL_CONFIRMATION_UPDATE: &str = r"UPDATE raw_terrain_heights
-            SET confirmation_time = NOW(), confirmer = :confirmer
-            WHERE LOWER(grid) = :grid AND region_coords_x = :region_coords_x AND region_coords_y = :region_coords_y";           
-        let confirmer = &self.owner_name
-            .as_ref()
-            .ok_or_else(|| anyhow!("No owner name from auth"))?;    // should fail upstream, not here.
-        let values = params! {
-        "grid" => region_info.grid.clone(),
-        "region_coords_x" => region_info.region_coords[0],
-        "region_coords_y" => region_info.region_coords[1],
-        "confirmer" => confirmer };
-        log::debug!("SQL confirmation update: {:?}", values);
-        self.conn.exec_drop(SQL_CONFIRMATION_UPDATE, values)?;
-        log::debug!("SQL confirmation update succeeded.");
-        Ok(())
-    }
-    
-    /// Is this a duplicate?
-    fn do_sql_unchanged_check(
-        &mut self,
-        region_info: &UploadedRegionInfo,
-    ) -> Result<ChangeStatus, Error> {
-        
-        let samples = region_info.get_samples()?;
-        let grid = &region_info.grid;
-        let region_coords_x = region_info.region_coords[0];
-        let region_coords_y = region_info.region_coords[1];
-        let new_elevs= region_info.get_elevs_as_blob()?;
-        const SQL_SELECT: &str = r"SELECT size_x, size_y, samples_x, samples_y, scale, offset, elevs, name, water_level
-            FROM raw_terrain_heights
-            WHERE LOWER(grid) = :grid AND region_coords_x = :region_coords_x AND region_coords_y = :region_coords_y";
-        let is_sames = self.conn.exec_map(
-            SQL_SELECT,
-            params! { grid, region_coords_x, region_coords_y },
-            |(size_x, size_y, samples_x, samples_y, scale, offset, elevs, name, water_level) : (u32, u32, u32, u32, f32, f32, Vec<u8>, String, f32)| {
-                //  Is the stored data identical to what we just read from the region?
-                log::trace!("Elevs:\n{:?} vs\n{:?}", elevs, new_elevs); // ***TEMP***
-                let is_same = 
-                    size_x == region_info.get_size()[0] && 
-                    size_y == region_info.get_size()[1] &&
-                    samples_x == samples[0] && 
-                    samples_y == samples[1] &&
-                    (scale - region_info.scale).abs() < Self::ELEV_ERROR_TOLERANCE  &&
-                    (offset - region_info.offset).abs() < Self::ELEV_ERROR_TOLERANCE &&
-                    Self::check_elev_err_within_tolerance(&elevs, &new_elevs, scale, offset, Self::ELEV_ERROR_TOLERANCE) &&
-                    name == region_info.name &&
-                    water_level == region_info.water_lev;                    
-                is_same
-            },
-        )?;
-        //  Changed?
-        Ok(if is_sames.is_empty() {
-            ChangeStatus::None
-        } else {
-            //  Must be 1, because of SELECT on unique key.
-            assert!(is_sames.len() == 1);
-            if is_sames[0] {
-                ChangeStatus::NoChange
-            } else {
-                ChangeStatus::Changed
-            }
-        })
-    }  
 
     /// Parse a request
     fn parse_request(
@@ -298,9 +137,9 @@ impl TerrainDownloadHandler {
         };
         
         //  There are three cases.
-        let where_clause = if let Some(viz_group) = viz_group_opt {
+        let where_clause = if viz_group_opt.is_some() {
             "grid = : grid AND viz_group = : viz_group"
-        } else if let Some(coords) = coords_opt {
+        } else if coords_opt.is_some() {
             "grid = : grid AND region_loc_x = :region_loc_x AND region_loc_y = : region_loc_y"
         }
         else {
@@ -337,7 +176,12 @@ impl TerrainDownloadHandler {
             |(grid, region_loc_x, region_loc_y, name, region_size_x, region_size_y, scale_x, scale_y, scale_z,
                 elevation_offset, impostor_lod, viz_group, mesh_uuid, sculpt_uuid, water_height, creator, creation_time, faces_json)| {
                 // ***MORE***
-                let faces_json: String = faces_json;    // type info
+                let impostor_lod: u8 = impostor_lod;
+                let faces_json: String = faces_json;    // JSON as a string.
+                let _creator: String = creator;
+                let _creation_time: String = creation_time; // needs to be a timestamp object compatible with the SQL package.
+                let region_loc_x: u32 = region_loc_x;
+                //////let grid: String = grid;
                 let rd = RegionImpostorData {
                     grid,
                     region_loc: [region_loc_x, region_loc_y],
