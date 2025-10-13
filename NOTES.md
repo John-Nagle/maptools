@@ -159,7 +159,7 @@ Next steps:
    Generated a valid impostor sculpt. Now need to generate JSON file.
    Also need to re-capture all the elevs; the data is bad.
   
-2023-09-26
+2025-09-26
 
    Data collection looks good. Manually generated sculpts look good.
    Need some kind of authentication for the capture script.
@@ -173,13 +173,13 @@ Next steps:
    - Got sculpt display into Sharpview.
    - Sculpts are being generated with X and Y exchanged.
    
-2023-09-29
+2025-09-29
 
    Sculpt impostors working.
    Need to generate sculpts with max, instead of min, so rocks
    in water are above the water line. [DONE]
    
-2023-10-02
+2025-10-02
 
    Wrote LSL script to look at uploaded sculpt textures and collect
    info to send to server. Wrote SQL for region_impostor table.
@@ -189,12 +189,16 @@ Next steps:
    - Upload needs some thought.
      - Need authentication for upload.
      
-2023-10-04
+2025-10-04
 
    Beginning of impostor upload code.
    Find out why "Siren's Isle" came through as "Sirens".
    Parse enums like this: https://play.rust-lang.org/?version=stable&mode=debug&edition=2024&gist=3c43bd9041eb567dbf974c8519ef10d7
    
+2025-10-12
+
+   Doing read from database for impostor data.
+   - Fix length of uuid field in "regionimpostors" in database.
    
       
       

@@ -27,6 +27,7 @@
 #![forbid(unsafe_code)]
 use anyhow::{Error, anyhow};
 use log::LevelFilter;
+use uuid::Uuid;
 use common::Credentials;
 use common::init_fcgi;
 use common::{Handler, Request, Response};
@@ -315,6 +316,16 @@ impl TerrainDownloadHandler {
     
     /// Select the desired items and generate JSON.
     fn do_select(&mut self, params: &HashMap<String, String>) -> Result<(), Error> {
+        //  Convert UUIDs, return None if fail.
+        fn convert_uuid(s_opt: Option<String>) -> Uuid {
+            if let Some(s) = s_opt {
+                match try_parse(s) {
+                    Ok(u) => Some(uuid),
+                    Err(_) => None
+            } else {
+                None
+            }
+        }
         // Build SELECT statement and get params
         let (stmt, grid, coords_opt, viz_group_opt) = Self::build_sql_query(params)?;
         let viz_group = if let Some(viz_group) = viz_group_opt { viz_group } else { 0 };
@@ -325,6 +336,20 @@ impl TerrainDownloadHandler {
             |(grid, region_loc_x, region_loc_y, name, region_size_x, region_size_y, scale_x, scale_y, scale_z,
                 elevation_offset, impostor_lod, viz_group, mesh_uuid, sculpt_uuid, water_height, creator, creation_time, faces_json)| {
                 // ***MORE***
+                let rd = RegionImpostorData {
+                    grid,
+                    region_loc: [region_loc_x, region_loc_y],
+                    name,
+                    region_size: [region_size_x, region_size_y],
+                    scale: [scale_x, scale_y. scale_z],
+                    elevation_offset,
+                    impostor_lod,
+                    viz_group,
+                    mesh_uuid: convert_uuid(mesh_uuid),
+                    sculpt_uuid: convert_uuid(sculpt_uuid),
+                    water_height,
+                    faces_json,            
+                };
             },
         )?;
         todo!();

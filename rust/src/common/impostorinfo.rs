@@ -19,7 +19,6 @@
 //! 
 //! This is very close to the JSON sent to the viewer.
 
-use anyhow::{Error, anyhow};
 use uuid::Uuid;
 use serde;
 use serde_json; // 1.0.143
@@ -56,6 +55,8 @@ pub struct RegionImpostorData {
     pub elevation_offset: f32,
     /// Water height. Water is optional.
     pub water_height: Option<f32>,
+    /// Name - name of region, or 0,0 corner region for lower LODs
+    pub name: String,
     /// Grid -- name of associated grid
     pub grid: String,
     /// Faces (as JSON)

@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS region_impostors (
     elevation_offset FLOAT NOT NULL,
     impostor_lod TINYINT NOT NULL,
     viz_group INT NOT NULL,
-    mesh_uuid CHAR(40) DEFAULT NULL,
+    mesh_uuid CHAR(36) DEFAULT NULL,
     sculpt_uuid CHAR(36) DEFAULT NULL,
     water_height FLOAT NOT NULL,
     creator VARCHAR(63) NOT NULL,
