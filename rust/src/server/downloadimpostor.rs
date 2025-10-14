@@ -196,7 +196,7 @@ impl TerrainDownloadHandler {
                 mesh_uuid: convert_uuid(row.get_opt(12).ok_or_else(|| anyhow!("mesh_uuid is null"))??,),
                 sculpt_uuid: convert_uuid(row.get_opt(13).ok_or_else(|| anyhow!("mesh_uuid is null"))??,),
                 water_height: row.get_opt(14).ok_or_else(|| anyhow!("water_height is null"))??,
-                faces: "".to_string(), // ***TEMP***
+                faces: row.get_opt(17).ok_or_else(|| anyhow!("faces_json is null"))??, // ***TEMP***
             };
             log::debug!("{:?}",rd);
             Ok(())
@@ -216,45 +216,9 @@ impl TerrainDownloadHandler {
         region_info: UploadedRegionInfo,
         params: &HashMap<String, String>,
     ) -> Result<(usize, String), Error> {
-        //  Parse URL parameters.
-        let query_string = params.get("QUERY_STRING").ok_or_else(|| anyhow!("No QUERY_STRING from FCGI"))?;
-        let query_vec = querystring::querify(query_string);
-        let query_params: HashMap<String, String> = query_vec.iter().map(|(k, v)| (k.to_lowercase().trim().to_string(), v.to_string())).collect();
-        //  Parameters are
-        //      grid
-        //      x
-        //      y
-        //      viz_group
-        //  Grid is mandatory
-        let grid = query_params.get("grid").ok_or_else(|| anyhow!("No \"grid\" parameter in HTTP request"))?;
-        let x = query_params.get("x");
-        let y = query_params.get("y");
-        let viz_group = query_params.get("viz_group");
-        log::info!("Query: grid: {} x: {:?}  y: {:?}  viz_group: {:?}", grid, x, y, viz_group);
-/*
-        let change_status = self.do_sql_unchanged_check(&region_info)?;
-        log::warn!("Changed status for region {}: {:?}", region_info.name, change_status);
-        match change_status {
-            ChangeStatus::None => {
-                //  New region, add region
-                log::info!("Region \"{}\") is new.", region_info.name);
-                self.do_sql_insert(&region_info, params)?; 
-                Ok((201, "Added region".to_string()))    
-            }
-            ChangeStatus::NoChange  => {
-                //  Existing region, same values as last time
-                log::info!("Region \"{}\") is unchanged.", region_info.name);
-                self.do_sql_confirmation_update(&region_info, params)?; 
-                Ok((204, "No change to region".to_string()))
-            }
-            ChangeStatus::Changed => {
-                log::info!("Region \"{}\") changed", region_info.name);
-                self.do_sql_full_update(&region_info, params)?; 
-                Ok((200, "Change to region".to_string()))
-            }
-        }
- */
-    todo!();
+        self.do_select(params)?;
+        //  ***MORE*** output JSON
+        Ok((200, "Done".to_string()))
     }
 }
 //  Our "handler"
