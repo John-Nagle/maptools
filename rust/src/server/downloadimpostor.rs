@@ -31,7 +31,6 @@ use uuid::Uuid;
 use common::Credentials;
 use common::init_fcgi;
 use common::{Handler, Request, Response};
-use common::{UploadedRegionInfo};
 use common::{RegionImpostorData, RegionImpostorLod};
 use common::u8_to_elev;
 use mysql::prelude::{Queryable};
@@ -91,19 +90,20 @@ impl TerrainDownloadHandler {
         Ok(Self { pool, conn, owner_name: None  })
     }
 
-    /// Parse a request
+    /// Parse a request.
+    /// There's no content, so this does nothing.
     fn parse_request(
         b: &[u8],
         _env: &HashMap<String, String>,
-    ) -> Result<UploadedRegionInfo, Error> {
+    ) -> Result<(), Error> {
         //  Should be UTF-8. Check.
         let s = core::str::from_utf8(b)?;
-        if s.trim().is_empty() {
-            return Err(anyhow!("Empty request. JSON was expected"));
+        if !s.trim().is_empty() {
+        return Err(anyhow!("Non-empty HTTP request. Should be a GET"));
         }
         log::info!("Uploaded JSON:\n{}", s);
         //  Should be valid JSON
-        Ok(UploadedRegionInfo::parse(s)?)
+        Ok(())
     }
     
     /// Build the SQL query statement.
@@ -213,7 +213,6 @@ impl TerrainDownloadHandler {
     /// If no, replace old data entirely.
     fn process_request(
         &mut self,
-        region_info: UploadedRegionInfo,
         params: &HashMap<String, String>,
     ) -> Result<(usize, String), Error> {
         self.do_select(params)?;
@@ -229,11 +228,11 @@ impl Handler for TerrainDownloadHandler {
         request: &Request,
         env: &HashMap<String, String>,
     ) -> Result<(), Error> {
-        //  We have a request. It's supposed to be in JSON.
+        //  We have a request. It's just a GET; no uploaded data.
         //  Parse. Error 400 with message if fail.
         match Self::parse_request(&request.standard_input, env) {
-            Ok(req) => {
-                log::info!("Request made: {:?} env {:?}", req, env);
+            Ok(_) => {
+                log::info!("Request made: env {:?}", env);
                 let params = request
                     .params
                     .as_ref()
@@ -247,7 +246,7 @@ impl Handler for TerrainDownloadHandler {
                     return Err(anyhow!("No HTTP request method."));
                 }
                 //  Process. Error 500 if fail.
-                match self.process_request(req, &params) {
+                match self.process_request(&params) {
                     Ok((status, msg)) => {
                         //  Success. Send a plain "OK"
                         let http_response = Response::http_response("text/plain", status, "OK");
