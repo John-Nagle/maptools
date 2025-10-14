@@ -138,12 +138,12 @@ impl TerrainDownloadHandler {
         
         //  There are three cases.
         let where_clause = if viz_group_opt.is_some() {
-            "grid = : grid AND viz_group = : viz_group"
+            "grid = :grid AND viz_group = :viz_group"
         } else if coords_opt.is_some() {
-            "grid = : grid AND region_loc_x = :region_loc_x AND region_loc_y = : region_loc_y"
+            "grid = :grid AND region_loc_x = :region_loc_x AND region_loc_y = :region_loc_y"
         }
         else {
-            ""   
+            "grid = :grid"  
         };
         log::info!("Query: grid: {} coords {:?}  viz_group: {:?}, WHERE clause: {}", grid, coords_opt, viz_group_opt, where_clause);
         const SELECT_PART: &str = "grid, region_loc_x, region_loc_y, name, region_size_x, region_size_y, scale_x, scale_y, scale_z, \
@@ -171,6 +171,7 @@ impl TerrainDownloadHandler {
         let viz_group = if let Some(viz_group) = viz_group_opt { viz_group } else { 0 };
         let (region_coords_x, region_coords_y) = if let Some(coords) = coords_opt { (coords.0, coords.1) } else { (0, 0) };
         //  Perform the SELECT
+        log::info!("Query: {}", stmt);
         let mut query_result: mysql::QueryResult<_> = self.conn.exec_iter(
             stmt,
             params! { grid, region_coords_x, region_coords_y, viz_group })?;
