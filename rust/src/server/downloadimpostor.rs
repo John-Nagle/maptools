@@ -31,11 +31,10 @@ use uuid::Uuid;
 use common::Credentials;
 use common::init_fcgi;
 use common::{Handler, Request, Response};
-use common::{RegionImpostorData, RegionImpostorLod};
-use common::u8_to_elev;
+use common::{RegionImpostorData};
 use mysql::prelude::{Queryable};
 use mysql::{Pool};
-use mysql::{PooledConn, params, Row};
+use mysql::{PooledConn, params};
 use std::collections::HashMap;
 use std::io::Write;
 
@@ -65,29 +64,20 @@ fn logger() {
     log::warn!("Logging to {:?}", LOG_FILE_NAME); // where the log is going
 }
 
-/// Change status for region data
-#[derive(Debug)]
-enum ChangeStatus {
-    None, 
-    NoChange,
-    Changed 
-}
-
 ///  Our handler
 struct TerrainDownloadHandler {
     /// MySQL onnection pool. We only use one.
+    #[allow(dead_code)] // needed to keep the pool alive, but never referenced.
     pool: Pool,
     /// Active MySQL connection.
     conn: PooledConn,
-    /// Owner of object at other end
-    owner_name: Option<String>,
 }
 impl TerrainDownloadHandler {
 
     /// Usual new. Saves connection pool for use.
     pub fn new(pool: Pool) -> Result<Self, Error> {
         let conn = pool.get_conn()?;
-        Ok(Self { pool, conn, owner_name: None  })
+        Ok(Self { pool, conn })
     }
 
     /// Parse a request.
@@ -154,7 +144,7 @@ impl TerrainDownloadHandler {
     }
     
     /// Select the desired items and generate JSON.
-    fn do_select(&mut self, params: &HashMap<String, String>) -> Result<(), Error> {
+    fn do_select(&mut self, params: &HashMap<String, String>) -> Result<Vec<RegionImpostorData>, Error> {
         //  Convert UUIDs, return None if fail.
         fn convert_uuid(s_opt: Option<String>) -> Option<Uuid> {
             if let Some(s) = s_opt {
@@ -179,8 +169,8 @@ impl TerrainDownloadHandler {
         //  There should be only one query result set since we only made one query.
         //  So this is iteration over rows.
         let first_result_set: mysql::ResultSet<_> = query_result.iter().expect("No result set from SELECT");
-        let error_sink: Result<(), Error> = first_result_set.map(|rs: Result<mysql::Row, mysql::Error> | {          
-            log::debug!("SELECT result: {:?}", rs);    // ***TEMP***
+        let impostors: Result<Vec<RegionImpostorData>, Error> = first_result_set.map(|rs: Result<mysql::Row, mysql::Error> | {          
+            log::trace!("SELECT result: {:?}", rs);    // ***TEMP***
             let row = rs?;
             let rd = RegionImpostorData {
                 grid: row.get_opt(0).ok_or_else(|| anyhow!("grid is null"))??,
@@ -200,10 +190,9 @@ impl TerrainDownloadHandler {
                 faces: row.get_opt(17).ok_or_else(|| anyhow!("faces_json is null"))??, // ***TEMP***
             };
             log::debug!("{:?}",rd);
-            Ok(())
+            Ok(rd)
         }).collect();
-        error_sink?;
-        Ok(())
+        Ok(impostors?)
     }
 
     /// Handle request.
@@ -216,9 +205,9 @@ impl TerrainDownloadHandler {
         &mut self,
         params: &HashMap<String, String>,
     ) -> Result<(usize, String), Error> {
-        self.do_select(params)?;
-        //  ***MORE*** output JSON
-        Ok((200, "Done".to_string()))
+        let items = self.do_select(params)?;
+        let json = serde_json::to_string(&items)?;
+        Ok((200, json))
     }
 }
 //  Our "handler"
@@ -250,7 +239,7 @@ impl Handler for TerrainDownloadHandler {
                 match self.process_request(&params) {
                     Ok((status, msg)) => {
                         //  Success. Send a plain "OK"
-                        let http_response = Response::http_response("text/plain", status, "OK");
+                        let http_response = Response::http_response("application/json", status, "OK");
                         //  Return something useful.
                         let b = msg.into_bytes();
                         Response::write_response(out, request, http_response.as_slice(), &b)?;

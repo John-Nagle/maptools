@@ -32,7 +32,7 @@ use serde::{Deserialize, Serialize};
 /// Mesh objects are -0.5 .. 0.5 in each axis, as is
 /// normal for SL/OS. The mesh will be scaled to fit the region box.
 /// Mesh impostor objects are aligned with the world coordinate system.
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct RegionImpostorData {
     /// Where it is in the world.
     pub region_loc: [u32;2],

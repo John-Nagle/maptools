@@ -63,6 +63,7 @@ enum ChangeStatus {
 ///  Our handler
 struct TerrainUploadHandler {
     /// MySQL onnection pool. We only use one.
+    #[allow(dead_code)] // needed to keep the pool alive, but never referenced.
     pool: Pool,
     /// Active MySQL connection.
     conn: PooledConn,
