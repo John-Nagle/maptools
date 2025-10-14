@@ -159,12 +159,12 @@ impl TerrainDownloadHandler {
         // Build SELECT statement and get params
         let (stmt, grid, coords_opt, viz_group_opt) = Self::build_sql_query(params)?;
         let viz_group = if let Some(viz_group) = viz_group_opt { viz_group } else { 0 };
-        let (region_coords_x, region_coords_y) = if let Some(coords) = coords_opt { (coords.0, coords.1) } else { (0, 0) };
+        let (region_loc_x, region_loc_y) = if let Some(coords) = coords_opt { (coords.0, coords.1) } else { (0, 0) };
         //  Perform the SELECT
         log::info!("Query: {}", stmt);
         let mut query_result: mysql::QueryResult<_> = self.conn.exec_iter(
             stmt,
-            params! { grid, region_coords_x, region_coords_y, viz_group })?;
+            params! { grid, region_loc_x, region_loc_y, viz_group })?;
         //  Process the results.
         //  There should be only one query result set since we only made one query.
         //  So this is iteration over rows.
