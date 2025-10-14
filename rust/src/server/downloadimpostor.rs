@@ -178,7 +178,7 @@ impl TerrainDownloadHandler {
         //  There should be only one query result set since we only made one query.
         //  So this is iteration over rows.
         let first_result_set: mysql::ResultSet<_> = query_result.iter().expect("No result set from SELECT");
-        let _sink = first_result_set.map(|rs: Result<mysql::Row, mysql::Error> | {          
+        let _sink: Result<(), Error> = first_result_set.map(|rs: Result<mysql::Row, mysql::Error> | {          
             log::debug!("SELECT result: {:?}", rs);    // ***TEMP***
             let row = rs?;
             let rd = RegionImpostorData {
@@ -218,7 +218,7 @@ impl TerrainDownloadHandler {
 */
             };
             Ok(())
-        });
+        }).collect();
 /*                                            
         let _all_regions = self.conn.exec_map(
             stmt,
