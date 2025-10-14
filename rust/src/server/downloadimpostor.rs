@@ -178,7 +178,7 @@ impl TerrainDownloadHandler {
         //  There should be only one query result set since we only made one query.
         //  So this is iteration over rows.
         let first_result_set: mysql::ResultSet<_> = query_result.iter().expect("No result set from SELECT");
-        let _sink: Result<(), Error> = first_result_set.map(|rs: Result<mysql::Row, mysql::Error> | {          
+        let error_sink: Result<(), Error> = first_result_set.map(|rs: Result<mysql::Row, mysql::Error> | {          
             log::debug!("SELECT result: {:?}", rs);    // ***TEMP***
             let row = rs?;
             let rd = RegionImpostorData {
@@ -198,59 +198,12 @@ impl TerrainDownloadHandler {
                 water_height: row.get_opt(14).ok_or_else(|| anyhow!("water_height is null"))??,
                 faces: "".to_string(), // ***TEMP***
                
-/*
-                region_loc: [region_loc_x, region_loc_y],
-                name,
-                region_size: [region_size_x, region_size_y],
-                scale: [scale_x, scale_y. scale_z],
-                elevation_offset,
-                impostor_lod,
-                viz_group,
-                mesh_uuid: convert_uuid(mesh_uuid),
-                sculpt_uuid: convert_uuid(sculpt_uuid),
-                water_height,
-                faces: "".to_string(), // ***TEMP***
-                    //////faces_json,            
 
-            //////let row_infos = rs.iter().map(|r| {
-            //////    println!("Row: {:?}", r);
-            //////});
-*/
             };
             Ok(())
         }).collect();
-/*                                            
-        let _all_regions = self.conn.exec_map(
-            stmt,
-            params! { grid, region_coords_x, region_coords_y, viz_group },
-            |(grid, region_loc_x, region_loc_y, name, region_size_x, region_size_y, scale_x, scale_y, scale_z,
-                elevation_offset, impostor_lod, viz_group, mesh_uuid, sculpt_uuid, water_height, creator, creation_time, faces_json)| {
-                // ***MORE***
-                let impostor_lod: u8 = impostor_lod;
-                let faces_json: String = faces_json;    // JSON as a string.
-                let _creator: String = creator;
-                let _creation_time: String = creation_time; // needs to be a timestamp object compatible with the SQL package.
-                let region_loc_x: u32 = region_loc_x;
-                //////let grid: String = grid;
-                let rd = RegionImpostorData {
-                    grid,
-                    region_loc: [region_loc_x, region_loc_y],
-                    name,
-                    region_size: [region_size_x, region_size_y],
-                    scale: [scale_x, scale_y. scale_z],
-                    elevation_offset,
-                    impostor_lod,
-                    viz_group,
-                    mesh_uuid: convert_uuid(mesh_uuid),
-                    sculpt_uuid: convert_uuid(sculpt_uuid),
-                    water_height,
-                    faces: "".to_string(), // ***TEMP***
-                    //////faces_json,            
-                };
-            },
-        )?;
-*/
-        todo!();
+        error_sink?;
+        Ok(());
     }
 
     /// Handle request.
