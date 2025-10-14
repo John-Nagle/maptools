@@ -178,11 +178,46 @@ impl TerrainDownloadHandler {
         //  There should be only one query result set since we only made one query.
         //  So this is iteration over rows.
         let first_result_set: mysql::ResultSet<_> = query_result.iter().expect("No result set from SELECT");
-        let _sink = first_result_set.map(|rs: Result<mysql::Row, mysql::Error> | {
+        let _sink = first_result_set.map(|rs: Result<mysql::Row, mysql::Error> | {          
             log::debug!("SELECT result: {:?}", rs);    // ***TEMP***
+            let row = rs?;
+            let rd = RegionImpostorData {
+                grid: row.get_opt(0).ok_or_else(|| anyhow!("grid is null"))??,
+                region_loc: [row.get_opt(1).ok_or_else(|| anyhow!("loc_x is null"))??, row.get_opt(2).ok_or_else(|| anyhow!("loc_y is null"))??],
+                name: row.get_opt(3).ok_or_else(|| anyhow!("name is null"))??,
+                region_size: [row.get_opt(4).ok_or_else(|| anyhow!("size_x is null"))??, row.get_opt(5).ok_or_else(|| anyhow!("size_y is null"))??],
+                scale: [
+                    row.get_opt::<u32, _>(6).ok_or_else(|| anyhow!("scale_x is null"))?? as f32, 
+                    row.get_opt::<u32, _>(7).ok_or_else(|| anyhow!("scale_y is null"))?? as f32, 
+                    row.get_opt(8).ok_or_else(|| anyhow!("scale_z is null"))??],
+                elevation_offset: row.get_opt(9).ok_or_else(|| anyhow!("elevation_offset is null"))??,
+                impostor_lod: row.get_opt(10).ok_or_else(|| anyhow!("impostor_lod is null"))??,
+                viz_group: row.get_opt(11).ok_or_else(|| anyhow!("Viz_group is null"))??,
+                mesh_uuid: convert_uuid(row.get_opt(12).ok_or_else(|| anyhow!("mesh_uuid is null"))??,),
+                sculpt_uuid: convert_uuid(row.get_opt(13).ok_or_else(|| anyhow!("mesh_uuid is null"))??,),
+                water_height: row.get_opt(14).ok_or_else(|| anyhow!("water_height is null"))??,
+                faces: "".to_string(), // ***TEMP***
+               
+/*
+                region_loc: [region_loc_x, region_loc_y],
+                name,
+                region_size: [region_size_x, region_size_y],
+                scale: [scale_x, scale_y. scale_z],
+                elevation_offset,
+                impostor_lod,
+                viz_group,
+                mesh_uuid: convert_uuid(mesh_uuid),
+                sculpt_uuid: convert_uuid(sculpt_uuid),
+                water_height,
+                faces: "".to_string(), // ***TEMP***
+                    //////faces_json,            
+
             //////let row_infos = rs.iter().map(|r| {
             //////    println!("Row: {:?}", r);
             //////});
+*/
+            };
+            Ok(())
         });
 /*                                            
         let _all_regions = self.conn.exec_map(
