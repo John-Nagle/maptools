@@ -197,13 +197,12 @@ impl TerrainDownloadHandler {
                 sculpt_uuid: convert_uuid(row.get_opt(13).ok_or_else(|| anyhow!("mesh_uuid is null"))??,),
                 water_height: row.get_opt(14).ok_or_else(|| anyhow!("water_height is null"))??,
                 faces: "".to_string(), // ***TEMP***
-               
-
             };
+            log::debug!("{:?}",rd);
             Ok(())
         }).collect();
         error_sink?;
-        Ok(());
+        Ok(())
     }
 
     /// Handle request.
