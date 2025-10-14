@@ -36,7 +36,7 @@ use common::{RegionImpostorData, RegionImpostorLod};
 use common::u8_to_elev;
 use mysql::prelude::{Queryable};
 use mysql::{Pool};
-use mysql::{PooledConn, params};
+use mysql::{PooledConn, params, Row};
 use std::collections::HashMap;
 use std::io::Write;
 
@@ -170,6 +170,21 @@ impl TerrainDownloadHandler {
         let (stmt, grid, coords_opt, viz_group_opt) = Self::build_sql_query(params)?;
         let viz_group = if let Some(viz_group) = viz_group_opt { viz_group } else { 0 };
         let (region_coords_x, region_coords_y) = if let Some(coords) = coords_opt { (coords.0, coords.1) } else { (0, 0) };
+        //  Perform the SELECT
+        let mut query_result: mysql::QueryResult<_> = self.conn.exec_iter(
+            stmt,
+            params! { grid, region_coords_x, region_coords_y, viz_group })?;
+        //  Process the results.
+        //  There should be only one query result set since we only made one query.
+        //  So this is iteration over rows.
+        let first_result_set: mysql::ResultSet<_> = query_result.iter().expect("No result set from SELECT");
+        let _sink = first_result_set.map(|rs: Result<mysql::Row, mysql::Error> | {
+            log::debug!("SELECT result: {:?}", rs);    // ***TEMP***
+            //////let row_infos = rs.iter().map(|r| {
+            //////    println!("Row: {:?}", r);
+            //////});
+        });
+/*                                            
         let _all_regions = self.conn.exec_map(
             stmt,
             params! { grid, region_coords_x, region_coords_y, viz_group },
@@ -199,6 +214,7 @@ impl TerrainDownloadHandler {
                 };
             },
         )?;
+*/
         todo!();
     }
 
