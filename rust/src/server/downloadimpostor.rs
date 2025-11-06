@@ -172,6 +172,7 @@ impl TerrainDownloadHandler {
         let impostors: Result<Vec<RegionImpostorData>, Error> = first_result_set.map(|rs: Result<mysql::Row, mysql::Error> | {          
             log::trace!("SELECT result: {:?}", rs);    // ***TEMP***
             let row = rs?;
+            //  We have to do this the hard way because there are more than 12 columns being read.
             let rd = RegionImpostorData {
                 grid: row.get_opt(0).ok_or_else(|| anyhow!("grid is null"))??,
                 region_loc: [row.get_opt(1).ok_or_else(|| anyhow!("loc_x is null"))??, row.get_opt(2).ok_or_else(|| anyhow!("loc_y is null"))??],
@@ -196,11 +197,7 @@ impl TerrainDownloadHandler {
     }
 
     /// Handle request.
-    ///
-    /// Start a database transaction.
-    /// Check if this data is the same as any stored data for this region.
-    /// If yes, just update confirmation user and time.
-    /// If no, replace old data entirely.
+    /// Return requsted data as JSON.
     fn process_request(
         &mut self,
         params: &HashMap<String, String>,
