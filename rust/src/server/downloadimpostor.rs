@@ -144,7 +144,7 @@ impl TerrainDownloadHandler {
     }
     
     /// Select the desired items and generate JSON.
-    fn do_select(&mut self, params: &HashMap<String, String>) -> Result<Vec<RegionImpostorData>, Error> {
+    fn do_select(&mut self, params: &HashMap<String, String>) -> Result<Vec<Result<RegionImpostorData, Error>>, Error> {
         //  Convert UUIDs, return None if fail.
         fn convert_uuid(s_opt: Option<String>) -> Option<Uuid> {
             if let Some(s) = s_opt {
@@ -170,8 +170,8 @@ impl TerrainDownloadHandler {
         //  So this is iteration over rows.
         let first_result_set: mysql::ResultSet<_> = query_result.iter().expect("No result set from SELECT");
         //  ***SHOULD RETURN A Vec<Result> so that we can keep all non-error results.***
-        let impostors: Result<Vec<RegionImpostorData>, Error> = first_result_set.map(|rs: Result<mysql::Row, mysql::Error> | {          
-            log::trace!("SELECT result: {:?}", rs);    // ***TEMP***
+        let impostor_results: Vec<Result<RegionImpostorData, Error>> = first_result_set.map(|rs: Result<mysql::Row, mysql::Error> | {          
+            log::trace!("SELECT result: {:?}", rs);
             let row = rs?;
             //  We have to do this the hard way because there are more than 12 columns being read.
             //  Faces is JSON as a string and must be parsed.
@@ -192,12 +192,14 @@ impl TerrainDownloadHandler {
                 mesh_uuid: convert_uuid(row.get_opt(12).ok_or_else(|| anyhow!("mesh_uuid is null"))??,),
                 sculpt_uuid: convert_uuid(row.get_opt(13).ok_or_else(|| anyhow!("mesh_uuid is null"))??,),
                 water_height: row.get_opt(14).ok_or_else(|| anyhow!("water_height is null"))??,
-                faces, //////: row.get_opt(17).ok_or_else(|| anyhow!("faces_json is null"))??, // ***TEMP***
+                faces,
             };
             log::debug!("{:?}",rd);
             Ok(rd)
         }).collect();
-        Ok(impostors?)
+        //  We have a vector of results. Some may have errors.
+        //  Individual bad entries should not kill the whole query.
+        Ok(impostor_results)
     }
 
     /// Handle request.
@@ -206,7 +208,13 @@ impl TerrainDownloadHandler {
         &mut self,
         params: &HashMap<String, String>,
     ) -> Result<(usize, String), Error> {
-        let items = self.do_select(params)?;
+        let impostor_results = self.do_select(params)?;
+        //  Now separate the good results from the errors.
+        //  ***NEED TO COLLECT ERRORS***
+        let items: Vec<RegionImpostorData> = impostor_results
+            .into_iter()
+            .filter_map(|item| if item.is_ok() { Some(item.unwrap()) } else { log::error!("Impostor data corrupted: {:?}", item); None })
+            .collect();
         let json = serde_json::to_string(&items)?;
         Ok((200, json))
     }
