@@ -169,10 +169,14 @@ impl TerrainDownloadHandler {
         //  There should be only one query result set since we only made one query.
         //  So this is iteration over rows.
         let first_result_set: mysql::ResultSet<_> = query_result.iter().expect("No result set from SELECT");
+        //  ***SHOULD RETURN A Vec<Result> so that we can keep all non-error results.***
         let impostors: Result<Vec<RegionImpostorData>, Error> = first_result_set.map(|rs: Result<mysql::Row, mysql::Error> | {          
             log::trace!("SELECT result: {:?}", rs);    // ***TEMP***
             let row = rs?;
             //  We have to do this the hard way because there are more than 12 columns being read.
+            //  Faces is JSON as a string and must be parsed.
+            let faces_json: String = row.get_opt(17).ok_or_else(|| anyhow!("faces_json is null"))??;
+            let faces = serde_json::from_str(&faces_json)?;
             let rd = RegionImpostorData {
                 grid: row.get_opt(0).ok_or_else(|| anyhow!("grid is null"))??,
                 region_loc: [row.get_opt(1).ok_or_else(|| anyhow!("loc_x is null"))??, row.get_opt(2).ok_or_else(|| anyhow!("loc_y is null"))??],
@@ -188,7 +192,7 @@ impl TerrainDownloadHandler {
                 mesh_uuid: convert_uuid(row.get_opt(12).ok_or_else(|| anyhow!("mesh_uuid is null"))??,),
                 sculpt_uuid: convert_uuid(row.get_opt(13).ok_or_else(|| anyhow!("mesh_uuid is null"))??,),
                 water_height: row.get_opt(14).ok_or_else(|| anyhow!("water_height is null"))??,
-                faces: row.get_opt(17).ok_or_else(|| anyhow!("faces_json is null"))??, // ***TEMP***
+                faces, //////: row.get_opt(17).ok_or_else(|| anyhow!("faces_json is null"))??, // ***TEMP***
             };
             log::debug!("{:?}",rd);
             Ok(rd)

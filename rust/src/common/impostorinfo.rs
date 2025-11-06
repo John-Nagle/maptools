@@ -20,6 +20,7 @@
 //! This is very close to the JSON sent to the viewer.
 
 use uuid::Uuid;
+use json::{JsonValue};
 use serde;
 use serde_json; // 1.0.143
 use serde::{Deserialize, Serialize};
@@ -60,16 +61,15 @@ pub struct RegionImpostorData {
     /// Grid -- name of associated grid
     pub grid: String,
     /// Faces (as JSON)
-    pub faces: String, //////Vec<RegionImpostorFaceData>,
+    pub faces: Vec<RegionImpostorFaceData>,
 }
 
 pub type RegionImpostorLod = u8;
 
 impl RegionImpostorData {
 }
-/*
 /// Data for each face.
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct RegionImpostorFaceData {
     /// Base texture for old non-material objects.
     pub base_texture_uuid: Uuid,
@@ -81,4 +81,3 @@ pub struct RegionImpostorFaceData {
 impl RegionImpostorFaceData {
 
 }
-*/
