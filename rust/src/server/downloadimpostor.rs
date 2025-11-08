@@ -210,11 +210,14 @@ impl TerrainDownloadHandler {
     ) -> Result<(usize, String), Error> {
         let impostor_results = self.do_select(params)?;
         //  Now separate the good results from the errors.
-        //  ***NEED TO COLLECT ERRORS***
-        let items: Vec<RegionImpostorData> = impostor_results
+        let (items, errors) : (Vec<_>, Vec<_>) = impostor_results
             .into_iter()
-            .filter_map(|item| if item.is_ok() { Some(item.unwrap()) } else { log::error!("Impostor data corrupted: {:?}", item); None })
-            .collect();
+            .partition(|item: &Result<_,_>| item.is_ok());
+        let items: Vec<RegionImpostorData> = items.into_iter().map(|item: Result<_,_>| item.ok().unwrap()).collect();
+        let errors: Vec<Error> = errors.into_iter().map(|item: Result<_,_>| item.err().unwrap()).collect();
+        if !errors.is_empty() {
+            log::error!("Impostor download fetch errors: {:?}", errors);
+        }
         let json = serde_json::to_string(&items)?;
         Ok((200, json))
     }
