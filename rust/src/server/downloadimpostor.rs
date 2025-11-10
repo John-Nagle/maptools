@@ -31,7 +31,7 @@ use uuid::Uuid;
 use common::Credentials;
 use common::init_fcgi;
 use common::{Handler, Request, Response};
-use common::{RegionImpostorData};
+use common::{RegionImpostorReply, RegionImpostorData};
 use mysql::prelude::{Queryable};
 use mysql::{Pool};
 use mysql::{PooledConn, params};
@@ -210,15 +210,21 @@ impl TerrainDownloadHandler {
     ) -> Result<(usize, String), Error> {
         let impostor_results = self.do_select(params)?;
         //  Now separate the good results from the errors.
-        let (items, errors) : (Vec<_>, Vec<_>) = impostor_results
+        let (impostors, errors) : (Vec<_>, Vec<_>) = impostor_results
             .into_iter()
             .partition(|item: &Result<_,_>| item.is_ok());
-        let items: Vec<RegionImpostorData> = items.into_iter().map(|item: Result<_,_>| item.ok().unwrap()).collect();
-        let errors: Vec<Error> = errors.into_iter().map(|item: Result<_,_>| item.err().unwrap()).collect();
+        let impostors: Vec<RegionImpostorData> = impostors.into_iter().map(|item: Result<_,_>| item.ok().unwrap()).collect();
+        let errors: Vec<String> = errors.into_iter().map(|item: Result<_,_>| format!("{:?}", item.err().unwrap())).collect();
         if !errors.is_empty() {
             log::error!("Impostor download fetch errors: {:?}", errors);
         }
-        let json = serde_json::to_string(&items)?;
+        //  Construct reply for REST query
+        let full_reply = RegionImpostorReply {
+            version: RegionImpostorReply::REGION_IMPOSTOR_INFO_VERSION,
+            impostors,
+            errors,            
+        };
+        let json = serde_json::to_string(&full_reply)?;
         Ok((200, json))
     }
 }

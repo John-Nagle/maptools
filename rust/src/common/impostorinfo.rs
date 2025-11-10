@@ -20,9 +20,9 @@
 //! This is very close to the JSON sent to the viewer.
 
 use uuid::Uuid;
-use json::{JsonValue};
+//////use json::{JsonValue};
 use serde;
-use serde_json; // 1.0.143
+//////use serde_json; // 1.0.143
 use serde::{Deserialize, Serialize};
 /// The data stored in the database for a region impostor.
 ///
@@ -81,3 +81,20 @@ pub struct RegionImpostorFaceData {
 impl RegionImpostorFaceData {
 
 }
+
+/// What's returned to a caller via a REST request
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct RegionImpostorReply {
+    /// Data version
+    pub version: u32,
+    /// The impostors
+    pub impostors: Vec<RegionImpostorData>,
+    /// Errors, if any
+    pub errors: Vec<String>,
+}
+
+impl RegionImpostorReply {
+    /// Version of this interface
+    pub const REGION_IMPOSTOR_INFO_VERSION: u32 = 1;
+}
+
