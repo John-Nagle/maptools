@@ -169,7 +169,6 @@ impl TerrainDownloadHandler {
         //  There should be only one query result set since we only made one query.
         //  So this is iteration over rows.
         let first_result_set: mysql::ResultSet<_> = query_result.iter().expect("No result set from SELECT");
-        //  ***SHOULD RETURN A Vec<Result> so that we can keep all non-error results.***
         let impostor_results: Vec<Result<RegionImpostorData, Error>> = first_result_set.map(|rs: Result<mysql::Row, mysql::Error> | {          
             log::trace!("SELECT result: {:?}", rs);
             let row = rs?;
@@ -178,6 +177,7 @@ impl TerrainDownloadHandler {
             let faces_json: String = row.get_opt(17).ok_or_else(|| anyhow!("faces_json is null"))??;
             let faces = serde_json::from_str(&faces_json)?;
             let rd = RegionImpostorData {
+                //  None of these null checks should fail, because those fields are non-null in the SQL table definition.
                 grid: row.get_opt(0).ok_or_else(|| anyhow!("grid is null"))??,
                 region_loc: [row.get_opt(1).ok_or_else(|| anyhow!("loc_x is null"))??, row.get_opt(2).ok_or_else(|| anyhow!("loc_y is null"))??],
                 name: row.get_opt(3).ok_or_else(|| anyhow!("name is null"))??,
@@ -189,8 +189,8 @@ impl TerrainDownloadHandler {
                 elevation_offset: row.get_opt(9).ok_or_else(|| anyhow!("elevation_offset is null"))??,
                 impostor_lod: row.get_opt(10).ok_or_else(|| anyhow!("impostor_lod is null"))??,
                 viz_group: row.get_opt(11).ok_or_else(|| anyhow!("Viz_group is null"))??,
-                mesh_uuid: convert_uuid(row.get_opt(12).ok_or_else(|| anyhow!("mesh_uuid is null"))??,),
-                sculpt_uuid: convert_uuid(row.get_opt(13).ok_or_else(|| anyhow!("mesh_uuid is null"))??,),
+                mesh_uuid: convert_uuid(row.get_opt(12).ok_or_else(|| anyhow!("mesh_uuid is invalid"))??,),
+                sculpt_uuid: convert_uuid(row.get_opt(13).ok_or_else(|| anyhow!("mesh_uuid is invalid"))??,),
                 water_height: row.get_opt(14).ok_or_else(|| anyhow!("water_height is null"))??,
                 faces,
             };
