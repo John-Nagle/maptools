@@ -201,5 +201,11 @@ Next steps:
    - Fix length of uuid field in "regionimpostors" in database.
    - "MySQL" statement generator only allows up to 12 fields, and I have 18. Bleah.
    
-      
+2025-11-19
+
+   Recovering from walking pneumonia.
+   Downloadimpostors is working.
+   Starting on uploadimpostors, where an LSL script tells the database what's been uploaded.
+   - Sculpts or meshes are self-identifying from their names
+   - Textures. Need to work on naming convention.     
       
