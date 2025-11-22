@@ -207,5 +207,17 @@ Next steps:
    Downloadimpostors is working.
    Starting on uploadimpostors, where an LSL script tells the database what's been uploaded.
    - Sculpts or meshes are self-identifying from their names
-   - Textures. Need to work on naming convention.     
+   - Textures. Need to work on naming convention.    
+   
+2025-11-20
+
+   Map tile plan:
+   - New SQL table.
+   - Upload all UUIDs from Grid Survey, once.
+   - Future changes involve actually uploading a tile. 
+   
+2025-11-21
+   Looks like there's no non-grid survey way to get map tiles in SL.
+   So, have to get them from the map server.
+   For SL, we can get those for any zoom level. For OS, not sure.
       

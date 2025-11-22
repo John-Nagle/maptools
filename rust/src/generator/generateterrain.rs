@@ -33,7 +33,7 @@ use std::path::PathBuf;
 mod vizgroup;
 use vizgroup::{CompletedGroups, RegionData, VizGroups};
 mod sculptmaker;
-use image::GrayImage;
+use image::{RgbImage};
 use sculptmaker::TerrainSculpt;
 
 /// MySQL Credentials for uploading.
@@ -226,7 +226,6 @@ impl TerrainGenerator {
     /// Generate name for impostor asset file.
     /// The name contains all the info we need to generate the impostor.
     /// Format: R_x_y_sx_sy_sz_offset_lod_waterlevel-name
-    //  ***ADD WATER HEIGHT***
     fn impostor_name(
         region: &RegionData,
         height_field: &HeightField,
@@ -305,6 +304,42 @@ impl TerrainGenerator {
     ) -> Result<(), Error> {
         todo!("glTF mesh generation is not implemented yet");
     }
+    
+    /// Fetch terrain image.
+    /// We can get terrain images from the map servers of SL and OS.
+    /// Level 0 LOD items are already in the SL asset store and have a UUID,
+    /// but there's no easy way to get that UUID without a viewer. So
+    /// we have to duplicate them in asset storage.
+    ///
+    /// Current SL official API:
+    /// https://secondlife-maps-cdn.akamaized.net/map-1-1024-1024-objects.jpg
+    pub fn fetch_terrain_image(
+        url_prefix: &str,
+        region_coords_x: u32,
+        region_coords_y: u32,
+        lod: u8) -> Result<RgbImage, Error> {
+        const STANDARD_TILE_SIZE: u32 = 256; // Even on OS
+        let tile_id_x = region_coords_x / STANDARD_TILE_SIZE;
+        let tile_id_y = region_coords_y / STANDARD_TILE_SIZE;
+        let lod = lod as u32;
+        if region_coords_x % STANDARD_TILE_SIZE * lod.pow(2) != 0
+        || region_coords_y % STANDARD_TILE_SIZE * lod.pow(2) != 0 {
+            return Err(anyhow!("Terrain image location ({},{}) lod {} is invalid.", 
+                region_coords_x, region_coords_y, lod));
+        }
+        const URL_SUFFIX: &str = "objects.jpg"; // make sure this is the same for OS
+        let url = format!("{}-{}-{}-{}", tile_id_x, tile_id_y, lod, URL_SUFFIX);
+        let mut resp = ureq::get(&url)
+            //////.set("User-Agent", USERAGENT)
+            .header("Content-Type", "image") // 
+            .call()
+            .map_err(anyhow::Error::msg)?;
+            //////.with_context(|| format!("Reading map tile  {}", url))?;
+        let buffer = resp.body_mut().read_to_vec()?;     
+        //  ***IMAGE TYPE?***
+        todo!();    // ***TEMP***
+    }
+
 
     /// Process one visibiilty group.
     /// There's a lot to do here.
