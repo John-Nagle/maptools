@@ -328,13 +328,14 @@ impl TerrainGenerator {
                 region_coords_x, region_coords_y, lod));
         }
         const URL_SUFFIX: &str = "objects.jpg"; // make sure this is the same for OS
-        let url = format!("{}-{}-{}-{}", tile_id_x, tile_id_y, lod, URL_SUFFIX);
+        let url = format!("{}{}-{}-{}-{}", url_prefix, tile_id_x, tile_id_y, lod, URL_SUFFIX);
         let mut resp = ureq::get(&url)
             //////.set("User-Agent", USERAGENT)
             .header("Content-Type", "image") // 
             .call()
             .map_err(anyhow::Error::msg)?;
             //////.with_context(|| format!("Reading map tile  {}", url))?;
+        let content_type = resp.headers().get("Content-Type").ok_or_else(|| anyhow!("No content type for image fetch"))?;
         let buffer = resp.body_mut().read_to_vec()?;     
         //  ***IMAGE TYPE?***
         todo!();    // ***TEMP***
@@ -506,28 +507,8 @@ fn main() {
         }
     };
 }
-/*
 #[test]
-fn generate_terrain() {
-    let creds = Credentials::new(UPLOAD_CREDS_FILE)?;
-    //  Optional MySQL port number
-    let portnum = if let Some(port) = creds.get("DB_PORT") {
-        port.parse::<u16>()?
-    } else {
-        //  Use MySQL default
-        3306
-    };
-    let opts = mysql::OptsBuilder::new()
-        //  Dreamhost is still using old authentication
-        .secure_auth(false)
-        .ip_or_hostname(creds.get("DB_HOST"))
-        .tcp_port(portnum)
-        .user(creds.get("DB_USER"))
-        .pass(creds.get("DB_PASS"))
-        .db_name(creds.get("DB_NAME"));
-    drop(creds);
-    //////log::info!("Opts: {:?}", opts);
-    let pool = Pool::new(opts)?;
-    log::info!("Connected to database.");
+fn read_terrain_texture() {
+    const URL_PREFIX: &str = "https://secondlife-maps-cdn.akamaized.net/map-";
+    let img = TerrainGenerator::fetch_terrain_image(URL_PREFIX, 1024*256, 1024*256, 0).expect("Terrain fetch failed");
 }
-*/
