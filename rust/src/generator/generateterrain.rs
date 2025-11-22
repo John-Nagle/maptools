@@ -327,11 +327,12 @@ impl TerrainGenerator {
             return Err(anyhow!("Terrain image location ({},{}) lod {} is invalid.", 
                 region_coords_x, region_coords_y, lod));
         }
-        const URL_SUFFIX: &str = "objects.jpg"; // make sure this is the same for OS
-        let url = format!("{}{}-{}-{}-{}", url_prefix, tile_id_x, tile_id_y, lod, URL_SUFFIX);
+        const URL_SUFFIX: &str = "-objects.jpg"; // make sure this is the same for OS
+        let url = format!("{}{}-{}-{}{}", url_prefix, lod + 1, tile_id_x, tile_id_y, URL_SUFFIX);
+        println!("URL: {}", url);   // ***TEMP***
         let mut resp = ureq::get(&url)
             //////.set("User-Agent", USERAGENT)
-            .header("Content-Type", "image") // 
+            .header("Content-Type", "image/jpg") // 
             .call()
             .map_err(anyhow::Error::msg)?;
             //////.with_context(|| format!("Reading map tile  {}", url))?;
