@@ -1,3 +1,4 @@
+/*
 //! Upload Second Life / Open Simulator terrain to server
 //! Part of the Animats impostor system
 //!
@@ -18,11 +19,10 @@
 //!    "scale":[256,256,25.690001],"water_height":20.000000,"sculpt_uuid":"64604b5c-461e-dd72-52a9-3d464abf78aa","impostor_lod":0},
 //! 
 //! This is very close to the JSON sent to the viewer.
-
+*/
+//
 use uuid::Uuid;
-//////use json::{JsonValue};
 use serde;
-//////use serde_json; // 1.0.143
 use serde::{Deserialize, Serialize};
 /// The data stored in the database for a region impostor.
 ///
@@ -97,4 +97,3 @@ impl RegionImpostorReply {
     /// Version of this interface
     pub const REGION_IMPOSTOR_INFO_VERSION: u32 = 1;
 }
-

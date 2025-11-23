@@ -27,13 +27,13 @@ use mysql::{params, PooledConn};
 use mysql::{Conn, Opts, OptsBuilder, Pool};
 use serde::Deserialize;
 use std::collections::HashMap;
-use std::io::Write;
+use std::io::{Write, Cursor};
 use std::path::PathBuf;
 
 mod vizgroup;
 use vizgroup::{CompletedGroups, RegionData, VizGroups};
 mod sculptmaker;
-use image::{RgbImage};
+use image::{RgbImage, DynamicImage, ImageReader};
 use sculptmaker::TerrainSculpt;
 
 /// MySQL Credentials for uploading.
@@ -317,7 +317,7 @@ impl TerrainGenerator {
         url_prefix: &str,
         region_coords_x: u32,
         region_coords_y: u32,
-        lod: u8) -> Result<RgbImage, Error> {
+        lod: u8) -> Result<DynamicImage, Error> {
         const STANDARD_TILE_SIZE: u32 = 256; // Even on OS
         let tile_id_x = region_coords_x / STANDARD_TILE_SIZE;
         let tile_id_y = region_coords_y / STANDARD_TILE_SIZE;
@@ -336,10 +336,15 @@ impl TerrainGenerator {
             .call()
             .map_err(anyhow::Error::msg)?;
             //////.with_context(|| format!("Reading map tile  {}", url))?;
-        let content_type = resp.headers().get("Content-Type").ok_or_else(|| anyhow!("No content type for image fetch"))?;
-        let buffer = resp.body_mut().read_to_vec()?;     
-        //  ***IMAGE TYPE?***
-        todo!();    // ***TEMP***
+        //////let content_type = resp.headers().get("Content-Type").ok_or_else(|| anyhow!("No content type for image fetch"))?;
+        let raw_data = resp.body_mut().read_to_vec()?;     
+        let mut reader = ImageReader::new(Cursor::new(raw_data))
+            .with_guessed_format()
+            .expect("Cursor io never fails");
+        //////assert_eq!(reader.format(), Some(ImageFormat::Pnm));
+
+        let image = reader.decode()?;
+        Ok(image)
     }
 
 
