@@ -515,6 +515,12 @@ fn main() {
 }
 #[test]
 fn read_terrain_texture() {
+    //  Want logging, but need to turn off Trace level to avoid too much junk.
+    let _ = simplelog::CombinedLogger::init(
+        vec![
+            simplelog::TermLogger::new(LevelFilter::Debug, simplelog::Config::default(), simplelog::TerminalMode::Mixed, simplelog::ColorChoice::Auto),]
+    );
+
     const URL_PREFIX: &str = "https://secondlife-maps-cdn.akamaized.net/map-";
     let img = TerrainGenerator::fetch_terrain_image(URL_PREFIX, 1024*256, 1024*256, 0).expect("Terrain fetch failed");
 }

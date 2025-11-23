@@ -476,13 +476,12 @@ fn test_visgroup() {
         )
         .collect();
     //  All errors to console
-    simplelog::CombinedLogger::init(vec![simplelog::TermLogger::new(
+    let _ = simplelog::CombinedLogger::init(vec![simplelog::TermLogger::new(
         simplelog::LevelFilter::Trace,
         simplelog::Config::default(),
         simplelog::TerminalMode::Mixed,
         simplelog::ColorChoice::Auto,
-    )])
-    .unwrap();
+    )]);
     let mut viz_groups = VizGroups::new(false);
     for item in test_data {
         let grid_break = viz_groups.add_region_data(item);
