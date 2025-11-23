@@ -1,4 +1,3 @@
-/*
 //! Upload Second Life / Open Simulator terrain to server
 //! Part of the Animats impostor system
 //!
@@ -7,9 +6,9 @@
 //! Later processing turns that into objects viewable in world via the
 //! region impostor system.
 //!
-//!     License: LGPL.
-//!     Animats
-//!     August, 2025.
+//! License: LGPL.
+//! Animats
+//! August, 2025.
 //!
 //! Once impostors have been created and uploaded to SL/OS, an LSL script tells this
 //! server about them. Messages are JSON, and look roughly like this:
@@ -19,7 +18,6 @@
 //!    "scale":[256,256,25.690001],"water_height":20.000000,"sculpt_uuid":"64604b5c-461e-dd72-52a9-3d464abf78aa","impostor_lod":0},
 //! 
 //! This is very close to the JSON sent to the viewer.
-*/
 //
 use uuid::Uuid;
 use serde;
