@@ -479,7 +479,7 @@ fn test_visgroup() {
     let _ = simplelog::CombinedLogger::init(vec![simplelog::TermLogger::new(
         simplelog::LevelFilter::Trace,
         simplelog::Config::default(),
-        simplelog::TerminalMode::Mixed,
+        simplelog::TerminalMode::Stdout,
         simplelog::ColorChoice::Auto,
     )]);
     let mut viz_groups = VizGroups::new(false);
