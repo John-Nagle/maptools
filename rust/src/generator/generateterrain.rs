@@ -305,47 +305,6 @@ impl TerrainGenerator {
         todo!("glTF mesh generation is not implemented yet");
     }
     
-    /// Fetch terrain image.
-    /// We can get terrain images from the map servers of SL and OS.
-    /// Level 0 LOD items are already in the SL asset store and have a UUID,
-    /// but there's no easy way to get that UUID without a viewer. So
-    /// we have to duplicate them in asset storage.
-    ///
-    /// Current SL official API:
-    /// https://secondlife-maps-cdn.akamaized.net/map-1-1024-1024-objects.jpg
-    pub fn fetch_terrain_image(
-        url_prefix: &str,
-        region_coords_x: u32,
-        region_coords_y: u32,
-        lod: u8) -> Result<DynamicImage, Error> {
-        const STANDARD_TILE_SIZE: u32 = 256; // Even on OS
-        let tile_id_x = region_coords_x / STANDARD_TILE_SIZE;
-        let tile_id_y = region_coords_y / STANDARD_TILE_SIZE;
-        let lod = lod as u32;
-        if region_coords_x % STANDARD_TILE_SIZE * lod.pow(2) != 0
-        || region_coords_y % STANDARD_TILE_SIZE * lod.pow(2) != 0 {
-            return Err(anyhow!("Terrain image location ({},{}) lod {} is invalid.", 
-                region_coords_x, region_coords_y, lod));
-        }
-        const URL_SUFFIX: &str = "-objects.jpg"; // make sure this is the same for OS
-        let url = format!("{}{}-{}-{}{}", url_prefix, lod + 1, tile_id_x, tile_id_y, URL_SUFFIX);
-        println!("URL: {}", url);   // ***TEMP***
-        let mut resp = ureq::get(&url)
-            //////.set("User-Agent", USERAGENT)
-            .header("Content-Type", "image/jpg") // 
-            .call()
-            .map_err(anyhow::Error::msg)?;
-            //////.with_context(|| format!("Reading map tile  {}", url))?;
-        //////let content_type = resp.headers().get("Content-Type").ok_or_else(|| anyhow!("No content type for image fetch"))?;
-        let raw_data = resp.body_mut().read_to_vec()?;     
-        let reader = ImageReader::new(Cursor::new(raw_data))
-            .with_guessed_format()
-            .expect("Cursor io never fails");
-        //////assert_eq!(reader.format(), Some(ImageFormat::Pnm));
-
-        let image = reader.decode()?;
-        Ok(image)
-    }
 
 
     /// Process one visibiilty group.
@@ -513,15 +472,4 @@ fn main() {
         }
     };
 }
-#[test]
-fn read_terrain_texture() {
-    //  Want logging, but need to turn off Trace level to avoid too much junk.
-    let _ = simplelog::CombinedLogger::init(
-        vec![
-            simplelog::TermLogger::new(LevelFilter::Debug, simplelog::Config::default(), simplelog::TerminalMode::Stdout, simplelog::ColorChoice::Auto),]
-    );
 
-    const URL_PREFIX: &str = "https://secondlife-maps-cdn.akamaized.net/map-";
-    let img = TerrainGenerator::fetch_terrain_image(URL_PREFIX, 1024*256, 1024*256, 0).expect("Terrain fetch failed");
-    img.save("/tmp/testimg.jpg").expect("test image write failed");
-}

@@ -4,12 +4,14 @@
 // Animats, October 2020
 // License: GPL
 
-use image::{Rgb, RgbImage};
+use image::{Rgb, RgbImage, ImageReader, DynamicImage};
 //////use serde::Deserialize;
 //////use serde_json;
 use std::cmp::{max, min};
 //////use std::env;
 use std::f64;
+use anyhow::{anyhow, Error};
+use std::io::{Write, Cursor};
 //////use std::fs::File;
 //////use std::io::{BufReader, Read};
 //////use std::path::Path;
@@ -122,76 +124,78 @@ impl TerrainSculpt {
         self.elevs = Some(elevs);
     }
 }
-/*
-fn unpackelev(elev: &str) -> Vec<u8> {
-    (0..(elev.len() / 2))
-        .map(|n| u8::from_str_radix(&elev[n * 2..n * 2 + 2], 16).unwrap())
-        .collect()
+
+/// Make a texture for a terrain sculpt.
+/// This is, for now, just the ground texture from the map tile server.
+pub struct TerrainSculptTexture {
+    /// Genereated image
+    pub image: Option<RgbImage>,
+    
 }
 
-// Struct to match JSON input
-#[derive(Deserialize)]
-struct TerrainJson {
-    elevs: Vec<String>,
-    scale: f64,
-    offset: f64,
-    region: String,
-}
-
-fn handlefile(filename: &str, outprefix: &str) {
-    // Read file
-    let mut file = File::open(filename).expect("Unable to open file");
-    let mut contents = String::new();
-    file.read_to_string(&mut contents)
-        .expect("Unable to read file");
-
-    let pos = contents.find("\n{").unwrap_or(0);
-    if pos < 1 {
-        panic!("Unable to find JSON data in file \"{}\"", filename);
+impl TerrainSculptTexture {
+    /// Usual new, doesn't do any real work
+    pub fn new(region_x_coords: u32, region_y_coords: u32, lod: u8, _region: &str) -> Self {
+        todo!();
     }
-    let s = &contents[(pos - 1)..];
+    
+    /// Actually makes the image and stores it in Self.
+    pub fn makeimage(&mut self, resolution: u32) -> Result<(), Error> {
+        todo!();
+    }
+    
+        /// Fetch terrain image.
+    /// We can get terrain images from the map servers of SL and OS.
+    /// Level 0 LOD items are already in the SL asset store and have a UUID,
+    /// but there's no easy way to get that UUID without a viewer. So
+    /// we have to duplicate them in asset storage.
+    ///
+    /// Current SL official API:
+    /// https://secondlife-maps-cdn.akamaized.net/map-1-1024-1024-objects.jpg
+    pub fn fetch_terrain_image(
+        url_prefix: &str,
+        region_coords_x: u32,
+        region_coords_y: u32,
+        lod: u8) -> Result<DynamicImage, Error> {
+        const STANDARD_TILE_SIZE: u32 = 256; // Even on OS
+        let tile_id_x = region_coords_x / STANDARD_TILE_SIZE;
+        let tile_id_y = region_coords_y / STANDARD_TILE_SIZE;
+        let lod = lod as u32;
+        if region_coords_x % STANDARD_TILE_SIZE * lod.pow(2) != 0
+        || region_coords_y % STANDARD_TILE_SIZE * lod.pow(2) != 0 {
+            return Err(anyhow!("Terrain image location ({},{}) lod {} is invalid.", 
+                region_coords_x, region_coords_y, lod));
+        }
+        const URL_SUFFIX: &str = "-objects.jpg"; // make sure this is the same for OS
+        let url = format!("{}{}-{}-{}{}", url_prefix, lod + 1, tile_id_x, tile_id_y, URL_SUFFIX);
+        println!("URL: {}", url);   // ***TEMP***
+        let mut resp = ureq::get(&url)
+            //////.set("User-Agent", USERAGENT)
+            .header("Content-Type", "image/jpg") // 
+            .call()
+            .map_err(anyhow::Error::msg)?;
+            //////.with_context(|| format!("Reading map tile  {}", url))?;
+        //////let content_type = resp.headers().get("Content-Type").ok_or_else(|| anyhow!("No content type for image fetch"))?;
+        let raw_data = resp.body_mut().read_to_vec()?;     
+        let reader = ImageReader::new(Cursor::new(raw_data))
+            .with_guessed_format()
+            .expect("Cursor io never fails");
+        //////assert_eq!(reader.format(), Some(ImageFormat::Pnm));
 
-    let jsn: TerrainJson = serde_json::from_str(s).expect("JSON parsing failed");
-    let elevs: Vec<Vec<u8>> = jsn.elevs.iter().map(|row| unpackelev(row)).collect();
+        let image = reader.decode()?;
+        Ok(image)
+    }
+}
 
-    println!(
-        "Region: {} scale: {:.3} offset {:.3}",
-        jsn.region, jsn.scale, jsn.offset
+#[test]
+fn read_terrain_texture() {
+    //  Want logging, but need to turn off Trace level to avoid too much junk.
+    let _ = simplelog::CombinedLogger::init(
+        vec![
+            simplelog::TermLogger::new(simplelog::LevelFilter::Debug, simplelog::Config::default(), simplelog::TerminalMode::Stdout, simplelog::ColorChoice::Auto),]
     );
 
-    let mut sculpt = TerrainSculpt::new(&jsn.region);
-    sculpt.setelevs(elevs, jsn.scale, jsn.offset);
-    sculpt.makeimage();
-
-    if let Some(img) = sculpt.image {
-        let outfile = format!("{}{}.png", outprefix, jsn.region);
-        img.save(&outfile).expect("Failed to save image");
-        println!("Saved {}", outfile);
-    }
+    const URL_PREFIX: &str = "https://secondlife-maps-cdn.akamaized.net/map-";
+    let img = TerrainSculptTexture::fetch_terrain_image(URL_PREFIX, 1024*256, 1024*256, 0).expect("Terrain fetch failed");
+    img.save("/tmp/testimg.jpg").expect("test image write failed");
 }
-
-fn main() {
-    let outprefix = "/tmp/terrainsculpt-";
-    let args: Vec<String> = env::args().collect();
-    if args.len() < 2 {
-        println!("Usage: {} <filenames>", args[0]);
-        process::exit(1);
-    }
-    let filenames = &args[1..];
-    for filename in filenames {
-        handlefile(filename, outprefix);
-    }
-}
-
-// For unit test, you can add
-// fn testmain() {
-//     let fname = "/tmp/sculpttest.png";
-//     let mut sculpt = TerrainSculpt::new("test");
-//     sculpt.pyramidtest();
-//     sculpt.makeimage();
-//     if let Some(img) = sculpt.image {
-//         img.save(fname).expect("Failed to save image");
-//         println!("Wrote {}", fname);
-//     }
-// }
-*/
