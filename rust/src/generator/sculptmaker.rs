@@ -128,6 +128,10 @@ impl TerrainSculpt {
 /// Make a texture for a terrain sculpt.
 /// This is, for now, just the ground texture from the map tile server.
 pub struct TerrainSculptTexture {
+    /// Coords X and Y. Meters.
+    region_coords_x: u32,
+    region_coords_y: u32,
+    lod: u8,
     /// Genereated image
     pub image: Option<RgbImage>,
     
@@ -135,13 +139,19 @@ pub struct TerrainSculptTexture {
 
 impl TerrainSculptTexture {
     /// Usual new, doesn't do any real work
-    pub fn new(region_x_coords: u32, region_y_coords: u32, lod: u8, _region: &str) -> Self {
-        todo!();
+    pub fn new(region_coords_x: u32, region_coords_y: u32, lod: u8, texture_name: &str) -> Self {
+        Self {
+            region_coords_x,
+            region_coords_y,
+            lod,
+            image: None,
+        }
     }
     
     /// Actually makes the image and stores it in Self.
     pub fn makeimage(&mut self, resolution: u32) -> Result<(), Error> {
-        todo!();
+        // ***MORE***
+        Ok(())
     }
     
         /// Fetch terrain image.

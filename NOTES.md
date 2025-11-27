@@ -220,4 +220,14 @@ Next steps:
    Looks like there's no non-grid survey way to get map tiles in SL.
    So, have to get them from the map server.
    For SL, we can get those for any zoom level. For OS, not sure.
+   
+2025-11-25
+
+   Give textures a name similar to that of the terrain sculpt/mesh.
+   Different prefix.
+   Consider adding a hash suffix to the file name to distinguish versions.
+   Textures and sculpt/mesh have the same suffix. 
+   - They're always replaced together.
+   
+   Do we still need another database table?
       

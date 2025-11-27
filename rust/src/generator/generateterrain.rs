@@ -34,7 +34,8 @@ mod vizgroup;
 use vizgroup::{CompletedGroups, RegionData, VizGroups};
 mod sculptmaker;
 use image::{RgbImage, DynamicImage, ImageReader};
-use sculptmaker::TerrainSculpt;
+use sculptmaker::{TerrainSculpt, TerrainSculptTexture};
+
 
 /// MySQL Credentials for uploading.
 /// This filename will be searched for in parent directories,
@@ -53,6 +54,8 @@ const UPLOAD_CREDS_FILE: &str = "generate_credentials.txt";
 /// Environment variables for obtaining owner info.
 /// ***ADD VALUES FOR OPEN SIMULATOR***
 const OWNER_NAME: &str = "HTTP_X_SECONDLIFE_OWNER_NAME";
+/// Size of output terrain sculpt textures, pixels.
+const TERRAIN_SCULPT_TEXTURE_SIZE: u32 = 256;
 
 /// Debug logging
 fn logger() {
@@ -281,15 +284,22 @@ impl TerrainGenerator {
     ) -> Result<(), Error> {
         log::info!("Generating sculpt for \"{}\": {}", impostor_name, height_field);
         // TerrainSculpt was translated from Python with an LLM. NEEDS WORK
-        let mut terrain_sculpt = TerrainSculpt::new(impostor_name);
+        let mut terrain_sculpt = TerrainSculpt::new(&impostor_name);
         let (scale, offset, elevs) = height_field.into_sculpt_array()?;
         terrain_sculpt.setelevs(elevs, scale as f64, offset as f64);
         terrain_sculpt.makeimage();
-        let img = terrain_sculpt.image.unwrap();
+        let sculpt_img = terrain_sculpt.image.unwrap();
         let mut imgpath = self.outdir.clone();
         imgpath.push(impostor_name.to_owned() + ".png");
-        log::info!("Sculpt image saved: \"{}\"", imgpath.display());
-        img.save(imgpath)?;
+        
+        log::info!("Generating texture for  \"{}\"", imgpath.display());
+        //  ***NEED REAL SCULPT NAME***
+        let mut terrain_image = TerrainSculptTexture::new(region_coords_x, region_coords_y, lod, impostor_name);
+        terrain_image.makeimage(TERRAIN_SCULPT_TEXTURE_SIZE)?;
+        //  Did both sculpt and its one texture. Now OK to write files
+        sculpt_img.save(&imgpath)?;
+        //  ***WRITE TERRAIN IMAGE***
+        log::info!("Sculpt image saved: \"{}\"", imgpath.display());        
         Ok(())
     }
 
