@@ -219,17 +219,17 @@ impl TerrainGenerator {
         region_coords_x: u32,
         region_coords_y: u32,
         lod: u8,
-        impostor_name: &str,
+        sculpt_impostor_name: &str,
     ) -> String {
         let x = region_coords_x;
         let y = region_coords_y;
-        format!("R-{}-{}-{}-{}", x, y, lod, impostor_name)
+        format!("R-{}-{}-{}-{}", x, y, lod, sculpt_impostor_name)
     }
 */    
     /// Generate name for impostor asset file.
     /// The name contains all the info we need to generate the impostor.
-    /// Format: R_x_y_sx_sy_sz_offset_lod_waterlevel-name
-    fn impostor_name(
+    /// Format: RS_x_y_sx_sy_sz_offset_lod_waterlevel_name
+    fn sculpt_impostor_name(
         region: &RegionData,
         height_field: &HeightField,
         lod: u8,
@@ -244,6 +244,24 @@ impl TerrainGenerator {
         let water_level = height_field.water_level;
         Ok(format!("RS_{}_{}_{}_{}_{:.2}_{:.2}_{}_{:.2}_{}", x, y, sx, sy, sz, offset, lod, water_level, name))
     }
+    
+    /// Generate name for impostor asset file.
+    /// The name contains all the info we need to generate the impostor.
+    /// Format: RTtexture_type_facenum_x_y_sx_sy_sz_name
+    //  Texture type is A for albedo and E for emissive.
+    fn terrain_impostor_name(
+        region: &RegionData,
+        lod: u8,
+        face_num: u8,
+        texture_type: char,
+        name: &str,
+    ) -> Result<String, Error> {
+        let x = region.region_coords_x;
+        let y = region.region_coords_y;
+        let sx = region.size_x;
+        let sy = region.size_y;
+        Ok(format!("RT{}_{}_{}_{}_{}_{}_{}", texture_type, face_num, x, y, sx, sy, name))
+    }
 
     /// Build the impostor
     pub fn build_impostor(
@@ -251,7 +269,7 @@ impl TerrainGenerator {
         region_coords_x: u32,
         region_coords_y: u32,
         lod: u8,
-        impostor_name: &str,
+        sculpt_impostor_name: &str,
         height_field: &HeightField,
     ) -> Result<(), Error> {
         if self.generate_mesh {
@@ -259,7 +277,7 @@ impl TerrainGenerator {
                 region_coords_x,
                 region_coords_y,
                 lod,
-                impostor_name,
+                sculpt_impostor_name,
                 height_field,
             )
         } else {
@@ -267,7 +285,7 @@ impl TerrainGenerator {
                 region_coords_x,
                 region_coords_y,
                 lod,
-                impostor_name,
+                sculpt_impostor_name,
                 height_field,
             )
         }
@@ -279,26 +297,27 @@ impl TerrainGenerator {
         region_coords_x: u32,
         region_coords_y: u32,
         lod: u8,
-        impostor_name: &str,
+        sculpt_impostor_name: &str,
         height_field: &HeightField,
     ) -> Result<(), Error> {
-        log::info!("Generating sculpt for \"{}\": {}", impostor_name, height_field);
+        log::info!("Generating sculpt for \"{}\": {}", sculpt_impostor_name, height_field);
         // TerrainSculpt was translated from Python with an LLM. NEEDS WORK
-        let mut terrain_sculpt = TerrainSculpt::new(&impostor_name);
+        let mut terrain_sculpt = TerrainSculpt::new(&sculpt_impostor_name);
         let (scale, offset, elevs) = height_field.into_sculpt_array()?;
         terrain_sculpt.setelevs(elevs, scale as f64, offset as f64);
         terrain_sculpt.makeimage();
         let sculpt_img = terrain_sculpt.image.unwrap();
         let mut imgpath = self.outdir.clone();
-        imgpath.push(impostor_name.to_owned() + ".png");
+        imgpath.push(sculpt_impostor_name.to_owned() + ".png");
         
         log::info!("Generating texture for  \"{}\"", imgpath.display());
         //  ***NEED REAL SCULPT NAME***
-        let mut terrain_image = TerrainSculptTexture::new(region_coords_x, region_coords_y, lod, impostor_name);
+        let mut terrain_image = TerrainSculptTexture::new(region_coords_x, region_coords_y, lod, sculpt_impostor_name);
         terrain_image.makeimage(TERRAIN_SCULPT_TEXTURE_SIZE)?;
         //  Did both sculpt and its one texture. Now OK to write files
         sculpt_img.save(&imgpath)?;
         //  ***WRITE TERRAIN IMAGE***
+        //  ***NEED TERRAIN IMAGE PATH***
         log::info!("Sculpt image saved: \"{}\"", imgpath.display());        
         Ok(())
     }
@@ -309,7 +328,7 @@ impl TerrainGenerator {
         region_coords_x: u32,
         region_coords_y: u32,
         lod: u8,
-        impostor_name: &str,
+        sculpt_impostor_name: &str,
         height_field: &HeightField,
     ) -> Result<(), Error> {
         todo!("glTF mesh generation is not implemented yet");
@@ -330,7 +349,7 @@ impl TerrainGenerator {
                 region.region_coords_x,
                 region.region_coords_y,
             )?;
-            let impostor_name = Self::impostor_name(
+            let sculpt_impostor_name = Self::sculpt_impostor_name(
                 region,
                 &height_field,
                 lod,
@@ -340,7 +359,7 @@ impl TerrainGenerator {
                 region.region_coords_x,
                 region.region_coords_y,
                 lod,
-                &impostor_name,
+                &sculpt_impostor_name,
                 &height_field,
             )?;
             println!("Region \"{}\": {}", region.name, height_field);

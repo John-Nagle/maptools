@@ -132,7 +132,7 @@ pub struct TerrainSculptTexture {
     region_coords_x: u32,
     region_coords_y: u32,
     lod: u8,
-    /// Genereated image
+    /// Generated image
     pub image: Option<RgbImage>,
     
 }
@@ -149,8 +149,14 @@ impl TerrainSculptTexture {
     }
     
     /// Actually makes the image and stores it in Self.
+    /// Temporary dumb version - just gets what the SL map has.
+    /// Need to generate our own larger images.
+    /// Need to adjust resolution.
     pub fn makeimage(&mut self, resolution: u32) -> Result<(), Error> {
-        // ***MORE***
+        //  ***NEED TO GET OS PREFIX FROM - WHERE? ***
+        const URL_PREFIX: &str = "https://secondlife-maps-cdn.akamaized.net/map-";
+        let img = Self::fetch_terrain_image(URL_PREFIX, self.region_coords_x, self.region_coords_y, self.lod)?;
+        self.image = Some(img.into());
         Ok(())
     }
     
