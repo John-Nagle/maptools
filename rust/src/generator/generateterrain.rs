@@ -244,7 +244,7 @@ impl TerrainGenerator {
         let water_level = height_field.water_level;
         Ok(format!("RS_{}_{}_{}_{}_{:.2}_{:.2}_{}_{:.2}_{}", x, y, sx, sy, sz, offset, lod, water_level, name))
     }
-    
+/*   
     /// Generate name for impostor asset file.
     /// The name contains all the info we need to generate the impostor.
     /// Format: RTtexture_type_facenum_x_y_sx_sy_sz_name
@@ -261,6 +261,27 @@ impl TerrainGenerator {
         let sx = region.size_x;
         let sy = region.size_y;
         Ok(format!("RT{}_{}_{}_{}_{}_{}_{}", texture_type, face_num, x, y, sx, sy, name))
+    }
+*/
+    
+    /// Encoded name for impostor asset file.
+    /// The name contains all the info we need to generate the impostor.
+    /// Format: RS_x_y_sx_sy_sz_offset_lod_waterlevel_name
+    fn impostor_name(
+        prefix: &str,
+        region: &RegionData,
+        height_field: &HeightField,
+        lod: u8,
+        hash: u32,
+    ) -> Result<String, Error> {
+        let x = region.region_coords_x;
+        let y = region.region_coords_y;
+        let (scale, offset) = height_field.get_scale_offset()?;
+        let sx = region.size_x;
+        let sy = region.size_y;
+        let sz = scale;
+        let water_level = height_field.water_level;
+        Ok(format!("{}_{}_{}_{}_{}_{:.2}_{:.2}_{}_{:.2}_0x{:08x}", prefix, x, y, sx, sy, sz, offset, lod, water_level, hash))
     }
 
     /// Build the impostor
