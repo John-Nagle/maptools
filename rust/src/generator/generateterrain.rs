@@ -287,69 +287,73 @@ impl TerrainGenerator {
     /// Build the impostor
     pub fn build_impostor(
         &mut self,
-        region_coords_x: u32,
-        region_coords_y: u32,
+        //////region_coords_x: u32,
+        //////region_coords_y: u32,
+        region: &RegionData,
         lod: u8,
-        sculpt_impostor_name: &str,
         height_field: &HeightField,
     ) -> Result<(), Error> {
         if self.generate_mesh {
             self.build_impostor_mesh(
-                region_coords_x,
-                region_coords_y,
+                region,
                 lod,
-                sculpt_impostor_name,
                 height_field,
             )
         } else {
             self.build_impostor_sculpt(
-                region_coords_x,
-                region_coords_y,
+                region,
                 lod,
-                sculpt_impostor_name,
                 height_field,
             )
         }
     }
 
     /// Build the impostor as a sculpt.
+    //  ***STILL STRUGGLING WITH ENCODING INFO IN NAME***
+    //  ***NEED HASH VALUE FOR EACH FILE***
     pub fn build_impostor_sculpt(
         &mut self,
-        region_coords_x: u32,
-        region_coords_y: u32,
+        region: &RegionData,
         lod: u8,
-        sculpt_impostor_name: &str,
         height_field: &HeightField,
     ) -> Result<(), Error> {
-        log::info!("Generating sculpt for \"{}\": {}", sculpt_impostor_name, height_field);
+        const IMPOSTOR_SCULPT_PREFIX: &str = "RS";
+        const IMPOSTOR_TERRAIN_PREFIX: &str = "RT0";
+        log::info!("Generating sculpt for \"{}\": {}", region.name, height_field);
         // TerrainSculpt was translated from Python with an LLM. NEEDS WORK
+        let sculpt_impostor_name = region.name.clone(); // ***TEMP***
         let mut terrain_sculpt = TerrainSculpt::new(&sculpt_impostor_name);
         let (scale, offset, elevs) = height_field.into_sculpt_array()?;
         terrain_sculpt.setelevs(elevs, scale as f64, offset as f64);
         terrain_sculpt.makeimage();
-        let sculpt_img = terrain_sculpt.image.unwrap();
-        let mut imgpath = self.outdir.clone();
-        imgpath.push(sculpt_impostor_name.to_owned() + ".png");
+        let hash = terrain_sculpt.get_hash()?;
+        let sculpt_name = Self::impostor_name(IMPOSTOR_SCULPT_PREFIX, region, height_field, lod, hash)?;
+        let sculpt_image = terrain_sculpt.image.unwrap();
+        let mut sculpt_image_path = self.outdir.clone();
+        sculpt_image_path.push(sculpt_name.to_owned() + ".png");
         
-        log::info!("Generating texture for  \"{}\"", imgpath.display());
-        //  ***NEED REAL SCULPT NAME***
-        let mut terrain_image = TerrainSculptTexture::new(region_coords_x, region_coords_y, lod, sculpt_impostor_name);
+        log::info!("Generating texture for  \"{}\"", sculpt_image_path.display());
+        let mut terrain_image = TerrainSculptTexture::new(region.region_coords_x, region.region_coords_y, lod, &region.name);
         terrain_image.makeimage(TERRAIN_SCULPT_TEXTURE_SIZE)?;
+        let hash = terrain_image.get_hash()?;
+        let terrain_image_name = Self::impostor_name(IMPOSTOR_TERRAIN_PREFIX, region, height_field, lod, hash)?;
+        
+        let mut terrain_image_path = self.outdir.clone();
+        terrain_image_path.push(terrain_image_name.to_owned() + ".png");
+        let terrain_image = terrain_image.image.unwrap();
         //  Did both sculpt and its one texture. Now OK to write files
-        sculpt_img.save(&imgpath)?;
-        //  ***WRITE TERRAIN IMAGE***
-        //  ***NEED TERRAIN IMAGE PATH***
-        log::info!("Sculpt image saved: \"{}\"", imgpath.display());        
+        sculpt_image.save(sculpt_image_path)?;
+        log::info!("Sculpt image saved: \"{}\"", terrain_image_path.display());    
+        terrain_image.save(&terrain_image_path)?;
+        log::info!("Sculpt terrain image saved: \"{}\"", terrain_image_path.display());        
         Ok(())
     }
 
     /// Build the impostor as a glTF mesh.
     pub fn build_impostor_mesh(
         &mut self,
-        region_coords_x: u32,
-        region_coords_y: u32,
+        region: &RegionData,
         lod: u8,
-        sculpt_impostor_name: &str,
         height_field: &HeightField,
     ) -> Result<(), Error> {
         todo!("glTF mesh generation is not implemented yet");
@@ -370,17 +374,20 @@ impl TerrainGenerator {
                 region.region_coords_x,
                 region.region_coords_y,
             )?;
+/*
             let sculpt_impostor_name = Self::sculpt_impostor_name(
                 region,
                 &height_field,
                 lod,
                 &region.name,
             )?;
+*/
             self.build_impostor(
-                region.region_coords_x,
-                region.region_coords_y,
+                //////region.region_coords_x,
+                //////region.region_coords_y,
+                region,
                 lod,
-                &sculpt_impostor_name,
+                //////&sculpt_impostor_name,
                 &height_field,
             )?;
             println!("Region \"{}\": {}", region.name, height_field);

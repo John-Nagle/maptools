@@ -70,6 +70,11 @@ impl TerrainSculpt {
             self.image = Some(img);
         }
     }
+    
+    /// Get uniqueness hash
+    pub fn get_hash(&self) -> Result<u32, Error> {
+        Ok(999)   // ***TEMP***
+    }
 
     pub fn setelevs(&mut self, elevs: Vec<Vec<u8>>, inputscale: f64, inputoffset: f64) {
         if elevs.len() == SCULPTDIM && elevs[0].len() == SCULPTDIM {
@@ -160,7 +165,12 @@ impl TerrainSculptTexture {
         Ok(())
     }
     
-        /// Fetch terrain image.
+    /// Get uniqueness hash
+    pub fn get_hash(&self) -> Result<u32, Error> {
+        Ok(999)   // ***TEMP***
+    }
+    
+    /// Fetch terrain image.
     /// We can get terrain images from the map servers of SL and OS.
     /// Level 0 LOD items are already in the SL asset store and have a UUID,
     /// but there's no easy way to get that UUID without a viewer. So
