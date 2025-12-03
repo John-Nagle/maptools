@@ -8,7 +8,7 @@ use image::{Rgb, RgbImage, ImageReader, DynamicImage};
 //////use serde::Deserialize;
 //////use serde_json;
 use std::cmp::{max, min};
-//////use std::env;
+use std::hash::{Hash, Hasher, DefaultHasher};
 use std::f64;
 use anyhow::{anyhow, Error};
 use std::io::{Write, Cursor};
@@ -17,27 +17,30 @@ use std::io::{Write, Cursor};
 //////use std::path::Path;
 //////use std::process;
 
+/// Calculate hash for duplicate check.
+fn calc_rgbimage_hash(img: &RgbImage) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    img.hash(&mut hasher);
+    hasher.finish()
+}
+
 const SCULPTDIM: usize = 64; // Sculpt textures are always 64x64
 
 #[derive(Debug)]
 pub struct TerrainSculpt {
-    //////region: String,
     pub image: Option<RgbImage>,
     elevs: Option<Vec<Vec<f64>>>,
     zheight: Option<f64>,
     zoffset: Option<f64>,
-    //////waterheight: Option<f64>,
 }
 
 impl TerrainSculpt {
     pub fn new(_region: &str) -> Self {
         TerrainSculpt {
-            //////region: region.to_string(),
             image: None,
             elevs: None,
             zheight: None,
             zoffset: None,
-            //////waterheight: None,
         }
     }
 
@@ -72,8 +75,8 @@ impl TerrainSculpt {
     }
     
     /// Get uniqueness hash
-    pub fn get_hash(&self) -> Result<u32, Error> {
-        Ok(999)   // ***TEMP***
+    pub fn get_hash(&self) -> Result<u64, Error> {
+        Ok(calc_rgbimage_hash(&self.image.as_ref().unwrap()))
     }
 
     pub fn setelevs(&mut self, elevs: Vec<Vec<u8>>, inputscale: f64, inputoffset: f64) {
@@ -166,8 +169,8 @@ impl TerrainSculptTexture {
     }
     
     /// Get uniqueness hash
-    pub fn get_hash(&self) -> Result<u32, Error> {
-        Ok(999)   // ***TEMP***
+    pub fn get_hash(&self) -> Result<u64, Error> {
+        Ok(calc_rgbimage_hash(&self.image.as_ref().unwrap()))
     }
     
     /// Fetch terrain image.

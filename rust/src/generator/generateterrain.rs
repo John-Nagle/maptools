@@ -272,7 +272,7 @@ impl TerrainGenerator {
         region: &RegionData,
         height_field: &HeightField,
         lod: u8,
-        hash: u32,
+        hash: u64,
     ) -> Result<String, Error> {
         let x = region.region_coords_x;
         let y = region.region_coords_y;
@@ -281,7 +281,7 @@ impl TerrainGenerator {
         let sy = region.size_y;
         let sz = scale;
         let water_level = height_field.water_level;
-        Ok(format!("{}_{}_{}_{}_{}_{:.2}_{:.2}_{}_{:.2}_0x{:08x}", prefix, x, y, sx, sy, sz, offset, lod, water_level, hash))
+        Ok(format!("{}_{}_{}_{}_{}_{:.2}_{:.2}_{}_{:.2}_0x{:016x}", prefix, x, y, sx, sy, sz, offset, lod, water_level, hash))
     }
 
     /// Build the impostor
