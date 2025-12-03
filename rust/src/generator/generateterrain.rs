@@ -448,7 +448,6 @@ fn setup() -> Result<(Pool, PathBuf, String, bool), Error> {
     );
     opts.optflag("m", "mesh", "Generate glTF mesh, not sculpt image");
     opts.optopt("g", "grid", "Only output for this grid", "NAME");
-    opts.optflag("m", "mesh", "Generate glTF mesh, not sculpt image");
     opts.optflag("h", "help", "Print this help menu.");
     opts.optflag("v", "verbose", "Verbose mode.");
     let matches = match opts.parse(&args[1..]) {
@@ -474,7 +473,7 @@ fn setup() -> Result<(Pool, PathBuf, String, bool), Error> {
     let outdir = PathBuf::from(&outdir.unwrap());
     let grid = grid.unwrap().trim().to_lowercase();
     // Create the output directory, empty.
-    //  ***MORE***
+    std::fs::create_dir_all(&outdir)?;
     // Connect to the database
     let creds = match Envie::load_with_path(&credsfile) {
         Ok(creds) => creds,
