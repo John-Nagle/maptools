@@ -274,13 +274,25 @@ impl TerrainGenerator {
         todo!("glTF mesh generation is not implemented yet");
     }
     
-
+    /// Get dimensions of a group.
+    pub fn get_group_bounds(&self, group: &Vec<RegionData>) -> Result<((u32,u32), (u32,u32)), Error> {
+        if group.is_empty() {
+            return Err(anyhow!("Empty group"));
+        }
+        Ok(
+            ((group.iter().fold(u32::MAX, |acc, v| acc.min(v.region_coords_x)),
+            group.iter().fold(u32::MAX, |acc, v| acc.min(v.region_coords_y))),
+            (group.iter().fold(u32::MIN, |acc, v| acc.max(v.region_coords_x + v.size_x)),
+            group.iter().fold(u32::MIN, |acc, v| acc.max(v.region_coords_y + v.size_y))))
+        )
+    }
 
     /// Process one visibiilty group.
     /// There's a lot to do here.
     /// Temp version - just generates impostors for all single regions.
     pub fn process_group(&mut self, group: &Vec<RegionData>) -> Result<(), Error> {
-        log::info!("Group: {} entries.", group.len());
+        let bounds = self.get_group_bounds(group)?;
+        log::info!("Group: {} entries, bounds: {:?}", group.len(), bounds);
                                                      //  Dumb version, just do single-size regions.
         let lod = 0; // single regions only
         for region in group {
