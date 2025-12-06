@@ -295,7 +295,7 @@ impl TerrainGenerator {
     /// For a group with given bounds, find the starting point and increments which will step
     /// a properly aligned rectangle for the given LOD over the bounds covering all rectangles within the bounds.
     /// This is pure math.
-    pub fn get_group_scan_limits(bounds: ((u32, u32), (u32, u32)), size: (u32, u32), lod: u8) -> Result<((u32, u32), (u32, u32)), Error> {
+    pub fn get_group_scan_limits(bounds: ((u32, u32), (u32, u32)), size: (u32, u32), lod: u8) -> ((u32, u32), (u32, u32)) {
         //  Get lower left and upper right
         let (lower_left, ur) = bounds;
         let lod_mult = 2_u32.pow(lod as u32);
@@ -303,7 +303,7 @@ impl TerrainGenerator {
         //  Now the tricky part. Round down the lower_left values to the next lower multiple of step.
         //  ***UNTESTED***
         let start = ((lower_left.0/step.0) * step.0, (lower_left.1/step.1) * step.1);
-        Ok((start, step))
+        (start, step)
     }
 
     /// Process one visibiilty group.
