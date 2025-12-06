@@ -275,7 +275,7 @@ impl TerrainGenerator {
     }
     
     /// Get dimensions of a group.
-    pub fn get_group_bounds(&self, group: &Vec<RegionData>) -> Result<((u32,u32), (u32,u32)), Error> {
+    pub fn get_group_bounds(group: &Vec<RegionData>) -> Result<((u32,u32), (u32,u32)), Error> {
         //  Error if empty group.
         if group.is_empty() {
             return Err(anyhow!("Empty viz group"));
@@ -295,23 +295,49 @@ impl TerrainGenerator {
     /// For a group with given bounds, find the starting point and increments which will step
     /// a properly aligned rectangle for the given LOD over the bounds covering all rectangles within the bounds.
     /// This is pure math.
-    pub fn get_group_scan_limits(bounds: ((u32, u32), (u32, u32)), size: (u32, u32), lod: u8) -> ((u32, u32), (u32, u32)) {
+    pub fn get_group_scan_limits(bounds: ((u32, u32), (u32, u32)), region_size: (u32, u32), lod: u8) -> ((u32, u32), (u32, u32)) {
         //  Get lower left and upper right
-        let (lower_left, ur) = bounds;
+        let (lower_left, _upper_right) = bounds;
         let lod_mult = 2_u32.pow(lod as u32);
-        let step = (size.0 * lod_mult, size.1 * lod_mult);
+        let step = (region_size.0 * lod_mult, region_size.1 * lod_mult);
         //  Now the tricky part. Round down the lower_left values to the next lower multiple of step.
         //  ***UNTESTED***
         let start = ((lower_left.0/step.0) * step.0, (lower_left.1/step.1) * step.1);
         (start, step)
+    }
+    
+    ///  Step through the regions of an entire LOD
+    /// ***TEST ONLY***
+    pub fn step_through_lod(&self, group: &Vec<RegionData>, lod: u8) -> Result<(), Error> {
+        let bounds = Self::get_group_bounds(group)?;
+        let upper_right = bounds.1;
+        //  Zero sized groups already filtered.
+        let region_size = (group[0].size_x, group[0].size_y);
+        let (start, step) = Self::get_group_scan_limits(bounds, region_size, lod);
+        for x in (start.0 .. upper_right.0).step_by(step.0 as usize) {
+            for y in (start.1 .. upper_right.1).step_by(step.1 as usize) {
+                log::debug!("LOD #{}: step ({}, {})", lod, x, y); 
+            }
+        }
+        Ok(())    
+    }
+    
+    /// Test only
+    pub fn step_through_all_lods(&self, group: &Vec<RegionData>) -> Result<(), Error> {
+        for lod in 0..8 {
+            self.step_through_lod(group, lod)?;
+        }
+        Ok(())
     }
 
     /// Process one visibiilty group.
     /// There's a lot to do here.
     /// Temp version - just generates impostors for all single regions.
     pub fn process_group(&mut self, group: &Vec<RegionData>) -> Result<(), Error> {
-        let bounds = self.get_group_bounds(group)?;
+        let bounds = Self::get_group_bounds(group)?;
         log::info!("Group: {} entries, bounds: {:?}", group.len(), bounds);
+        //  ***TEST ONLY***
+        self.step_through_all_lods(group)?;         // ***TEMP***
                                                      //  Dumb version, just do single-size regions.
         let lod = 0; // single regions only
         for region in group {
