@@ -230,4 +230,16 @@ Next steps:
    - They're always replaced together.
    
    Do we still need another database table?
+   
+2025-12-04
+
+   No, don't need another table, just a filename field in region_impostors to
+   tell us when we don't need to make a new one.
+   
+   Single generation is working. Next, hierarchical generation.
+   - Generate all singles. 
+   - Work upwards - 4x, 16x, etc. until largest one covers the extents of the viz group.
+   - Cache completed regions.
+   - Every 2x rows, do 2x regions, iterating across row.
+     - Every 4x rows, do 4x regions, etc. This keeps regions needed in cache without storing entire map in memory.
       

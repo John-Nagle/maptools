@@ -276,8 +276,13 @@ impl TerrainGenerator {
     
     /// Get dimensions of a group.
     pub fn get_group_bounds(&self, group: &Vec<RegionData>) -> Result<((u32,u32), (u32,u32)), Error> {
+        //  Error if empty group.
         if group.is_empty() {
-            return Err(anyhow!("Empty group"));
+            return Err(anyhow!("Empty viz group"));
+        }
+        //  Error if group is not homogeneous. It always is in SL. For OS, we don't try to do multi-region impostors.
+        if group.iter().find(|v| v.size_x != group[0].size_x || v.size_y != group[0].size_y).is_some() {
+            return Err(anyhow!("Regions in a viz group are not all the same size"));
         }
         Ok(
             ((group.iter().fold(u32::MAX, |acc, v| acc.min(v.region_coords_x)),
@@ -285,6 +290,20 @@ impl TerrainGenerator {
             (group.iter().fold(u32::MIN, |acc, v| acc.max(v.region_coords_x + v.size_x)),
             group.iter().fold(u32::MIN, |acc, v| acc.max(v.region_coords_y + v.size_y))))
         )
+    }
+    
+    /// For a group with given bounds, find the starting point and increments which will step
+    /// a properly aligned rectangle for the given LOD over the bounds covering all rectangles within the bounds.
+    /// This is pure math.
+    pub fn get_group_scan_limits(bounds: ((u32, u32), (u32, u32)), size: (u32, u32), lod: u8) -> Result<((u32, u32), (u32, u32)), Error> {
+        //  Get lower left and upper right
+        let (lower_left, ur) = bounds;
+        let lod_mult = 2_u32.pow(lod as u32);
+        let step = (size.0 * lod_mult, size.1 * lod_mult);
+        //  Now the tricky part. Round down the lower_left values to the next lower multiple of step.
+        //  ***UNTESTED***
+        let start = ((lower_left.0/step.0) * step.0, (lower_left.1/step.1) * step.1);
+        Ok((start, step))
     }
 
     /// Process one visibiilty group.
