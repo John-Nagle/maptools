@@ -15,6 +15,9 @@
 //!     August, 2025.
 //
 #![forbid(unsafe_code)]
+mod sculptmaker;
+mod regionorder;
+mod vizgroup;
 use anyhow::{anyhow, Error};
 use chrono::{NaiveDateTime, Utc};
 use common::Credentials;
@@ -29,10 +32,7 @@ use serde::Deserialize;
 use std::collections::HashMap;
 use std::io::{Write, Cursor};
 use std::path::PathBuf;
-
-mod vizgroup;
 use vizgroup::{CompletedGroups, RegionData, VizGroups};
-mod sculptmaker;
 use image::{RgbImage, DynamicImage, ImageReader};
 use sculptmaker::{TerrainSculpt, TerrainSculptTexture};
 
