@@ -29,6 +29,53 @@ use std::path::PathBuf;
 use crate::vizgroup::{CompletedGroups, RegionData, VizGroups};
 use image::{RgbImage, DynamicImage, ImageReader};
 
+const MAX_LOD: u8 = 10;
+
+/// Simple version, without optimization.
+/// Just iterates over &Vec<RegionData>.
+/// No LODs other than 0.
+pub struct SimpleColumnCursors {
+    /// The regions
+    regions: Vec<RegionData>,
+    /// The cursor
+    cursor: usize,     
+}
+
+impl SimpleColumnCursors {
+    /// The regions
+    pub fn new(regions: Vec<RegionData>) -> Self {
+        Self {
+            regions,
+            cursor: 0
+        }    
+    } 
+}
+
+impl Iterator for SimpleColumnCursors {
+    type Item = RegionData;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.cursor < self.regions.len() {
+            let i = self.cursor;
+            self.cursor += 1;
+            Some(self.regions[i].clone())
+        } else {
+            None
+        }
+    }
+}
+
+///  All the column cursors for all the LODs.
+pub struct ColumnCursors {
+    /// Cursors for each LOD
+    cursors: [ColumnCursor; MAX_LOD as usize],
+}
+
+impl ColumnCursors {
+    
+    //  This ought to return an iterator.
+}
+
 
 /// Advance across a LOD one column at a time.
 pub struct ColumnCursor {
