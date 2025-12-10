@@ -70,14 +70,24 @@ impl Iterator for SimpleColumnCursors {
 /// constructe higher LOD impostors.
 
 pub struct ColumnCursors {
+    /// Bounds of the entire region data
+    bounds: ((u32, u32), (u32, u32)),
     /// Cursors for each LOD
-    cursors: [ColumnCursor; MAX_LOD as usize],
+    //////cursors: [ColumnCursor; MAX_LOD as usize],
+    /// The regions
+    regions: Vec<RegionData>,
 }
 
 impl ColumnCursors {
-    /// The regions
+    /// The cursors for the regions.
     pub fn new(regions: Vec<RegionData>) -> Self {
-        todo!();
+        let bounds = get_group_bounds(&regions).expect("Invalid group bounds");
+        let cursors_vec: Vec<_> = (0..MAX_LOD).map(|lod| ColumnCursor::new(bounds, lod)).collect();
+        Self {
+            bounds, 
+            regions,
+            //////cursors: (0..MAX_LOD).map(|lod| ColumnCursor::new(bounds, lod)).collect(),
+        }
     }
     /*
             Self {
@@ -100,6 +110,10 @@ impl Iterator for ColumnCursors {
 pub struct ColumnCursor {}
 
 impl ColumnCursor {
+    /// Usual new
+    pub fn new(bounds: ((u32, u32), (u32, u32)), lod: u8) -> ColumnCursor {
+        todo!();
+    }
     /// Advance column if possible
     pub fn advance(&mut self) {
         //  ***MORE***
