@@ -73,7 +73,7 @@ pub struct ColumnCursors {
     /// Bounds of the entire region data
     bounds: ((u32, u32), (u32, u32)),
     /// Cursors for each LOD
-    //////cursors: [ColumnCursor; MAX_LOD as usize],
+    cursors: Vec<ColumnCursor>,
     /// The regions
     regions: Vec<RegionData>,
 }
@@ -82,25 +82,26 @@ impl ColumnCursors {
     /// The cursors for the regions.
     pub fn new(regions: Vec<RegionData>) -> Self {
         let bounds = get_group_bounds(&regions).expect("Invalid group bounds");
-        let cursors_vec: Vec<_> = (0..MAX_LOD).map(|lod| ColumnCursor::new(bounds, lod)).collect();
+        let cursors: Vec<_> = (0..MAX_LOD).map(|lod| ColumnCursor::new(bounds, lod)).collect();
         Self {
             bounds, 
             regions,
-            //////cursors: (0..MAX_LOD).map(|lod| ColumnCursor::new(bounds, lod)).collect(),
+            cursors
         }
     }
-    /*
-            Self {
-                regions,
-                cursor: 0
-            }
-        }
-    */
 }
 
 impl Iterator for ColumnCursors {
     type Item = RegionData;
 
+    /// The iterator for ColumnCursors.
+    /// This returns the next RegionData for which an impostor is to be generated.
+    /// A RegionData for LOD > 0 may not be returned until all four regions for the
+    /// next higher LOD have been returned, or are known to be empty water regions.
+    /// The RegionData for a LOD > 0 should be returned as soon as all the needed
+    /// regions to build that group of four have been built. 
+    /// This is to avoid the need to keep huge numbers of region images in memory
+    /// at one time. 
     fn next(&mut self) -> Option<Self::Item> {
         todo!();
     }
