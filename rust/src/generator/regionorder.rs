@@ -107,6 +107,42 @@ impl Iterator for ColumnCursors {
     }
 }
 
+#[derive(Default)]
+enum RecentRegionType {
+    /// Not checked yet
+    #[default] Unknown,
+    /// Empty water
+    Water,
+    /// Land
+    Land,
+}
+
+/// The last two colums.
+/// This is how we decide which lower LODs get impostered,
+/// and when the info for them is emitted.
+pub struct RecentColumnInfo {
+    /// Impostor size. Multiple regions. Meters.
+    size:  (u32, u32),
+    /// Offset of first entry. Meters.
+    position: (u32, u32),
+    /// Region type info
+    info: [Vec<RecentRegionType>;2],
+}
+
+impl RecentColumnInfo {
+    /// New. Sizes the recent column info for one LOD and
+    /// fills in the array with Unknown.
+    pub fn new(
+        bounds: ((u32, u32), (u32, u32)),
+        region_size: (u32, u32),
+        lod: u8,) -> Self {
+        let scan_limits = get_group_scan_limits(bounds, region_size, lod);
+        todo!();    // ***MORE***
+    }
+    
+    //  ***MORE***
+}
+
 /// Advance across a LOD one column at a time.
 pub struct ColumnCursor {}
 
@@ -123,6 +159,20 @@ impl ColumnCursor {
 
     /// True if advance is safe. That is, the previous LOD columns needed
     /// to build this column are already done.
+    //  ***NEED A DATA STRUCTURE FOR EACH LOD THAT TELLS US WHETHER
+    //  ***EACH CELL IS ALREADY DONE, KNOWN EMPTY WATER, or NOT DONE YET***
+    //  ***SO TWO BITS PER CELL.***
+    //  ***MAP BELONGS TO NEXT HIGHER LOD
+    //  ***SET WHEN NEXT RETURNS A VALUE***
+    //  ***NEED TO KEEP ONLY THE LAST TWO COLUMNS?
+    //  *** Probably. Just keep an array of two columns x column length in region units with bounds from bounds calc.
+    //  *** When column advances, shift array.
+    //  ***  Offset issue is complicated but bounds calc already does most of the work.
+    //  ***ADVANCE - Check the four indicated entries.
+    //  *** All done - generate this item.
+    //  *** All empty water - set this item as empty water, skip returning item.
+    //  *** All done or empty water - generate this item.
+    //  *** All not done yet - return done for now.
     fn is_advance_safe(&self) -> bool {
         //  ***MORE***
         todo!();
