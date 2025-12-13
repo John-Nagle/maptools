@@ -107,7 +107,7 @@ impl Iterator for ColumnCursors {
     }
 }
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Copy, Debug)]
 enum RecentRegionType {
     /// Not checked yet
     #[default] Unknown,
@@ -115,11 +115,14 @@ enum RecentRegionType {
     Water,
     /// Land
     Land,
+    /// Error - should not happen
+    Error,
 }
 
 /// The last two colums.
 /// This is how we decide which lower LODs get impostered,
 /// and when the info for them is emitted.
+#[derive(Debug)]
 pub struct RecentColumnInfo {
     /// Impostor size. Multiple regions. Meters.
     size:  (u32, u32),
@@ -149,12 +152,32 @@ impl RecentColumnInfo {
     }
     
     /// Shift recent column info from current to previous column.
+    /// Current column is 0, previous column is 1.
     fn shift(&mut self) {
         self.region_type_info[1] = self.region_type_info[0].clone();
         self.region_type_info[0] = vec![RecentRegionType::Unknown; self.region_type_info[0].len()];
+        //  Advance position. Position is of the current column, not the previous one.
+        self.start.0 += self.size.0;
     }
     
-    //  ***MORE***
+    //  ***MORE***    
+    fn test_cell(&self, loc: (u32, u32)) -> RecentRegionType {
+        let (x, y) = loc;
+        //  Check that X is within bounds.
+        //  Low limit is previous row.
+        //  High limit is current row.
+        let row = if x == self.start.0 {
+            &self.region_type_info[0]
+        } else if x + self.size.0 == self.start.0 {
+            &self.region_type_info[1]
+        } else { 
+            log::error!("Test cell for {:?} out of range in X for {:?}", loc, self);
+            return RecentRegionType::Error
+        };
+        //  Return element.
+        assert_eq!(y % self.size.1 ,0);
+        row[(y / self.size.1) as usize]
+    }
 }
 
 /// Advance across a LOD one column at a time.
