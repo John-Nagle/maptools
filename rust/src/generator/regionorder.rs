@@ -107,7 +107,7 @@ impl Iterator for ColumnCursors {
     }
 }
 
-#[derive(Default, Clone, Copy, Debug)]
+#[derive(Default, Clone, Copy, Debug, PartialEq, Eq)]
 enum RecentRegionType {
     /// Not checked yet
     #[default] Unknown,
@@ -160,7 +160,7 @@ impl RecentColumnInfo {
         self.start.0 += self.size.0;
     }
     
-    //  ***MORE***    
+    /// Test one cell for status 
     fn test_cell(&self, loc: (u32, u32)) -> RecentRegionType {
         let (x, y) = loc;
         //  Check that X is within bounds.
@@ -177,6 +177,29 @@ impl RecentColumnInfo {
         //  Return element.
         assert_eq!(y % self.size.1 ,0);
         row[(y / self.size.1) as usize]
+    }
+    
+    /// Test a 4-cell quadrant for status.
+    /// This is used by the next lowest LOD to decide what to do.
+    fn test_four_cells(&self, loc: (u32, u32)) -> RecentRegionType {
+        let (x, y) = loc;
+        let s00 = self.test_cell((x, y));
+        let s01 = self.test_cell((x, y + self.size.1));
+        let s10 = self.test_cell((x + self.size.0, y));
+        let s11 = self.test_cell((x + self.size.0, y + self.size.1));
+        if (s00 == RecentRegionType::Error) || (s01 == RecentRegionType::Error)|| (s10 == RecentRegionType::Error) || (s11 == RecentRegionType::Error) {
+            return RecentRegionType::Error;
+        }
+        //  Unknown, can't process yet.
+        if (s00 == RecentRegionType::Unknown) || (s01 == RecentRegionType::Unknown) || (s10 == RecentRegionType::Unknown) || (s11 == RecentRegionType::Unknown) {
+            return RecentRegionType::Unknown;
+        }
+        //  All water, impostor as water.
+        if (s00 == RecentRegionType::Water) && (s01 == RecentRegionType::Water) && (s10 == RecentRegionType::Water) &&  (s11 == RecentRegionType::Water) {
+            return RecentRegionType::Water;
+        }
+        //  Not all water, but ready to process. Impostor as land.
+        RecentRegionType::Land
     }
 }
 
