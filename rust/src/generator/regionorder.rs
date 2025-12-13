@@ -103,7 +103,16 @@ impl Iterator for ColumnCursors {
     /// This is to avoid the need to keep huge numbers of region images in memory
     /// at one time. 
     fn next(&mut self) -> Option<Self::Item> {
-        todo!();
+        //  Look for the lowest LOD for which we can return an item.
+        //  ***NEEDS MORE EXPLAINATION***
+        //  ***ADVANCE NEEDS MORE PARAMS***
+        for lod in (0..self.cursors.len()).rev() {
+            if let Some(item) = self.cursors[lod].advance() {
+                return Some(item)
+            }
+        }
+        //  Can't advance on any LOD. Done.
+        None
     }
 }
 
@@ -212,7 +221,7 @@ impl ColumnCursor {
         todo!();
     }
     /// Advance column if possible
-    pub fn advance(&mut self) {
+    pub fn advance(&mut self) -> Option<RegionData> {
         //  ***MORE***
         todo!();
     }
