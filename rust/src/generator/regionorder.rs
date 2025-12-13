@@ -107,7 +107,7 @@ impl Iterator for ColumnCursors {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 enum RecentRegionType {
     /// Not checked yet
     #[default] Unknown,
@@ -124,9 +124,9 @@ pub struct RecentColumnInfo {
     /// Impostor size. Multiple regions. Meters.
     size:  (u32, u32),
     /// Offset of first entry. Meters.
-    position: (u32, u32),
+    start: (u32, u32),
     /// Region type info
-    info: [Vec<RecentRegionType>;2],
+    region_type_info: [Vec<RecentRegionType>;2],
 }
 
 impl RecentColumnInfo {
@@ -136,8 +136,22 @@ impl RecentColumnInfo {
         bounds: ((u32, u32), (u32, u32)),
         region_size: (u32, u32),
         lod: u8,) -> Self {
-        let scan_limits = get_group_scan_limits(bounds, region_size, lod);
-        todo!();    // ***MORE***
+        let (start, size) = get_group_scan_limits(bounds, region_size, lod);
+        let (ll, ur) = bounds;
+        let x_steps = (ur.0 - ll.0) / size.0 + 1;
+        let region_type_info = [vec![RecentRegionType::Unknown; x_steps as usize], vec![RecentRegionType::Unknown; x_steps as usize]];
+        log::debug!("LOD {}, {} steps", lod, x_steps);
+        Self {
+            start,
+            size,
+            region_type_info,
+        }
+    }
+    
+    /// Shift recent column info from current to previous column.
+    fn shift(&mut self) {
+        self.region_type_info[1] = self.region_type_info[0].clone();
+        self.region_type_info[0] = vec![RecentRegionType::Unknown; self.region_type_info[0].len()];
     }
     
     //  ***MORE***
