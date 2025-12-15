@@ -115,18 +115,16 @@ impl Iterator for ColumnCursors {
         //  ***NEEDS MORE EXPLAINATION***
         //  ***ADVANCE NEEDS MORE PARAMS***
         for lod in (0..self.cursors.len()).rev() {           
-            let (previous_lod, curr) = if lod == 0 {
-                (PreviousLodInfo::Regions(&self.regions), &mut self.cursors[0])
+            let opt_region = if lod == 0 {         
+                self.cursors[0].advance_lod_0(&self.regions)
             } else {
                 //  We need to mutably access two elements of the same array.
                 let (prev, curr) = self.cursors.split_at_mut(lod);
                 let prev = &prev[prev.len()];
                 let curr: &mut ColumnCursor = &mut curr[0];
-                (PreviousLodInfo::PreviousLod(&prev.recent_column_info), curr)
+                curr.advance_lod_n(&prev.recent_column_info)
             };
-            if let Some(item) = self.cursors[lod].advance() {
-                return Some(item)
-            }
+            //  ***MORE***
         }
         //  Can't advance on any LOD. Done.
         None
@@ -242,6 +240,16 @@ impl ColumnCursor {
     /// Advance column if possible
     pub fn advance(&mut self) -> Option<RegionData> {
         //  ***MORE***
+        todo!();
+    }
+    
+    /// Advance to next region, for LOD 0 only.
+    pub fn advance_lod_0(&mut self, regions: &Vec<RegionData>) -> Option<RegionData> {
+        todo!();
+    }
+    
+    /// Advance to next region, for LOD > 0.
+    pub fn advance_lod_n(&mut self, recent_column_info: &RecentColumnInfo) -> Option<RegionData> {
         todo!();
     }
 
