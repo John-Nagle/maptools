@@ -137,7 +137,7 @@ enum RecentRegionType {
     Error,
 }
 
-/// The last two colums.
+/// The last two columns.
 /// This is how we decide which lower LODs get impostered,
 /// and when the info for them is emitted.
 #[derive(Debug)]
@@ -223,7 +223,12 @@ impl RecentColumnInfo {
 
 /// Advance across a LOD one column at a time.
 pub struct ColumnCursor {
+    /// The last two columns.
     recent_column_info: RecentColumnInfo,
+    /// Current location for this LOD
+    loc: (u32, u32),
+    /// Index into region data, for LOD 0 only
+    region_data_index: usize,
 }
 
 impl ColumnCursor {
@@ -231,15 +236,28 @@ impl ColumnCursor {
     pub fn new(bounds: ((u32, u32), (u32, u32)), lod: u8) -> ColumnCursor {
         todo!();
     }
-    /// Advance column if possible
-    pub fn advance(&mut self) -> Option<RegionData> {
+    /// Mark region as land.
+    /// Not just the current cell, but the ones leading up to it.
+    /// Previous untouched cells are marked as Water.
+    /// This relies in input being processed in x,y order.
+    pub fn mark_as_land(&mut self, loc: (u32, u32)) {
         //  ***MORE***
         todo!();
     }
     
     /// Advance to next region, for LOD 0 only.
     pub fn advance_lod_0(&mut self, regions: &Vec<RegionData>) -> Option<RegionData> {
-        todo!();
+        let n = self.region_data_index;
+        if n < regions.len() {
+            let region = &regions[n];
+            let loc = (region.region_coords_x, region.region_coords_y);
+            self.mark_as_land(loc);
+            self.region_data_index += 1;
+            Some(region.clone())
+        } else {
+            //  End of input
+            None
+        }
     }
     
     /// Advance to next region, for LOD > 0.
