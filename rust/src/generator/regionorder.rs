@@ -62,14 +62,6 @@ impl Iterator for SimpleColumnCursors {
     }
 }
 
-/// What each LOD needs to know about the next higher LOD
-enum PreviousLodInfo <'a> {
-    /// LOD 0 needs the region data
-    Regions(&'a Vec<RegionData>),
-    /// Other LODs need the next higher LOD's column info
-    PreviousLod(&'a RecentColumnInfo)
-}
-
 /// All the column cursors for all the LODs.
 ///
 /// The goal here is to return all the regions that
@@ -113,7 +105,6 @@ impl Iterator for ColumnCursors {
     fn next(&mut self) -> Option<Self::Item> {
         //  Look for the lowest LOD for which we can return an item.
         //  ***NEEDS MORE EXPLAINATION***
-        //  ***ADVANCE NEEDS MORE PARAMS***
         for lod in (0..self.cursors.len()).rev() {           
             let opt_region = if lod == 0 {         
                 self.cursors[0].advance_lod_0(&self.regions)
@@ -124,10 +115,13 @@ impl Iterator for ColumnCursors {
                 let curr: &mut ColumnCursor = &mut curr[0];
                 curr.advance_lod_n(&prev.recent_column_info)
             };
-            //  ***MORE***
+            //  If we have a winner, return it.
+            if opt_region.is_some() {
+                return opt_region
+            }
         }
         //  Can't advance on any LOD. Done.
-        None
+        None	
     }
 }
 
