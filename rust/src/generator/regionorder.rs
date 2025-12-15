@@ -62,6 +62,14 @@ impl Iterator for SimpleColumnCursors {
     }
 }
 
+/// What each LOD needs to know about the next higher LOD
+enum PreviousLodInfo <'a> {
+    /// LOD 0 needs the region data
+    Regions(&'a Vec<RegionData>),
+    /// Other LODs need the next higher LOD's column info
+    PreviousLod(&'a RecentColumnInfo)
+}
+
 /// All the column cursors for all the LODs.
 ///
 /// The goal here is to return all the regions that
@@ -106,7 +114,16 @@ impl Iterator for ColumnCursors {
         //  Look for the lowest LOD for which we can return an item.
         //  ***NEEDS MORE EXPLAINATION***
         //  ***ADVANCE NEEDS MORE PARAMS***
-        for lod in (0..self.cursors.len()).rev() {
+        for lod in (0..self.cursors.len()).rev() {           
+            let (previous_lod, curr) = if lod == 0 {
+                (PreviousLodInfo::Regions(&self.regions), &mut self.cursors[0])
+            } else {
+                //  We need to mutably access two elements of the same array.
+                let (prev, curr) = self.cursors.split_at_mut(lod);
+                let prev = &prev[prev.len()];
+                let curr: &mut ColumnCursor = &mut curr[0];
+                (PreviousLodInfo::PreviousLod(&prev.recent_column_info), curr)
+            };
             if let Some(item) = self.cursors[lod].advance() {
                 return Some(item)
             }
@@ -213,7 +230,9 @@ impl RecentColumnInfo {
 }
 
 /// Advance across a LOD one column at a time.
-pub struct ColumnCursor {}
+pub struct ColumnCursor {
+    recent_column_info: RecentColumnInfo,
+}
 
 impl ColumnCursor {
     /// Usual new
