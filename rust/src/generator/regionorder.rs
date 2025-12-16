@@ -359,3 +359,24 @@ pub fn get_group_scan_limits(
     );
     (start, step)
 }
+
+//  Unit test
+#[test]
+/// Test region order
+fn test_region_order() {
+    //  Set up logging
+    use common::{test_logger};
+    test_logger();
+    //  Build test data
+    use super::vizgroup::{vizgroup_test_pattern_1};
+    let test_data = vizgroup_test_pattern_1();
+    let mut viz_groups = VizGroups::new(false);
+    for item in test_data {
+        let grid_break = viz_groups.add_region_data(item);
+        //  This example is all one grid, so there's no control break.
+        assert_eq!(grid_break, None);
+    }
+    let results = viz_groups.end_grid();
+    //  Do test
+    //  ***MORE***
+}
