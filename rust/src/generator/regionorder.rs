@@ -360,6 +360,14 @@ pub fn get_group_scan_limits(
     (start, step)
 }
 
+/// Check loc order. Panic if error.
+/// This module assumes everything is in strictly increasing sequence. So we check.
+pub fn check_loc_sequence(a: (u32, u32), b: (u32, u32)) {
+    if a.0 > b.0 || (a.0 == b.0 && a.1 >= b.1) {
+        panic!("Locations out of sequence: a {:?} >= b {:?}", a, b);
+    }
+}
+
 //  Unit test
 #[test]
 /// Test region order
@@ -377,6 +385,17 @@ fn test_region_order() {
         assert_eq!(grid_break, None);
     }
     let results = viz_groups.end_grid();
+    //  Validate data is in increasing order.
+    for group in results {
+        let mut prev_loc_opt = None;
+        for item in group {
+            let loc = (item.region_coords_x, item.region_coords_y);
+            if let Some(prev_loc) = prev_loc_opt {            
+                check_loc_sequence(prev_loc, loc);
+            }
+            prev_loc_opt = Some(loc);
+        }
+    }
     //  Do test
     //  ***MORE***
 }
