@@ -244,6 +244,10 @@ impl ColumnCursor {
         //  The update must be applied to row 0 of recent column info.
         //  If the location does not match, the recent column info must
         //  be adjusted.
+        assert!(self.recent_column_info.start.0 <= loc.0);  // columns (X) must be in order
+        while self.recent_column_info.start.0 < loc.0 {
+            self.recent_column_info.shift();
+        }
         //  ***ADJUST COLUMN HERE***MORE***
         assert_eq!(self.recent_column_info.start.0, loc.0);    // on correct column
         let yixloc = loc.1 / self.recent_column_info.size.1;
@@ -254,6 +258,7 @@ impl ColumnCursor {
         //  Duplicates not allowed.
         assert_eq!(self.recent_column_info.region_type_info[0][yix], RecentRegionType::Unknown);
         //  Mark this as a land cell.
+        //  ***SHOULD WE FILL IN CELLS SKIPPED AS WATER CELLS?***
         self.recent_column_info.region_type_info[0][yix] = RecentRegionType::Land;
         todo!();
     }
