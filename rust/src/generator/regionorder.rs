@@ -241,7 +241,20 @@ impl ColumnCursor {
     /// Previous untouched cells are marked as Water.
     /// This relies in input being processed in x,y order.
     pub fn mark_as_land(&mut self, loc: (u32, u32)) {
-        //  ***MORE***
+        //  The update must be applied to row 0 of recent column info.
+        //  If the location does not match, the recent column info must
+        //  be adjusted.
+        //  ***ADJUST COLUMN HERE***MORE***
+        assert_eq!(self.recent_column_info.start.0, loc.0);    // on correct column
+        let yixloc = loc.1 / self.recent_column_info.size.1;
+        assert_eq!(loc.1 % self.recent_column_info.size.1, 0);
+        let yixstart = self.recent_column_info.start.1 / self.recent_column_info.size.1;
+        assert!(yixloc >= yixstart);
+        let yix = (yixloc - yixstart) as usize;
+        //  Duplicates not allowed.
+        assert_eq!(self.recent_column_info.region_type_info[0][yix], RecentRegionType::Unknown);
+        //  Mark this as a land cell.
+        self.recent_column_info.region_type_info[0][yix] = RecentRegionType::Land;
         todo!();
     }
     
