@@ -480,14 +480,9 @@ pub fn vizgroup_test_pattern_1() -> Vec<RegionData> {
 
 #[test]
 fn test_vizgroup() {
-
     //  All errors to console
-    let _ = simplelog::CombinedLogger::init(vec![simplelog::TermLogger::new(
-        simplelog::LevelFilter::Debug,
-        simplelog::Config::default(),
-        simplelog::TerminalMode::Stdout,
-        simplelog::ColorChoice::Auto,
-    )]);
+    use common::{test_logger};
+    test_logger();
     let test_data = vizgroup_test_pattern_1();
     let mut viz_groups = VizGroups::new(false);
     for item in test_data {
