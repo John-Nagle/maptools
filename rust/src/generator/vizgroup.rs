@@ -420,7 +420,7 @@ impl VizGroups {
     }
 }
 
-//  Unit test.
+/// Unit test data. Available for tests in other modules.
 //  The test data represents this pattern.
 //  Ordered by x, y.
 //  Result should be three VizGroup items.
@@ -431,9 +431,9 @@ impl VizGroups {
 //  X    X X  X
 //  XXXXXX
 //
-#[test]
-fn test_visgroup() {
-    /// Test pattern
+#[cfg(test)]
+pub fn vizgroup_test_pattern_1() -> Vec<RegionData> {
+    /// Test pattern 1
     /// Format: RegionData { grid, region_coords_x, region_coords_y, size_x, size_y, name };
     const TEST_PATTERN: [(&str, u32, u32, u32, u32, &str); 24] = [
         ("Test", 0, 0, 100, 100, "Bottom left"),
@@ -475,13 +475,20 @@ fn test_visgroup() {
             },
         )
         .collect();
+    test_data
+}
+
+#[test]
+fn test_vizgroup() {
+
     //  All errors to console
     let _ = simplelog::CombinedLogger::init(vec![simplelog::TermLogger::new(
-        simplelog::LevelFilter::Trace,
+        simplelog::LevelFilter::Debug,
         simplelog::Config::default(),
         simplelog::TerminalMode::Stdout,
         simplelog::ColorChoice::Auto,
     )]);
+    let test_data = vizgroup_test_pattern_1();
     let mut viz_groups = VizGroups::new(false);
     for item in test_data {
         let grid_break = viz_groups.add_region_data(item);
