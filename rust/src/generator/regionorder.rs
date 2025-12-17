@@ -387,8 +387,8 @@ fn test_region_order() {
     use common::{test_logger};
     test_logger();
     //  Build test data
-    use super::vizgroup::{vizgroup_test_pattern_1};
-    let test_data = vizgroup_test_pattern_1();
+    use super::vizgroup::{vizgroup_test_patterns};
+    let test_data = vizgroup_test_patterns()[1].clone();
     let mut viz_groups = VizGroups::new(false);
     for item in test_data {
         let grid_break = viz_groups.add_region_data(item);
