@@ -113,7 +113,8 @@ impl Iterator for ColumnCursors {
             } else {
                 //  We need to mutably access two elements of the same array.
                 let (prev, curr) = self.cursors.split_at_mut(lod);
-                let prev = &prev[prev.len()];
+                assert!(!prev.is_empty());
+                let prev = &prev[prev.len()-1];
                 let curr: &mut ColumnCursor = &mut curr[0];
                 curr.advance_lod_n(&prev.recent_column_info)
             };
@@ -253,6 +254,7 @@ impl ColumnCursor {
         //  The update must be applied to row 0 of recent column info.
         //  If the location does not match, the recent column info must
         //  be adjusted.
+        log::debug!("Mark {:?} as land. Size {:?}", loc, self.recent_column_info.size);
         assert!(self.recent_column_info.start.0 <= loc.0);  // columns (X) must be in order
         while self.recent_column_info.start.0 < loc.0 {
             self.recent_column_info.shift();
@@ -269,7 +271,7 @@ impl ColumnCursor {
         //  Mark this as a land cell.
         //  ***SHOULD WE FILL IN CELLS SKIPPED AS WATER CELLS?***
         self.recent_column_info.region_type_info[0][yix] = RecentRegionType::Land;
-        todo!();
+        //////todo!();
     }
     
     /// Advance to next region, for LOD 0 only.
@@ -289,7 +291,7 @@ impl ColumnCursor {
     
     /// Advance to next region, for LOD > 0.
     pub fn advance_lod_n(&mut self, recent_column_info: &RecentColumnInfo) -> Option<RegionData> {
-        todo!();
+        return None // ***TEMP TURNOFF*** just do LOD 0
     }
 
     /// True if advance is safe. That is, the previous LOD columns needed
@@ -407,6 +409,9 @@ fn test_region_order() {
         }
         //  Do test for one group
         let mut column_cursors = ColumnCursors::new(group);
+        for item in column_cursors {
+            log::debug!("Item: {:?}", item);
+        }
         // ***MORE***
     }
 }

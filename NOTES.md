@@ -242,4 +242,13 @@ Next steps:
    - Cache completed regions.
    - Every 2x rows, do 2x regions, iterating across row.
      - Every 4x rows, do 4x regions, etc. This keeps regions needed in cache without storing entire map in memory.
+     
+2025-12-16
+
+   Hierarchy stuff underway. Harder than expected.
+   Two modes:
+   - No hierarchy, variable sized region.
+   - Hierarchy, uniform sized regions.
+     - Need non-uniform size detector.
+     - Existing test case is not valid for hierarchy.
       
