@@ -462,7 +462,7 @@ pub fn vizgroup_test_patterns() -> Vec<Vec<RegionData>> {
         ("Test", 900, 300, 100, 100, "Right 300"),
         ("Test", 900, 400, 100, 100, "Right 400"),
     ];
-    
+
     /// Same as TEST_PATTERN_0 except all regions are the same size.
     /// This allows multi-LOD processing.
     const TEST_PATTERN_1: [(&str, u32, u32, u32, u32, &str); 25] = [
@@ -492,33 +492,35 @@ pub fn vizgroup_test_patterns() -> Vec<Vec<RegionData>> {
         ("Test", 900, 300, 100, 100, "Right 300"),
         ("Test", 900, 400, 100, 100, "Right 400"),
     ];
-    
+
     /// All test patterns
-    const TEST_PATTERNS: [[(&str, u32, u32, u32, u32, &str); 25];2] = [TEST_PATTERN_0, TEST_PATTERN_1];
+    const TEST_PATTERNS: [[(&str, u32, u32, u32, u32, &str); 25]; 2] =
+        [TEST_PATTERN_0, TEST_PATTERN_1];
 
     let test_data: Vec<Vec<_>> = TEST_PATTERNS
-      .iter().map(|v|
-        v.iter()
-        .map(
-            |(grid, region_coords_x, region_coords_y, size_x, size_y, name)| RegionData {
-                grid: grid.to_string(),
-                region_coords_x: *region_coords_x,
-                region_coords_y: *region_coords_y,
-                size_x: *size_x,
-                size_y: *size_y,
-                name: name.to_string(),
-            },
-        )
-        .collect()
-       )
-      .collect();
+        .iter()
+        .map(|v| {
+            v.iter()
+                .map(
+                    |(grid, region_coords_x, region_coords_y, size_x, size_y, name)| RegionData {
+                        grid: grid.to_string(),
+                        region_coords_x: *region_coords_x,
+                        region_coords_y: *region_coords_y,
+                        size_x: *size_x,
+                        size_y: *size_y,
+                        name: name.to_string(),
+                    },
+                )
+                .collect()
+        })
+        .collect();
     test_data
 }
 
 #[test]
 fn test_vizgroup() {
     //  All errors to console
-    use common::{test_logger};
+    use common::test_logger;
     test_logger();
     let test_data = vizgroup_test_patterns()[0].clone();
     let mut viz_groups = VizGroups::new(false);
