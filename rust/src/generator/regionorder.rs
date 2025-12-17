@@ -67,7 +67,7 @@ impl Iterator for SimpleColumnCursors {
 /// The goal here is to return all the regions that
 /// need to be impostored in the order that will allow
 /// the lower LOD impostors to be constructed from recently
-/// constructe higher LOD impostors.
+/// constructes higher LOD impostors.
 
 pub struct ColumnCursors {
     /// Bounds of the entire region data
@@ -82,7 +82,9 @@ impl ColumnCursors {
     /// The cursors for the regions.
     pub fn new(regions: Vec<RegionData>) -> Self {
         let bounds = get_group_bounds(&regions).expect("Invalid group bounds");
-        let cursors: Vec<_> = (0..MAX_LOD).map(|lod| ColumnCursor::new(bounds, lod)).collect();
+        assert!(!regions.is_empty());   // This is checked in get_group_bounds
+        let base_region_size = (regions[0].size_x, regions[0].size_y);
+        let cursors: Vec<_> = (0..MAX_LOD).map(|lod| ColumnCursor::new(bounds, base_region_size, lod)).collect();
         Self {
             bounds, 
             regions,
@@ -233,8 +235,15 @@ pub struct ColumnCursor {
 
 impl ColumnCursor {
     /// Usual new
-    pub fn new(bounds: ((u32, u32), (u32, u32)), lod: u8) -> ColumnCursor {
-        todo!();
+    pub fn new(bounds: ((u32, u32), (u32, u32)), base_region_size: (u32, u32), lod: u8) -> ColumnCursor {
+        let size_mult = 2_u32.pow(lod as u32);
+        let region_size = (base_region_size.0 * size_mult, base_region_size.1 * size_mult);
+        let recent_column_info = RecentColumnInfo::new(bounds, region_size, lod);
+        Self {
+            recent_column_info,
+            loc: (0,0), // ***TEMP***
+            region_data_index: 0
+        }
     }
     /// Mark region as land.
     /// Not just the current cell, but the ones leading up to it.
@@ -388,14 +397,16 @@ fn test_region_order() {
     //  Validate data is in increasing order.
     for group in results {
         let mut prev_loc_opt = None;
-        for item in group {
+        for item in &group {
             let loc = (item.region_coords_x, item.region_coords_y);
             if let Some(prev_loc) = prev_loc_opt {            
                 check_loc_sequence(prev_loc, loc);
+                
             }
             prev_loc_opt = Some(loc);
         }
+        //  Do test for one group
+        let mut column_cursors = ColumnCursors::new(group);
+        // ***MORE***
     }
-    //  Do test
-    //  ***MORE***
 }
