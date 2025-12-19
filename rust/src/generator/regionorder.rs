@@ -108,7 +108,7 @@ impl Iterator for ColumnCursors {
         //  Look for the lowest LOD for which we can return an item.
         //  ***NEEDS MORE EXPLAINATION***
         for lod in (0..self.cursors.len()).rev() {           
-            let opt_region = if lod == 0 {         
+            let advance_status = if lod == 0 {         
                 self.cursors[0].advance_lod_0(&self.regions)
             } else {
                 //  We need to mutably access two elements of the same array.
@@ -119,8 +119,10 @@ impl Iterator for ColumnCursors {
                 curr.advance_lod_n(&prev.recent_column_info)
             };
             //  If we have a winner, return it.
-            if opt_region.is_some() {
-                return opt_region
+            match advance_status {
+                AdvanceStatus::None => continue,
+                AdvanceStatus::Data(region) => return Some(region),
+                AdvanceStatus::Retry => todo!(), // Need to go around again. AT WHAT LODs?***
             }
         }
         //  Can't advance on any LOD. Done.
@@ -224,6 +226,15 @@ impl RecentColumnInfo {
     }
 }
 
+enum AdvanceStatus {
+    /// None - EOF 
+    None,
+    /// Retry - go do this again
+    Retry,
+    /// Output - we have a result to return
+    Data(RegionData)
+}
+
 /// Advance across a LOD one column at a time.
 pub struct ColumnCursor {
     /// The last two columns.
@@ -252,7 +263,9 @@ impl ColumnCursor {
     /// Not just the current cell, but the ones leading up to it.
     /// Previous untouched cells are marked as Water.
     /// This relies in input being processed in x,y order.
-    pub fn mark_as_land(&mut self, loc: (u32, u32)) {
+    /// If this returns false, the markng was not done and we have to retry.
+    /// This occurs when a column is complete.
+    pub fn mark_as_land(&mut self, loc: (u32, u32)) -> bool {
         //  The update must be applied to row 0 of recent column info.
         //  If the location does not match, the recent column info must
         //  be adjusted.
@@ -260,6 +273,7 @@ impl ColumnCursor {
         assert!(self.recent_column_info.start.0 <= loc.0);  // columns (X) must be in order
         while self.recent_column_info.start.0 < loc.0 {
             self.recent_column_info.shift();
+            return false    // a shift occured, we will not do the insert
         }
         //  ***ADJUST COLUMN HERE***MORE***
         assert_eq!(self.recent_column_info.start.0, loc.0);    // on correct column
@@ -282,27 +296,31 @@ impl ColumnCursor {
         //  ***  If row advance peeks ahead for advance_lod_0, is that good enough? 
         //  ***  - Not sure.
         self.recent_column_info.region_type_info[0][yix] = RecentRegionType::Land;
+        true
         //////todo!();
     }
     
     /// Advance to next region, for LOD 0 only.
-    pub fn advance_lod_0(&mut self, regions: &Vec<RegionData>) -> Option<RegionData> {
+    pub fn advance_lod_0(&mut self, regions: &Vec<RegionData>) -> AdvanceStatus {
         let n = self.region_data_index;
         if n < regions.len() {
             let region = &regions[n];
             let loc = (region.region_coords_x, region.region_coords_y);
-            self.mark_as_land(loc);
+            if !self.mark_as_land(loc) {
+                // We advanced a row, and must do this again.
+                return AdvanceStatus::Retry
+            }
             self.region_data_index += 1;
-            Some(region.clone())
+            AdvanceStatus::Data(region.clone())
         } else {
             //  End of input
-            None
+            AdvanceStatus::None
         }
     }
     
     /// Advance to next region, for LOD > 0.
-    pub fn advance_lod_n(&mut self, recent_column_info: &RecentColumnInfo) -> Option<RegionData> {
-        return None // ***TEMP TURNOFF*** just do LOD 0
+    pub fn advance_lod_n(&mut self, recent_column_info: &RecentColumnInfo) -> AdvanceStatus {
+        return AdvanceStatus::None // ***TEMP TURNOFF*** just do LOD 0
     }
 
     /// True if advance is safe. That is, the previous LOD columns needed
