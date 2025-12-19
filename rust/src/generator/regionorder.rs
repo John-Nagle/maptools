@@ -82,13 +82,15 @@ impl ColumnCursors {
     /// The cursors for the regions.
     pub fn new(regions: Vec<RegionData>) -> Self {
         let bounds = get_group_bounds(&regions).expect("Invalid group bounds");
-        assert!(!regions.is_empty());   // This is checked in get_group_bounds
+        assert!(!regions.is_empty()); // This is checked in get_group_bounds
         let base_region_size = (regions[0].size_x, regions[0].size_y);
-        let cursors: Vec<_> = (0..MAX_LOD).map(|lod| ColumnCursor::new(bounds, base_region_size, lod)).collect();
+        let cursors: Vec<_> = (0..MAX_LOD)
+            .map(|lod| ColumnCursor::new(bounds, base_region_size, lod))
+            .collect();
         Self {
-            bounds, 
+            bounds,
             regions,
-            cursors
+            cursors,
         }
     }
 }
@@ -101,39 +103,49 @@ impl Iterator for ColumnCursors {
     /// A RegionData for LOD > 0 may not be returned until all four regions for the
     /// next higher LOD have been returned, or are known to be empty water regions.
     /// The RegionData for a LOD > 0 should be returned as soon as all the needed
-    /// regions to build that group of four have been built. 
+    /// regions to build that group of four have been built.
     /// This is to avoid the need to keep huge numbers of region images in memory
-    /// at one time. 
+    /// at one time.
     fn next(&mut self) -> Option<Self::Item> {
         //  Look for the lowest LOD for which we can return an item.
         //  ***NEEDS MORE EXPLAINATION***
-        for lod in (0..self.cursors.len()).rev() {           
-            let advance_status = if lod == 0 {         
-                self.cursors[0].advance_lod_0(&self.regions)
-            } else {
-                //  We need to mutably access two elements of the same array.
-                let (prev, curr) = self.cursors.split_at_mut(lod);
-                assert!(!prev.is_empty());
-                let prev = &prev[prev.len()-1];
-                let curr: &mut ColumnCursor = &mut curr[0];
-                curr.advance_lod_n(&prev.recent_column_info)
-            };
-            //  If we have a winner, return it.
-            match advance_status {
-                AdvanceStatus::None => continue,
-                AdvanceStatus::Data(region) => return Some(region),
-                AdvanceStatus::Retry => todo!(), // Need to go around again. AT WHAT LODs?***
+        'outer: loop {
+            let mut need_retry = false;
+            for lod in (0..self.cursors.len()).rev() {
+                let advance_status = if lod == 0 {
+                    self.cursors[0].advance_lod_0(&self.regions)
+                } else {
+                    //  We need to mutably access two elements of the same array.
+                    let (prev, curr) = self.cursors.split_at_mut(lod);
+                    assert!(!prev.is_empty());
+                    let prev = &prev[prev.len() - 1];
+                    let curr: &mut ColumnCursor = &mut curr[0];
+                    curr.advance_lod_n(&prev.recent_column_info)
+                };
+                //  If we have a winner, return it.
+                match advance_status {
+                    AdvanceStatus::None => continue,
+                    AdvanceStatus::Data(region) => return Some(region),
+                    AdvanceStatus::Retry => {
+                        need_retry = true;
+                        continue;
+                    } // Need to go around again. AT WHAT LODs?***
+                }
+            }
+            if !need_retry {
+                break 'outer;
             }
         }
         //  Can't advance on any LOD. Done.
-        None	
+        None
     }
 }
 
 #[derive(Default, Clone, Copy, Debug, PartialEq, Eq)]
 enum RecentRegionType {
     /// Not checked yet
-    #[default] Unknown,
+    #[default]
+    Unknown,
     /// Empty water
     Water,
     /// Land
@@ -148,24 +160,24 @@ enum RecentRegionType {
 #[derive(Debug)]
 pub struct RecentColumnInfo {
     /// Impostor size. Multiple regions. Meters.
-    size:  (u32, u32),
+    size: (u32, u32),
     /// Offset of first entry. Meters.
     start: (u32, u32),
     /// Region type info
-    region_type_info: [Vec<RecentRegionType>;2],
+    region_type_info: [Vec<RecentRegionType>; 2],
 }
 
 impl RecentColumnInfo {
     /// New. Sizes the recent column info for one LOD and
     /// fills in the array with Unknown.
-    pub fn new(
-        bounds: ((u32, u32), (u32, u32)),
-        region_size: (u32, u32),
-        lod: u8,) -> Self {
+    pub fn new(bounds: ((u32, u32), (u32, u32)), region_size: (u32, u32), lod: u8) -> Self {
         let (start, size) = get_group_scan_limits(bounds, region_size, lod);
         let (ll, ur) = bounds;
         let x_steps = (ur.0 - ll.0) / size.0 + 1;
-        let region_type_info = [vec![RecentRegionType::Unknown; x_steps as usize], vec![RecentRegionType::Unknown; x_steps as usize]];
+        let region_type_info = [
+            vec![RecentRegionType::Unknown; x_steps as usize],
+            vec![RecentRegionType::Unknown; x_steps as usize],
+        ];
         log::debug!("LOD {}, {} steps", lod, x_steps);
         Self {
             start,
@@ -173,7 +185,7 @@ impl RecentColumnInfo {
             region_type_info,
         }
     }
-    
+
     /// Shift recent column info from current to previous column.
     /// Current column is 0, previous column is 1.
     fn shift(&mut self) {
@@ -182,8 +194,8 @@ impl RecentColumnInfo {
         //  Advance position. Position is of the current column, not the previous one.
         self.start.0 += self.size.0;
     }
-    
-    /// Test one cell for status 
+
+    /// Test one cell for status
     fn test_cell(&self, loc: (u32, u32)) -> RecentRegionType {
         let (x, y) = loc;
         //  Check that X is within bounds.
@@ -193,15 +205,15 @@ impl RecentColumnInfo {
             &self.region_type_info[0]
         } else if x + self.size.0 == self.start.0 {
             &self.region_type_info[1]
-        } else { 
+        } else {
             log::error!("Test cell for {:?} out of range in X for {:?}", loc, self);
-            return RecentRegionType::Error
+            return RecentRegionType::Error;
         };
         //  Return element.
-        assert_eq!(y % self.size.1 ,0);
+        assert_eq!(y % self.size.1, 0);
         row[(y / self.size.1) as usize]
     }
-    
+
     /// Test a 4-cell quadrant for status.
     /// This is used by the next lowest LOD to decide what to do.
     fn test_four_cells(&self, loc: (u32, u32)) -> RecentRegionType {
@@ -210,15 +222,27 @@ impl RecentColumnInfo {
         let s01 = self.test_cell((x, y + self.size.1));
         let s10 = self.test_cell((x + self.size.0, y));
         let s11 = self.test_cell((x + self.size.0, y + self.size.1));
-        if (s00 == RecentRegionType::Error) || (s01 == RecentRegionType::Error)|| (s10 == RecentRegionType::Error) || (s11 == RecentRegionType::Error) {
+        if (s00 == RecentRegionType::Error)
+            || (s01 == RecentRegionType::Error)
+            || (s10 == RecentRegionType::Error)
+            || (s11 == RecentRegionType::Error)
+        {
             return RecentRegionType::Error;
         }
         //  Unknown, can't process yet.
-        if (s00 == RecentRegionType::Unknown) || (s01 == RecentRegionType::Unknown) || (s10 == RecentRegionType::Unknown) || (s11 == RecentRegionType::Unknown) {
+        if (s00 == RecentRegionType::Unknown)
+            || (s01 == RecentRegionType::Unknown)
+            || (s10 == RecentRegionType::Unknown)
+            || (s11 == RecentRegionType::Unknown)
+        {
             return RecentRegionType::Unknown;
         }
         //  All water, impostor as water.
-        if (s00 == RecentRegionType::Water) && (s01 == RecentRegionType::Water) && (s10 == RecentRegionType::Water) &&  (s11 == RecentRegionType::Water) {
+        if (s00 == RecentRegionType::Water)
+            && (s01 == RecentRegionType::Water)
+            && (s10 == RecentRegionType::Water)
+            && (s11 == RecentRegionType::Water)
+        {
             return RecentRegionType::Water;
         }
         //  Not all water, but ready to process. Impostor as land.
@@ -227,12 +251,12 @@ impl RecentColumnInfo {
 }
 
 enum AdvanceStatus {
-    /// None - EOF 
+    /// None - EOF
     None,
     /// Retry - go do this again
     Retry,
     /// Output - we have a result to return
-    Data(RegionData)
+    Data(RegionData),
 }
 
 /// Advance across a LOD one column at a time.
@@ -248,15 +272,22 @@ pub struct ColumnCursor {
 
 impl ColumnCursor {
     /// Usual new
-    pub fn new(bounds: ((u32, u32), (u32, u32)), base_region_size: (u32, u32), lod: u8) -> ColumnCursor {
+    pub fn new(
+        bounds: ((u32, u32), (u32, u32)),
+        base_region_size: (u32, u32),
+        lod: u8,
+    ) -> ColumnCursor {
         let size_mult = 2_u32.pow(lod as u32);
-        let region_size = (base_region_size.0 * size_mult, base_region_size.1 * size_mult);
+        let region_size = (
+            base_region_size.0 * size_mult,
+            base_region_size.1 * size_mult,
+        );
         let recent_column_info = RecentColumnInfo::new(bounds, region_size, lod);
         let next_loc = recent_column_info.start;
         Self {
             recent_column_info,
             next_loc,
-            region_data_index: 0
+            region_data_index: 0,
         }
     }
     /// Mark region as land.
@@ -269,37 +300,44 @@ impl ColumnCursor {
         //  The update must be applied to row 0 of recent column info.
         //  If the location does not match, the recent column info must
         //  be adjusted.
-        log::debug!("Mark {:?} as land. Size {:?}", loc, self.recent_column_info.size);
-        assert!(self.recent_column_info.start.0 <= loc.0);  // columns (X) must be in order
+        log::debug!(
+            "Mark {:?} as land. Size {:?}",
+            loc,
+            self.recent_column_info.size
+        );
+        assert!(self.recent_column_info.start.0 <= loc.0); // columns (X) must be in order
         while self.recent_column_info.start.0 < loc.0 {
             self.recent_column_info.shift();
-            return false    // a shift occured, we will not do the insert
+            return false; // a shift occured, we will not do the insert
         }
         //  ***ADJUST COLUMN HERE***MORE***
-        assert_eq!(self.recent_column_info.start.0, loc.0);    // on correct column
+        assert_eq!(self.recent_column_info.start.0, loc.0); // on correct column
         let yixloc = loc.1 / self.recent_column_info.size.1;
         assert_eq!(loc.1 % self.recent_column_info.size.1, 0);
         let yixstart = self.recent_column_info.start.1 / self.recent_column_info.size.1;
         assert!(yixloc >= yixstart);
         let yix = (yixloc - yixstart) as usize;
         //  Duplicates not allowed.
-        assert_eq!(self.recent_column_info.region_type_info[0][yix], RecentRegionType::Unknown);
+        assert_eq!(
+            self.recent_column_info.region_type_info[0][yix],
+            RecentRegionType::Unknown
+        );
         //  Mark this as a land cell.
         //  ***SHOULD WE FILL IN CELLS SKIPPED AS WATER CELLS?*** ***YES*** fill up to one being set here.
         //  ***HOW DO WE FILL OUT END OF LINE?***
-        //  ***- We know about end of line only when X advances. 
+        //  ***- We know about end of line only when X advances.
         //  ***- Now we need to fill out the line, and let lower LODs run before doing the shift.
         //  ***- Design problem. Need a 2-step process***
         //  ***- Need to separate y-changed from mark as land.
         //  ***- When Y changes for LOD 0, need to shift, then go around the LODs again, then mark as land.
         //  ***  When Y changes for LOD > 0, ??? How does that work?
-        //  ***  If row advance peeks ahead for advance_lod_0, is that good enough? 
+        //  ***  If row advance peeks ahead for advance_lod_0, is that good enough?
         //  ***  - Not sure.
         self.recent_column_info.region_type_info[0][yix] = RecentRegionType::Land;
         true
         //////todo!();
     }
-    
+
     /// Advance to next region, for LOD 0 only.
     pub fn advance_lod_0(&mut self, regions: &Vec<RegionData>) -> AdvanceStatus {
         let n = self.region_data_index;
@@ -308,7 +346,7 @@ impl ColumnCursor {
             let loc = (region.region_coords_x, region.region_coords_y);
             if !self.mark_as_land(loc) {
                 // We advanced a row, and must do this again.
-                return AdvanceStatus::Retry
+                return AdvanceStatus::Retry;
             }
             self.region_data_index += 1;
             AdvanceStatus::Data(region.clone())
@@ -317,10 +355,10 @@ impl ColumnCursor {
             AdvanceStatus::None
         }
     }
-    
+
     /// Advance to next region, for LOD > 0.
     pub fn advance_lod_n(&mut self, recent_column_info: &RecentColumnInfo) -> AdvanceStatus {
-        return AdvanceStatus::None // ***TEMP TURNOFF*** just do LOD 0
+        return AdvanceStatus::None; // ***TEMP TURNOFF*** just do LOD 0
     }
 
     /// True if advance is safe. That is, the previous LOD columns needed
@@ -413,10 +451,10 @@ pub fn check_loc_sequence(a: (u32, u32), b: (u32, u32)) {
 /// Test region order
 fn test_region_order() {
     //  Set up logging
-    use common::{test_logger};
+    use common::test_logger;
     test_logger();
     //  Build test data
-    use super::vizgroup::{vizgroup_test_patterns};
+    use super::vizgroup::vizgroup_test_patterns;
     let test_data = vizgroup_test_patterns()[1].clone();
     let mut viz_groups = VizGroups::new(false);
     for item in test_data {
@@ -430,9 +468,8 @@ fn test_region_order() {
         let mut prev_loc_opt = None;
         for item in &group {
             let loc = (item.region_coords_x, item.region_coords_y);
-            if let Some(prev_loc) = prev_loc_opt {            
+            if let Some(prev_loc) = prev_loc_opt {
                 check_loc_sequence(prev_loc, loc);
-                
             }
             prev_loc_opt = Some(loc);
         }
