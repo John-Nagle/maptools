@@ -228,8 +228,9 @@ impl RecentColumnInfo {
 pub struct ColumnCursor {
     /// The last two columns.
     recent_column_info: RecentColumnInfo,
-    /// Current location for this LOD
-    loc: (u32, u32),
+    /// Current location for this LOD. One rectangle
+    /// past the last one filled in.
+    next_loc: (u32, u32),
     /// Index into region data, for LOD 0 only
     region_data_index: usize,
 }
@@ -240,9 +241,10 @@ impl ColumnCursor {
         let size_mult = 2_u32.pow(lod as u32);
         let region_size = (base_region_size.0 * size_mult, base_region_size.1 * size_mult);
         let recent_column_info = RecentColumnInfo::new(bounds, region_size, lod);
+        let next_loc = recent_column_info.start;
         Self {
             recent_column_info,
-            loc: (0,0), // ***TEMP***
+            next_loc,
             region_data_index: 0
         }
     }
@@ -269,7 +271,16 @@ impl ColumnCursor {
         //  Duplicates not allowed.
         assert_eq!(self.recent_column_info.region_type_info[0][yix], RecentRegionType::Unknown);
         //  Mark this as a land cell.
-        //  ***SHOULD WE FILL IN CELLS SKIPPED AS WATER CELLS?***
+        //  ***SHOULD WE FILL IN CELLS SKIPPED AS WATER CELLS?*** ***YES*** fill up to one being set here.
+        //  ***HOW DO WE FILL OUT END OF LINE?***
+        //  ***- We know about end of line only when X advances. 
+        //  ***- Now we need to fill out the line, and let lower LODs run before doing the shift.
+        //  ***- Design problem. Need a 2-step process***
+        //  ***- Need to separate y-changed from mark as land.
+        //  ***- When Y changes for LOD 0, need to shift, then go around the LODs again, then mark as land.
+        //  ***  When Y changes for LOD > 0, ??? How does that work?
+        //  ***  If row advance peeks ahead for advance_lod_0, is that good enough? 
+        //  ***  - Not sure.
         self.recent_column_info.region_type_info[0][yix] = RecentRegionType::Land;
         //////todo!();
     }
