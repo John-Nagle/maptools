@@ -174,7 +174,8 @@ impl RecentColumnInfo {
     pub fn new(bounds: ((u32, u32), (u32, u32)), region_size: (u32, u32), lod: u8) -> Self {
         let (start, size) = get_group_scan_limits(bounds, region_size, lod);
         let (ll, ur) = bounds;
-        let x_steps = (ur.0 - ll.0) / size.0 - 1;
+        log::debug!("New recent column info. ur: {:?}, ll: {:?}, region_size: {:?}", ur, ll, region_size);    // ***TEMP***
+        let x_steps = (ur.0 - ll.0) / region_size.0 - 1;
         let region_type_info = [
             vec![RecentRegionType::Unknown; x_steps as usize],
             vec![RecentRegionType::Unknown; x_steps as usize],
