@@ -265,7 +265,7 @@ pub struct ColumnCursor {
     recent_column_info: RecentColumnInfo,
     /// Current location for this LOD. One rectangle
     /// past the last one filled in.
-    next_loc: (u32, u32),
+    next_y_index: usize,
     /// Index into region data, for LOD 0 only
     region_data_index: usize,
 }
@@ -286,7 +286,7 @@ impl ColumnCursor {
         let next_loc = recent_column_info.start;
         Self {
             recent_column_info,
-            next_loc,
+            next_y_index: 0,
             region_data_index: 0,
         }
     }
@@ -306,10 +306,34 @@ impl ColumnCursor {
             self.recent_column_info.size
         );
         assert!(self.recent_column_info.start.0 <= loc.0); // columns (X) must be in order
+        if self.recent_column_info.start.0 < loc.0 {
+            //  Column break. First, is this column full yet?
+            assert!(self.recent_column_info.region_type_info[0].len() > 0);
+            let fill_last = self.recent_column_info.region_type_info[0].len() -1;
+            if self.recent_column_info.region_type_info[0][fill_last] == RecentRegionType::Unknown {
+                //  This column is not full yet, so we have to fill it out to the end.
+                let fill_start = loc.1 / self.recent_column_info.size.1;
+                for n in (fill_start as usize ..  fill_last - 1) {
+                    assert_eq!(self.recent_column_info.region_type_info[0][n], RecentRegionType::Unknown);
+                    self.recent_column_info.region_type_info[0][n] = RecentRegionType::Water;
+                }
+                //  At this point, all entries in the column should be known.
+                assert!(self.recent_column_info.region_type_info[0].iter().find(|&&v| v != RecentRegionType::Unknown).is_none());
+                //  We won't do the insert; have to go around again and let the lower LODs have a chance.
+                return false                    
+            } else {
+                //  This column is already full, and other LODs have been processed, so we can shift columns.
+                self.recent_column_info.shift();
+            }
+        }      
+/*        
         while self.recent_column_info.start.0 < loc.0 {
+            //  ***FILL AS WATER OUT TO END OF COLUMN***
+            //  ***WRONG*** fill and return false, if not filled. Then do the shift and insert
             self.recent_column_info.shift();
             return false; // a shift occured, we will not do the insert
         }
+*/
         //  ***ADJUST COLUMN HERE***MORE***
         assert_eq!(self.recent_column_info.start.0, loc.0); // on correct column
         let yixloc = loc.1 / self.recent_column_info.size.1;
@@ -333,9 +357,13 @@ impl ColumnCursor {
         //  ***  When Y changes for LOD > 0, ??? How does that work?
         //  ***  If row advance peeks ahead for advance_lod_0, is that good enough?
         //  ***  - Not sure.
+        //  Fill as water up to new land cell.
+        for n in (self.next_y_index .. yix) {
+            self.recent_column_info.region_type_info[0][yix] = RecentRegionType::Water;
+        }  
         self.recent_column_info.region_type_info[0][yix] = RecentRegionType::Land;
+        self.next_y_index = yix + 1;
         true
-        //////todo!();
     }
 
     /// Advance to next region, for LOD 0 only.
