@@ -82,6 +82,7 @@ impl ColumnCursors {
     /// The cursors for the regions.
     pub fn new(regions: Vec<RegionData>) -> Self {
         let bounds = get_group_bounds(&regions).expect("Invalid group bounds");
+        log::debug!("Group bounds: {:?}", bounds);
         assert!(!regions.is_empty()); // This is checked in get_group_bounds
         let base_region_size = (regions[0].size_x, regions[0].size_y);
         let cursors: Vec<_> = (0..MAX_LOD)
@@ -173,12 +174,12 @@ impl RecentColumnInfo {
     pub fn new(bounds: ((u32, u32), (u32, u32)), region_size: (u32, u32), lod: u8) -> Self {
         let (start, size) = get_group_scan_limits(bounds, region_size, lod);
         let (ll, ur) = bounds;
-        let x_steps = (ur.0 - ll.0) / size.0 + 1;
+        let x_steps = (ur.0 - ll.0) / size.0 - 1;
         let region_type_info = [
             vec![RecentRegionType::Unknown; x_steps as usize],
             vec![RecentRegionType::Unknown; x_steps as usize],
         ];
-        log::debug!("LOD {}, {} steps", lod, x_steps);
+        log::debug!("LOD {}, bounds {:?}, {} steps", lod, bounds, x_steps);
         Self {
             start,
             size,
@@ -301,24 +302,26 @@ impl ColumnCursor {
         //  If the location does not match, the recent column info must
         //  be adjusted.
         log::debug!(
-            "Mark {:?} as land. Size {:?}",
+            "Try to mark {:?} as land. Size {:?}",
             loc,
             self.recent_column_info.size
         );
         assert!(self.recent_column_info.start.0 <= loc.0); // columns (X) must be in order
         if self.recent_column_info.start.0 < loc.0 {
+            log::debug!("Column break.");
             //  Column break. First, is this column full yet?
             assert!(self.recent_column_info.region_type_info[0].len() > 0);
             let fill_last = self.recent_column_info.region_type_info[0].len() -1;
             if self.recent_column_info.region_type_info[0][fill_last] == RecentRegionType::Unknown {
                 //  This column is not full yet, so we have to fill it out to the end.
                 let fill_start = loc.1 / self.recent_column_info.size.1;
-                for n in (fill_start as usize ..  fill_last - 1) {
+                for n in (fill_start as usize ..  fill_last + 1) {
                     assert_eq!(self.recent_column_info.region_type_info[0][n], RecentRegionType::Unknown);
                     self.recent_column_info.region_type_info[0][n] = RecentRegionType::Water;
                 }
                 //  At this point, all entries in the column should be known.
-                assert!(self.recent_column_info.region_type_info[0].iter().find(|&&v| v != RecentRegionType::Unknown).is_none());
+                log::debug!("Col: {:?}", self.recent_column_info.region_type_info[0]);  // ***TEMP***
+                assert!(self.recent_column_info.region_type_info[0].iter().find(|&&v| v == RecentRegionType::Unknown).is_none());
                 //  We won't do the insert; have to go around again and let the lower LODs have a chance.
                 return false                    
             } else {
@@ -358,9 +361,16 @@ impl ColumnCursor {
         //  ***  If row advance peeks ahead for advance_lod_0, is that good enough?
         //  ***  - Not sure.
         //  Fill as water up to new land cell.
+        log::debug!(
+            "Mark {:?} as land. Size {:?}",
+            loc,
+            self.recent_column_info.size
+        );
         for n in (self.next_y_index .. yix) {
+            assert_eq!(self.recent_column_info.region_type_info[0][n], RecentRegionType::Unknown);
             self.recent_column_info.region_type_info[0][yix] = RecentRegionType::Water;
-        }  
+        }
+        assert_eq!(self.recent_column_info.region_type_info[0][yix], RecentRegionType::Unknown);
         self.recent_column_info.region_type_info[0][yix] = RecentRegionType::Land;
         self.next_y_index = yix + 1;
         true
@@ -414,6 +424,11 @@ impl ColumnCursor {
 /// Get dimensions of a group.
 pub fn get_group_bounds(group: &Vec<RegionData>) -> Result<((u32, u32), (u32, u32)), Error> {
     //  Error if empty group.
+    //  ***BEGIN TEMP***
+    for v in group {
+        log::debug!(" Region loc: ({}, {}), size: ({}, {})", v.region_coords_x, v.region_coords_y, v.size_x, v.size_y);
+    }
+    //  ***END TEMP***
     if group.is_empty() {
         return Err(anyhow!("Empty viz group"));
     }
@@ -493,6 +508,7 @@ fn test_region_order() {
     let results = viz_groups.end_grid();
     //  Validate data is in increasing order.
     for group in results {
+        log::debug!("Next group, {} items", group.len());
         let mut prev_loc_opt = None;
         for item in &group {
             let loc = (item.region_coords_x, item.region_coords_y);
