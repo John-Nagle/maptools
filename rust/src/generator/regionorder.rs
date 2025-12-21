@@ -85,6 +85,7 @@ impl ColumnCursors {
         log::debug!("Group bounds: {:?}", bounds);
         assert!(!regions.is_empty()); // This is checked in get_group_bounds
         let base_region_size = (regions[0].size_x, regions[0].size_y);
+        //  ***NEED TO STOP GENERATING COLUMN CURSORS WHEN ONE REGION OF LOD ENCOMPASSES ENTIRE BOUNDS***
         let cursors: Vec<_> = (0..MAX_LOD)
             .map(|lod| ColumnCursor::new(bounds, base_region_size, lod))
             .collect();
@@ -172,9 +173,9 @@ impl RecentColumnInfo {
     /// New. Sizes the recent column info for one LOD and
     /// fills in the array with Unknown.
     pub fn new(bounds: ((u32, u32), (u32, u32)), region_size: (u32, u32), lod: u8) -> Self {
-        let (start, size) = get_group_scan_limits(bounds, region_size, lod);
-        let (ll, ur) = bounds;
-        log::debug!("New recent column info. ur: {:?}, ll: {:?}, region_size: {:?}", ur, ll, region_size);    // ***TEMP***
+        let (ll, ur, size) = get_group_scan_limits(bounds, region_size, lod);
+        //////let (ll, ur) = bounds;
+        log::debug!("New recent column info, LOD{}: ur: {:?}, ll: {:?}, region_size: {:?}", lod, ur, ll, region_size);    // ***TEMP***
         let x_steps = (ur.0 - ll.0) / region_size.0 - 1;
         let region_type_info = [
             vec![RecentRegionType::Unknown; x_steps as usize],
@@ -182,9 +183,34 @@ impl RecentColumnInfo {
         ];
         log::debug!("LOD {}, bounds {:?}, {} steps", lod, bounds, x_steps);
         Self {
-            start,
-            size,
+            start: ll,
+            size,	
             region_type_info,
+        }
+    }
+    
+    /// Calculate array index for a Y value.
+    /// Non-fatal bounds check
+    pub fn try_calc_y_index(&self, y: u32) -> Option<usize> {
+        if y >= self.start.1 {
+            let yix = ((y - self.start.1) / self.size.1) as usize;
+            if yix < self.region_type_info[0].len() {
+                Some(yix)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+    
+    /// As above, but panic on bounds check
+    pub fn calc_y_index(&self, y: u32) -> usize {
+        if let Some(yix) = self.try_calc_y_index(y) {
+            yix 
+        } else {
+            panic!("RegionOrder::RecentColumnInfo bounds check fail: y: {}, size: {:?}, start: {:?}, len: {}",
+                y, self.size, self.start, self.region_type_info[0].len());
         }
     }
 
@@ -315,8 +341,11 @@ impl ColumnCursor {
             let fill_last = self.recent_column_info.region_type_info[0].len() -1;
             if self.recent_column_info.region_type_info[0][fill_last] == RecentRegionType::Unknown {
                 //  This column is not full yet, so we have to fill it out to the end.
-                let fill_start = loc.1 / self.recent_column_info.size.1;
-                for n in (fill_start as usize ..  fill_last + 1) {
+                let fill_start = (loc.1 - self.recent_column_info.start.1) / self.recent_column_info.size.1 + 1;
+                //  ***WRONG*** not filling properly. Need to adjust fill start for offset.
+                //  ***NO, NO - fill from previous fill to end.
+                log::debug!("Fill start: {}, fill last: {}", fill_start, fill_last);
+                for n in (self.next_y_index as usize .. fill_last + 1) {
                     assert_eq!(self.recent_column_info.region_type_info[0][n], RecentRegionType::Unknown);
                     self.recent_column_info.region_type_info[0][n] = RecentRegionType::Water;
                 }
@@ -324,20 +353,15 @@ impl ColumnCursor {
                 log::debug!("Col: {:?}", self.recent_column_info.region_type_info[0]);  // ***TEMP***
                 assert!(self.recent_column_info.region_type_info[0].iter().find(|&&v| v == RecentRegionType::Unknown).is_none());
                 //  We won't do the insert; have to go around again and let the lower LODs have a chance.
+                self.next_y_index = fill_last;  // which is off the end by 1.
                 return false                    
             } else {
                 //  This column is already full, and other LODs have been processed, so we can shift columns.
+                self.next_y_index = 0;
                 self.recent_column_info.shift();
             }
         }      
-/*        
-        while self.recent_column_info.start.0 < loc.0 {
-            //  ***FILL AS WATER OUT TO END OF COLUMN***
-            //  ***WRONG*** fill and return false, if not filled. Then do the shift and insert
-            self.recent_column_info.shift();
-            return false; // a shift occured, we will not do the insert
-        }
-*/
+
         //  ***ADJUST COLUMN HERE***MORE***
         assert_eq!(self.recent_column_info.start.0, loc.0); // on correct column
         let yixloc = loc.1 / self.recent_column_info.size.1;
@@ -367,7 +391,7 @@ impl ColumnCursor {
             loc,
             self.recent_column_info.size
         );
-        for n in (self.next_y_index .. yix) {
+        for n in self.next_y_index .. yix {
             assert_eq!(self.recent_column_info.region_type_info[0][n], RecentRegionType::Unknown);
             self.recent_column_info.region_type_info[0][yix] = RecentRegionType::Water;
         }
@@ -468,18 +492,26 @@ pub fn get_group_scan_limits(
     bounds: ((u32, u32), (u32, u32)),
     region_size: (u32, u32),
     lod: u8,
-) -> ((u32, u32), (u32, u32)) {
+) -> ((u32, u32), (u32, u32), (u32, u32)) {
     //  Get lower left and upper right
-    let (lower_left, _upper_right) = bounds;
+    let (lower_left, upper_right) = bounds;
     let lod_mult = 2_u32.pow(lod as u32);
     let step = (region_size.0 * lod_mult, region_size.1 * lod_mult);
     //  Now the tricky part. Round down the lower_left values to the next lower multiple of step.
     //  ***UNTESTED***
-    let start = (
+    //  ***NEED TO ROUND LOWER LEFT DOWN, and UPPER RIGHT UP***
+    //  ***LOWER LIMITS WILL ALWAYS BE NONNEGATIVE BECAUSE OF HOW ALIGNMENT WORKS***
+    //  ***UPPER LIMITS GET LARGER AS SIZE INCREASES***
+    //  ***WHEN LOD IS ONE REGION, WE ARE DONE***
+    let new_ll = (
         (lower_left.0 / step.0) * step.0,
         (lower_left.1 / step.1) * step.1,
     );
-    (start, step)
+    let new_ur = (
+        ((upper_right.0 + step.0) / step.0) * step.0,
+        ((upper_right.1 + step.1) / step.1) * step.1,
+    );
+    (new_ll, new_ur, step)
 }
 
 /// Check loc order. Panic if error.

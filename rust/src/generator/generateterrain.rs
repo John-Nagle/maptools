@@ -284,9 +284,9 @@ impl TerrainGenerator {
         let upper_right = bounds.1;
         //  Zero sized groups already filtered.
         let region_size = (group[0].size_x, group[0].size_y);
-        let (start, step) = get_group_scan_limits(bounds, region_size, lod);
-        for x in (start.0 .. upper_right.0).step_by(step.0 as usize) {
-            for y in (start.1 .. upper_right.1).step_by(step.1 as usize) {
+        let (ll, ur, step) = get_group_scan_limits(bounds, region_size, lod);
+        for x in (ll.0 .. ur.0).step_by(step.0 as usize) {
+            for y in (ll.1 .. ur.1).step_by(step.1 as usize) {
                 log::debug!("LOD #{}: step ({}, {})", lod, x, y); 
             }
         }
