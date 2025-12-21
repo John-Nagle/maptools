@@ -176,7 +176,7 @@ impl RecentColumnInfo {
         let (ll, ur, size) = get_group_scan_limits(bounds, region_size, lod);
         //////let (ll, ur) = bounds;
         log::debug!("New recent column info, LOD{}: ur: {:?}, ll: {:?}, region_size: {:?}", lod, ur, ll, region_size);    // ***TEMP***
-        let x_steps = (ur.0 - ll.0) / region_size.0 - 1;
+        let x_steps = (ur.0 - ll.0) / region_size.0;
         let region_type_info = [
             vec![RecentRegionType::Unknown; x_steps as usize],
             vec![RecentRegionType::Unknown; x_steps as usize],
@@ -364,11 +364,12 @@ impl ColumnCursor {
 
         //  ***ADJUST COLUMN HERE***MORE***
         assert_eq!(self.recent_column_info.start.0, loc.0); // on correct column
-        let yixloc = loc.1 / self.recent_column_info.size.1;
+        //////let yixloc = loc.1 / self.recent_column_info.size.1;
+        let yix = self.recent_column_info.calc_y_index(loc.1);
         assert_eq!(loc.1 % self.recent_column_info.size.1, 0);
-        let yixstart = self.recent_column_info.start.1 / self.recent_column_info.size.1;
-        assert!(yixloc >= yixstart);
-        let yix = (yixloc - yixstart) as usize;
+        //////let yixstart = self.recent_column_info.start.1 / self.recent_column_info.size.1;
+        //////assert!(yixloc >= yixstart);
+        //////let yix = (yixloc - yixstart) as usize;
         //  Duplicates not allowed.
         assert_eq!(
             self.recent_column_info.region_type_info[0][yix],
