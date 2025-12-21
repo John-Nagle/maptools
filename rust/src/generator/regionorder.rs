@@ -342,8 +342,6 @@ impl ColumnCursor {
             if self.recent_column_info.region_type_info[0][fill_last] == RecentRegionType::Unknown {
                 //  This column is not full yet, so we have to fill it out to the end.
                 let fill_start = (loc.1 - self.recent_column_info.start.1) / self.recent_column_info.size.1 + 1;
-                //  ***WRONG*** not filling properly. Need to adjust fill start for offset.
-                //  ***NO, NO - fill from previous fill to end.
                 log::debug!("Fill start: {}, fill last: {}", fill_start, fill_last);
                 for n in (self.next_y_index as usize .. fill_last + 1) {
                     assert_eq!(self.recent_column_info.region_type_info[0][n], RecentRegionType::Unknown);
@@ -365,12 +363,8 @@ impl ColumnCursor {
 
         //  ***ADJUST COLUMN HERE***MORE***
         assert_eq!(self.recent_column_info.start.0, loc.0); // on correct column
-        //////let yixloc = loc.1 / self.recent_column_info.size.1;
         let yix = self.recent_column_info.calc_y_index(loc.1);
         assert_eq!(loc.1 % self.recent_column_info.size.1, 0);
-        //////let yixstart = self.recent_column_info.start.1 / self.recent_column_info.size.1;
-        //////assert!(yixloc >= yixstart);
-        //////let yix = (yixloc - yixstart) as usize;
         //  Duplicates not allowed.
         assert_eq!(
             self.recent_column_info.region_type_info[0][yix],
@@ -395,14 +389,12 @@ impl ColumnCursor {
             self.recent_column_info.size
         );
         //  Fill as water up to, but not including, yix.
-        log::debug!("Preparing to mark. Col: {:?}", self.recent_column_info.region_type_info[0]);
         log::debug!("Filling as water from {} to {} exclusive.", self.next_y_index, yix);
         for n in self.next_y_index .. yix {
             log::debug!("Filling as water at {} ", n);  // ***TEMP***
             assert_eq!(self.recent_column_info.region_type_info[0][n], RecentRegionType::Unknown);
             self.recent_column_info.region_type_info[0][n] = RecentRegionType::Water;
         }
-        log::debug!("About to mark at {}. Col: {:?}", yix, self.recent_column_info.region_type_info[0]);
         assert_eq!(self.recent_column_info.region_type_info[0][yix], RecentRegionType::Unknown);
         self.recent_column_info.region_type_info[0][yix] = RecentRegionType::Land;
         self.next_y_index = yix + 1;
