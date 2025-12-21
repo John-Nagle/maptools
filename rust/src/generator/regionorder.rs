@@ -359,6 +359,7 @@ impl ColumnCursor {
                 //  This column is already full, and other LODs have been processed, so we can shift columns.
                 self.next_y_index = 0;
                 self.recent_column_info.shift();
+                log::debug!("Shifted columns. Col: {:?}", self.recent_column_info.region_type_info[0]);
             }
         }      
 
@@ -388,14 +389,20 @@ impl ColumnCursor {
         //  ***  - Not sure.
         //  Fill as water up to new land cell.
         log::debug!(
-            "Mark {:?} as land. Size {:?}",
+            "Mark {:?}, index {} as land. Size {:?}",
             loc,
+            yix,
             self.recent_column_info.size
         );
+        //  Fill as water up to, but not including, yix.
+        log::debug!("Preparing to mark. Col: {:?}", self.recent_column_info.region_type_info[0]);
+        log::debug!("Filling as water from {} to {} exclusive.", self.next_y_index, yix);
         for n in self.next_y_index .. yix {
+            log::debug!("Filling as water at {} ", n);  // ***TEMP***
             assert_eq!(self.recent_column_info.region_type_info[0][n], RecentRegionType::Unknown);
-            self.recent_column_info.region_type_info[0][yix] = RecentRegionType::Water;
+            self.recent_column_info.region_type_info[0][n] = RecentRegionType::Water;
         }
+        log::debug!("About to mark at {}. Col: {:?}", yix, self.recent_column_info.region_type_info[0]);
         assert_eq!(self.recent_column_info.region_type_info[0][yix], RecentRegionType::Unknown);
         self.recent_column_info.region_type_info[0][yix] = RecentRegionType::Land;
         self.next_y_index = yix + 1;
