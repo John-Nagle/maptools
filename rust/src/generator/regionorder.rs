@@ -29,7 +29,7 @@ use std::path::PathBuf;
 use crate::vizgroup::{CompletedGroups, RegionData, VizGroups};
 use image::{DynamicImage, ImageReader, RgbImage};
 
-const MAX_LOD: u8 = 10;
+const MAX_LOD: u8 = 16;
 
 /// Simple version, without optimization.
 /// Just iterates over &Vec<RegionData>.
@@ -85,10 +85,22 @@ impl ColumnCursors {
         log::debug!("Group bounds: {:?}", bounds);
         assert!(!regions.is_empty()); // This is checked in get_group_bounds
         let base_region_size = (regions[0].size_x, regions[0].size_y);
+/*
         //  ***NEED TO STOP GENERATING COLUMN CURSORS WHEN ONE REGION OF LOD ENCOMPASSES ENTIRE BOUNDS***
         let cursors: Vec<_> = (0..MAX_LOD)
             .map(|lod| ColumnCursor::new(bounds, base_region_size, lod))
             .collect();
+*/
+        //  Generate LODs unti one LOD covers the entire bounds.
+        let mut cursors = Vec::new();
+        for lod in 0..MAX_LOD {
+            let new_cursor = ColumnCursor::new(bounds, base_region_size, lod);
+            let done = new_cursor.recent_column_info.is_full_coverage();
+            cursors.push(new_cursor);
+            if done {
+                break
+            }
+        }
         Self {
             bounds,
             regions,
@@ -167,25 +179,34 @@ pub struct RecentColumnInfo {
     start: (u32, u32),
     /// Region type info
     region_type_info: [Vec<RecentRegionType>; 2],
+    /// True if this LOD needs only one tile to cover the entire area
+    full_coverage: bool,
 }
 
 impl RecentColumnInfo {
     /// New. Sizes the recent column info for one LOD and
     /// fills in the array with Unknown.
-    pub fn new(bounds: ((u32, u32), (u32, u32)), region_size: (u32, u32), lod: u8) -> Self {
-        let (ll, ur, size) = get_group_scan_limits(bounds, region_size, lod);
-        //////let (ll, ur) = bounds;
-        log::debug!("New recent column info, LOD{}: ur: {:?}, ll: {:?}, region_size: {:?}", lod, ur, ll, region_size);    // ***TEMP***
-        let x_steps = (ur.0 - ll.0) / region_size.0;
+    pub fn new(bounds: ((u32, u32), (u32, u32)), base_region_size: (u32, u32), lod: u8) -> Self {
+        let (ll, ur, size) = get_group_scan_limits(bounds, base_region_size, lod);
+        log::debug!("New recent column info, LOD{}: ur: {:?}, ll: {:?}, base_region_size: {:?}", lod, ur, ll, base_region_size);    // ***TEMP***
+        let scale = 2_u32.pow(lod as u32);
+        let tile_size = (
+            base_region_size.0 * scale,
+            base_region_size.1 * scale,
+        );
+        let x_steps = (ur.0 - ll.0) / tile_size.0;
+        let y_steps = (ur.1 - ll.1) / tile_size.1;
         let region_type_info = [
             vec![RecentRegionType::Unknown; x_steps as usize],
             vec![RecentRegionType::Unknown; x_steps as usize],
         ];
-        log::debug!("LOD {}, bounds {:?}, {} steps", lod, bounds, x_steps);
+        log::debug!("LOD {}, bounds {:?}, {} x_steps, {} y_steps", lod, bounds, x_steps, y_steps);
+        let full_coverage = x_steps == 1 && y_steps == 1;
         Self {
             start: ll,
             size,	
             region_type_info,
+            full_coverage,
         }
     }
     
@@ -222,6 +243,11 @@ impl RecentColumnInfo {
         //  Advance position. Position is of the current column, not the previous one.
         self.start.0 += self.size.0;
     }
+    
+    /// Does this tile cover the entire bounds of the viz group?
+    fn is_full_coverage(&self) -> bool {
+        self.full_coverage
+    }   
 
     /// Test one cell for status
     fn test_cell(&self, loc: (u32, u32)) -> RecentRegionType {
@@ -305,12 +331,9 @@ impl ColumnCursor {
         base_region_size: (u32, u32),
         lod: u8,
     ) -> ColumnCursor {
+        //  Calculate tile size at this LOD.
         let size_mult = 2_u32.pow(lod as u32);
-        let region_size = (
-            base_region_size.0 * size_mult,
-            base_region_size.1 * size_mult,
-        );
-        let recent_column_info = RecentColumnInfo::new(bounds, region_size, lod);
+        let recent_column_info = RecentColumnInfo::new(bounds, base_region_size, lod);
         let next_loc = recent_column_info.start;
         Self {
             recent_column_info,
@@ -503,6 +526,7 @@ pub fn get_group_scan_limits(
     //  ***LOWER LIMITS WILL ALWAYS BE NONNEGATIVE BECAUSE OF HOW ALIGNMENT WORKS***
     //  ***UPPER LIMITS GET LARGER AS SIZE INCREASES***
     //  ***WHEN LOD IS ONE REGION, WE ARE DONE***
+    //  ***WRONG new_ur is far too big***
     let new_ll = (
         (lower_left.0 / step.0) * step.0,
         (lower_left.1 / step.1) * step.1,
