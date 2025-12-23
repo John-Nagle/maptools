@@ -14,6 +14,8 @@
 //! that need two columns of the LOD 0 regions. On every fourth cycle, the LOD 2 regions
 //! that need two columns of the LOD 1 regions. And so forth.
 //!
+//! For what little this does, it is unreasonably complicated.
+//!
 //!     License: LGPL.
 //!     Animats
 //!     December, 2025.
@@ -29,6 +31,7 @@ use std::path::PathBuf;
 use crate::vizgroup::{CompletedGroups, RegionData, VizGroups};
 use image::{DynamicImage, ImageReader, RgbImage};
 
+/// Maximum LOD. It never gets this big, because there would have to be a viz group 2^LOD across for that to happen.
 const MAX_LOD: u8 = 16;
 
 /// Simple version, without optimization.
@@ -164,11 +167,9 @@ enum RecentRegionType {
     Water,
     /// Land
     Land,
-    /// Error - should not happen
-    Error,
 }
 
-/// The last two columns.
+/// The most recent two columns.
 /// This is how we decide which lower LODs get impostered,
 /// and when the info for them is emitted.
 #[derive(Debug)]
@@ -261,7 +262,7 @@ impl RecentColumnInfo {
             &self.region_type_info[1]
         } else {
             log::error!("Test cell for {:?} out of range in X for {:?}", loc, self);
-            return RecentRegionType::Error;
+            return RecentRegionType::Water;
         };
         //  Return element.
         assert_eq!(y % self.size.1, 0);
@@ -276,13 +277,6 @@ impl RecentColumnInfo {
         let s01 = self.test_cell((x, y + self.size.1));
         let s10 = self.test_cell((x + self.size.0, y));
         let s11 = self.test_cell((x + self.size.0, y + self.size.1));
-        if (s00 == RecentRegionType::Error)
-            || (s01 == RecentRegionType::Error)
-            || (s10 == RecentRegionType::Error)
-            || (s11 == RecentRegionType::Error)
-        {
-            return RecentRegionType::Error;
-        }
         //  Unknown, can't process yet.
         if (s00 == RecentRegionType::Unknown)
             || (s01 == RecentRegionType::Unknown)
@@ -443,10 +437,38 @@ impl ColumnCursor {
     }
 
     /// Advance to next region, for LOD > 0.
-    pub fn advance_lod_n(&mut self, recent_column_info: &RecentColumnInfo) -> AdvanceStatus {
+    /// This constructs LOD N entries based on LOD N-1.
+    pub fn advance_lod_n(&mut self, previous_lod_column_info: &RecentColumnInfo) -> AdvanceStatus {
         return AdvanceStatus::None; // ***TEMP TURNOFF*** just do LOD 0
+/* ***TEMP***
+        let fill_last = self.recent_column_info.region_type_info[0].len() -1;
+        while self.next_y_index < fill_last {
+            let loc = (99999,99999);    // ***TEMP***
+            match self.recent_column_info.test_cell(loc) {
+                RecentRegionType::Unknown {
+                    //  Try above LODs, then try again
+                    return AdvanceStatus::Retry;
+                }
+                RecentRegionType::Land {
+                    self.recent_column_info.region_type_info[0][self.next_y_index] = RecentRegionType::Land;
+                    //  ***NEED TO GENERATE AND RETURN A TILE***
+                    self.next_y_index += 1;
+                    return AdvanceStatus::Data(new_tile);
+                }
+                RecentRegionType::Water {
+                    self.next_y_index += 1;
+                    self.recent_column_info.region_type_info[0][self.next_y_index] = RecentRegionType::Water;
+                    return AdvanceStatus::Retry;
+                }
+            self.next_y_index += 1;
+        }
+        //  Done with this column.
+        self.shift();
+        self.next_y_index = 0;
+        //  ***NEED CHECK FOR LAST COLUMN TO RETURN NONE***
+*/     
     }
-
+/*
     /// True if advance is safe. That is, the previous LOD columns needed
     /// to build this column are already done.
     //  ***NEED A DATA STRUCTURE FOR EACH LOD THAT TELLS US WHETHER
@@ -467,6 +489,7 @@ impl ColumnCursor {
         //  ***MORE***
         todo!();
     }
+*/
 }
 
 /// Get dimensions of a group.
