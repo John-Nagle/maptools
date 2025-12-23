@@ -316,6 +316,8 @@ pub struct ColumnCursor {
     next_y_index: usize,
     /// Index into region data, for LOD 0 only
     region_data_index: usize,
+    /// LOD
+    lod: u8,
 }
 
 impl ColumnCursor {
@@ -333,6 +335,7 @@ impl ColumnCursor {
             recent_column_info,
             next_y_index: 0,
             region_data_index: 0,
+            lod,
         }
     }
     /// Mark region as land.
@@ -435,38 +438,53 @@ impl ColumnCursor {
             AdvanceStatus::None
         }
     }
+    
+    /// Build a new tile for a LOD > 0.
+    fn build_new_tile(&self, loc: (u32, u32), size: (u32, u32)) -> RegionData {
+        RegionData {
+            grid: "???".to_string(),    // ***TEMP***
+            region_coords_x: loc.0,
+            region_coords_y: loc.1,
+            size_x: size.0,
+            size_y: size.1,
+            name: "???".to_string(),    // ***TEMP***
+        }
+    }
 
     /// Advance to next region, for LOD > 0.
     /// This constructs LOD N entries based on LOD N-1.
     pub fn advance_lod_n(&mut self, previous_lod_column_info: &RecentColumnInfo) -> AdvanceStatus {
         return AdvanceStatus::None; // ***TEMP TURNOFF*** just do LOD 0
-/* ***TEMP***
         let fill_last = self.recent_column_info.region_type_info[0].len() -1;
         while self.next_y_index < fill_last {
-            let loc = (99999,99999);    // ***TEMP***
+            let loc = (self.recent_column_info.start.0, self.recent_column_info.start.1 + self.recent_column_info.size.1 * (self.next_y_index as u32));
             match self.recent_column_info.test_cell(loc) {
-                RecentRegionType::Unknown {
+                RecentRegionType::Unknown => {
+                    //  Not ready to do this yet.
                     //  Try above LODs, then try again
                     return AdvanceStatus::Retry;
                 }
-                RecentRegionType::Land {
+                RecentRegionType::Land => {
                     self.recent_column_info.region_type_info[0][self.next_y_index] = RecentRegionType::Land;
-                    //  ***NEED TO GENERATE AND RETURN A TILE***
+                    //  Generate and return a land tile.
+                    let new_tile = self.build_new_tile(loc, self.recent_column_info.size);
                     self.next_y_index += 1;
                     return AdvanceStatus::Data(new_tile);
                 }
-                RecentRegionType::Water {
+                RecentRegionType::Water => {
                     self.next_y_index += 1;
+                    //  Mark as a water tile to be skipped.
                     self.recent_column_info.region_type_info[0][self.next_y_index] = RecentRegionType::Water;
                     return AdvanceStatus::Retry;
                 }
+            }
             self.next_y_index += 1;
         }
         //  Done with this column.
-        self.shift();
+        self.recent_column_info.shift();
         self.next_y_index = 0;
-        //  ***NEED CHECK FOR LAST COLUMN TO RETURN NONE***
-*/     
+        //////if loc.1 >= 
+        //  ***NEED CHECK FOR LAST COLUMN TO RETURN NONE - NEED BOUNDS INFO***     
     }
 /*
     /// True if advance is safe. That is, the previous LOD columns needed
