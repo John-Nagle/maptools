@@ -140,12 +140,14 @@ impl Iterator for ColumnCursors {
                     curr.advance_lod_n(&prev.recent_column_info)
                 };
                 //  If we have a winner, return it.
+                log::debug!("LOD {}, advance {:?}", lod, advance_status);
                 match advance_status {
                     AdvanceStatus::None => continue,
                     AdvanceStatus::Data(region) => return Some(region),
                     AdvanceStatus::Retry => {
+                        //  Retry at outer loop level
                         need_retry = true;
-                        continue;
+                        break;  
                     } // Need to go around again. AT WHAT LODs?***
                 }
             }
@@ -249,6 +251,7 @@ impl RecentColumnInfo {
         self.region_type_info[0] = vec![RecentRegionType::Unknown; self.region_type_info[0].len()];
         //  Advance position. Position is of the current column, not the previous one.
         self.start.0 += self.size.0;
+        log::debug!("Column shift. Next start: {:?}", self.start);
     }
     
     /// Does this tile cover the entire bounds of the viz group?
@@ -304,6 +307,7 @@ impl RecentColumnInfo {
     }
 }
 
+#[derive(Debug)]
 enum AdvanceStatus {
     /// None - EOF
     None,
@@ -464,7 +468,8 @@ impl ColumnCursor {
             self.recent_column_info.shift();
             self.next_y_index = 0;
             //  Test for done in X axis
-                if self.recent_column_info.start.0 >= self.recent_column_info.lod_bounds.1.0 {   
+            if self.recent_column_info.start.0 >= self.recent_column_info.lod_bounds.1.0 { 
+                log::debug!("LOD EOF test passed: {} vs {}", self.recent_column_info.start.0, self.recent_column_info.lod_bounds.1.0);
                 return AdvanceStatus::None
             }
         }
