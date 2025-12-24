@@ -458,37 +458,40 @@ impl ColumnCursor {
     /// Advance to next region, for LOD > 0.
     /// This constructs LOD N entries based on LOD N-1.
     pub fn advance_lod_n(&mut self, previous_lod_column_info: &RecentColumnInfo) -> AdvanceStatus {
-        return AdvanceStatus::None; // ***TEMP TURNOFF*** just do LOD 0
         let fill_last = self.recent_column_info.region_type_info[0].len() -1;
-        while self.next_y_index < fill_last {
-            let loc = (self.recent_column_info.start.0, self.recent_column_info.start.1 + self.recent_column_info.size.1 * (self.next_y_index as u32));
-            match self.recent_column_info.test_cell(loc) {
-                RecentRegionType::Unknown => {
-                    //  Not ready to do this yet.
-                    //  Try above LODs, then try again
-                    return AdvanceStatus::Retry;
-                }
-                RecentRegionType::Land => {
-                    self.recent_column_info.region_type_info[0][self.next_y_index] = RecentRegionType::Land;
-                    //  Generate and return a land tile.
-                    let new_tile = self.build_new_tile(loc, self.recent_column_info.size);
-                    self.next_y_index += 1;
-                    return AdvanceStatus::Data(new_tile);
-                }
-                RecentRegionType::Water => {
-                    self.next_y_index += 1;
-                    //  Mark as a water tile to be skipped.
-                    self.recent_column_info.region_type_info[0][self.next_y_index] = RecentRegionType::Water;
-                    return AdvanceStatus::Retry;
-                }
+        //  Test for done in Y axis.
+        if self.next_y_index >= fill_last {
+            self.recent_column_info.shift();
+            self.next_y_index = 0;
+            //  Test for done in X axis
+                if self.recent_column_info.start.0 >= self.recent_column_info.lod_bounds.1.0 {   
+                return AdvanceStatus::None
             }
-            self.next_y_index += 1;
         }
-        //  Done with this column.
-        self.recent_column_info.shift();
-        self.next_y_index = 0;
-        //////if loc.1 >= 
-        //  ***NEED CHECK FOR LAST COLUMN TO RETURN NONE - NEED BOUNDS INFO***     
+      
+        //  Test next cell along Y axis.
+        let loc = (self.recent_column_info.start.0, self.recent_column_info.start.1 + self.recent_column_info.size.1 * (self.next_y_index as u32));
+        match self.recent_column_info.test_cell(loc) {
+            RecentRegionType::Unknown => {
+                //  Not ready to do this yet.
+                //  Try above LODs, then try again
+                AdvanceStatus::Retry
+            }
+            RecentRegionType::Land => {
+                self.recent_column_info.region_type_info[0][self.next_y_index] = RecentRegionType::Land;
+                //  Generate and return a land tile.
+                let new_tile = self.build_new_tile(loc, self.recent_column_info.size);
+                log::debug!("New tile: {:?}", new_tile);
+                self.next_y_index += 1;
+                AdvanceStatus::Data(new_tile)
+            }
+            RecentRegionType::Water => {            
+                //  Mark as a water tile to be skipped.
+                self.recent_column_info.region_type_info[0][self.next_y_index] = RecentRegionType::Water;
+                self.next_y_index += 1;
+                AdvanceStatus::Retry
+            }
+        }
     }
 /*
     /// True if advance is safe. That is, the previous LOD columns needed
