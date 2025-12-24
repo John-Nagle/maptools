@@ -174,10 +174,12 @@ enum RecentRegionType {
 /// and when the info for them is emitted.
 #[derive(Debug)]
 pub struct RecentColumnInfo {
-    /// Impostor size. Multiple regions. Meters.
+    /// Impostor tile size at this LOD. Meters.
     size: (u32, u32),
     /// Offset of first entry. Meters.
     start: (u32, u32),
+    /// Bounds of the entire map at this LOD.
+    lod_bounds: ((u32, u32), (u32, u32)),
     /// Region type info
     region_type_info: [Vec<RecentRegionType>; 2],
     /// True if this LOD needs only one tile to cover the entire area
@@ -200,22 +202,26 @@ impl RecentColumnInfo {
         let region_type_info = [
             vec![RecentRegionType::Unknown; x_steps as usize],
             vec![RecentRegionType::Unknown; x_steps as usize],
-        ];
-        log::debug!("LOD {}, bounds {:?}, {} x_steps, {} y_steps", lod, bounds, x_steps, y_steps);
+        ];        
+        let lod_bounds = (ll, ur);
         let full_coverage = x_steps == 1 && y_steps == 1;
+        log::debug!("LOD {}, bounds {:?}, {} x_steps, {} y_steps, full coverage: {}", lod, bounds, x_steps, y_steps, full_coverage);
+
         Self {
-            start: ll,
             size,	
             region_type_info,
             full_coverage,
+            lod_bounds,
+            start: lod_bounds.0,
         }
     }
     
     /// Calculate array index for a Y value.
     /// Non-fatal bounds check
     pub fn try_calc_y_index(&self, y: u32) -> Option<usize> {
-        if y >= self.start.1 {
-            let yix = ((y - self.start.1) / self.size.1) as usize;
+        let ll_y = self.lod_bounds.0.1;
+        if y >= ll_y {
+            let yix = ((y - ll_y) / self.size.1) as usize;
             if yix < self.region_type_info[0].len() {
                 Some(yix)
             } else {
@@ -232,7 +238,7 @@ impl RecentColumnInfo {
             yix 
         } else {
             panic!("RegionOrder::RecentColumnInfo bounds check fail: y: {}, size: {:?}, start: {:?}, len: {}",
-                y, self.size, self.start, self.region_type_info[0].len());
+                y, self.size, self.lod_bounds, self.region_type_info[0].len());
         }
     }
 
@@ -363,7 +369,7 @@ impl ColumnCursor {
                 //  This column is not full yet, so we have to fill it out to the end.
                 let fill_start = (loc.1 - self.recent_column_info.start.1) / self.recent_column_info.size.1 + 1;
                 log::debug!("Fill start: {}, fill last: {}", fill_start, fill_last);
-                for n in (self.next_y_index as usize .. fill_last + 1) {
+                for n in self.next_y_index as usize .. fill_last + 1 {
                     assert_eq!(self.recent_column_info.region_type_info[0][n], RecentRegionType::Unknown);
                     self.recent_column_info.region_type_info[0][n] = RecentRegionType::Water;
                 }
@@ -377,11 +383,10 @@ impl ColumnCursor {
                 //  This column is already full, and other LODs have been processed, so we can shift columns.
                 self.next_y_index = 0;
                 self.recent_column_info.shift();
-                log::debug!("Shifted columns. Col: {:?}", self.recent_column_info.region_type_info[0]);
+                log::debug!("Shifted columns. Col: {:?}", self.recent_column_info.region_type_info[1]);
             }
         }      
 
-        //  ***ADJUST COLUMN HERE***MORE***
         assert_eq!(self.recent_column_info.start.0, loc.0); // on correct column
         let yix = self.recent_column_info.calc_y_index(loc.1);
         assert_eq!(loc.1 % self.recent_column_info.size.1, 0);
@@ -411,7 +416,6 @@ impl ColumnCursor {
         //  Fill as water up to, but not including, yix.
         log::debug!("Filling as water from {} to {} exclusive.", self.next_y_index, yix);
         for n in self.next_y_index .. yix {
-            log::debug!("Filling as water at {} ", n);  // ***TEMP***
             assert_eq!(self.recent_column_info.region_type_info[0][n], RecentRegionType::Unknown);
             self.recent_column_info.region_type_info[0][n] = RecentRegionType::Water;
         }
