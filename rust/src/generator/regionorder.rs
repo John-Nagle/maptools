@@ -147,7 +147,7 @@ impl Iterator for ColumnCursors {
                     AdvanceStatus::Retry => {
                         //  Retry at outer loop level
                         need_retry = true;
-                        break;  
+                        continue;  
                     } // Need to go around again. AT WHAT LODs?***
                 }
             }
@@ -247,6 +247,8 @@ impl RecentColumnInfo {
     /// Shift recent column info from current to previous column.
     /// Current column is 0, previous column is 1.
     fn shift(&mut self) {
+        //  Columns must be totally filled in before a shift.
+        assert!(self.region_type_info[0].iter().find(|&&v| v == RecentRegionType::Unknown).is_none());
         self.region_type_info[1] = self.region_type_info[0].clone();
         self.region_type_info[0] = vec![RecentRegionType::Unknown; self.region_type_info[0].len()];
         //  Advance position. Position is of the current column, not the previous one.
@@ -275,7 +277,13 @@ impl RecentColumnInfo {
         };
         //  Return element.
         assert_eq!(y % self.size.1, 0);
-        row[(y / self.size.1) as usize]
+        //  If out of range, treat as water.
+        if let Some(v) = row.get((y / self.size.1) as usize) {
+            *v
+        } else {
+            RecentRegionType::Water
+        }
+        //////row[(y / self.size.1) as usize]
     }
 
     /// Test a 4-cell quadrant for status.
@@ -462,9 +470,10 @@ impl ColumnCursor {
     /// Advance to next region, for LOD > 0.
     /// This constructs LOD N entries based on LOD N-1.
     pub fn advance_lod_n(&mut self, previous_lod_column_info: &RecentColumnInfo) -> AdvanceStatus {
-        let fill_last = self.recent_column_info.region_type_info[0].len() -1;
+        log::debug!("Advance LOD {}, next y {}, col {:?}", self.lod, self.next_y_index, self.recent_column_info.region_type_info[0]);  // ***TEMP***
+        //////let fill_last = self.recent_column_info.region_type_info[0].len() -1;
         //  Test for done in Y axis.
-        if self.next_y_index >= fill_last {
+        if self.next_y_index >= self.recent_column_info.region_type_info[0].len() {
             self.recent_column_info.shift();
             self.next_y_index = 0;
             //  Test for done in X axis
@@ -476,7 +485,7 @@ impl ColumnCursor {
       
         //  Test next cell along Y axis.
         let loc = (self.recent_column_info.start.0, self.recent_column_info.start.1 + self.recent_column_info.size.1 * (self.next_y_index as u32));
-        match self.recent_column_info.test_cell(loc) {
+        match previous_lod_column_info.test_cell(loc) {
             RecentRegionType::Unknown => {
                 //  Not ready to do this yet.
                 //  Try above LODs, then try again
