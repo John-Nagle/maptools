@@ -125,41 +125,6 @@ impl Iterator for ColumnCursors {
     /// This is to avoid the need to keep huge numbers of region images in memory
     /// at one time.
     fn next(&mut self) -> Option<Self::Item> {
-/*
-        //  Look for the lowest LOD for which we can return an item.
-        //  ***NEEDS MORE EXPLAINATION***
-        'outer: loop {
-            let mut need_retry = false;
-            for lod in (0..self.cursors.len()).rev() {
-                let advance_status = if lod == 0 {
-                    self.cursors[0].advance_lod_0(&self.regions)
-                } else {
-                    //  We need to mutably access two elements of the same array.
-                    let (prev, curr) = self.cursors.split_at_mut(lod);
-                    assert!(!prev.is_empty());
-                    let prev = &prev[prev.len() - 1];
-                    let curr: &mut ColumnCursor = &mut curr[0];
-                    curr.advance_lod_n(&prev.recent_column_info)
-                };
-                //  If we have a winner, return it.
-                log::debug!("LOD {}, advance {:?}", lod, advance_status);
-                match advance_status {
-                    AdvanceStatus::None => continue,
-                    AdvanceStatus::Data(region) => return Some(region),
-                    AdvanceStatus::Progress => {
-                        //  Retry at outer loop level
-                        need_retry = true;
-                        continue;  
-                    } // Need to go around again. AT WHAT LODs?***
-                }
-            }
-            if !need_retry {
-                break 'outer;
-            }
-        }
-        //  Can't advance on any LOD. Done.
-        None
-*/
         //  The main loop to find the next item to return.
         // - Hold working LOD on Data(item) and Progress (i.e. water). Set progress_made.
         // - Advance working_lod if None and progress_made.
@@ -327,7 +292,6 @@ impl RecentColumnInfo {
         } else {
             RecentRegionType::Water
         }
-        //////row[(y / self.size.1) as usize]
     }
 
     /// Test a 4-cell quadrant for status.
@@ -441,13 +405,13 @@ impl ColumnCursor {
             if self.recent_column_info.region_type_info[0][fill_last] == RecentRegionType::Unknown {
                 //  This column is not full yet, so we have to fill it out to the end.
                 let fill_start = (loc.1 - self.recent_column_info.start.1) / self.recent_column_info.size.1 + 1;
-                log::debug!("Fill start: {}, fill last: {}", fill_start, fill_last);
+                log::trace!("Fill start: {}, fill last: {}", fill_start, fill_last);
                 for n in self.next_y_index as usize .. fill_last + 1 {
                     assert_eq!(self.recent_column_info.region_type_info[0][n], RecentRegionType::Unknown);
                     self.recent_column_info.region_type_info[0][n] = RecentRegionType::Water;
                 }
                 //  At this point, all entries in the column should be known.
-                log::debug!("Col: {:?}", self.recent_column_info.region_type_info[0]);  // ***TEMP***
+                log::trace!("Col: {:?}", self.recent_column_info.region_type_info[0]);  // ***TEMP***
                 assert!(self.recent_column_info.region_type_info[0].iter().find(|&&v| v == RecentRegionType::Unknown).is_none());
                 //  We won't do the insert; have to go around again and let the lower LODs have a chance.
                 self.next_y_index = fill_last;  // which is off the end by 1.
@@ -469,16 +433,6 @@ impl ColumnCursor {
             RecentRegionType::Unknown
         );
         //  Mark this as a land cell.
-        //  ***SHOULD WE FILL IN CELLS SKIPPED AS WATER CELLS?*** ***YES*** fill up to one being set here.
-        //  ***HOW DO WE FILL OUT END OF LINE?***
-        //  ***- We know about end of line only when X advances.
-        //  ***- Now we need to fill out the line, and let lower LODs run before doing the shift.
-        //  ***- Design problem. Need a 2-step process***
-        //  ***- Need to separate y-changed from mark as land.
-        //  ***- When Y changes for LOD 0, need to shift, then go around the LODs again, then mark as land.
-        //  ***  When Y changes for LOD > 0, ??? How does that work?
-        //  ***  If row advance peeks ahead for advance_lod_0, is that good enough?
-        //  ***  - Not sure.
         //  Fill as water up to new land cell.
         log::debug!(
             "Mark {:?}, index {} as land. Size {:?}",
@@ -490,12 +444,8 @@ impl ColumnCursor {
         log::debug!("Filling as water from {} to {} exclusive.", self.next_y_index, yix);
         for n in self.next_y_index .. yix {
             self.mark_region_type(n, RecentRegionType::Water);
-            //////assert_eq!(self.recent_column_info.region_type_info[0][n], RecentRegionType::Unknown);
-            //////self.recent_column_info.region_type_info[0][n] = RecentRegionType::Water;
         }
         self.mark_region_type(yix, RecentRegionType::Land);
-        //////assert_eq!(self.recent_column_info.region_type_info[0][yix], RecentRegionType::Unknown);
-        //////self.recent_column_info.region_type_info[0][yix] = RecentRegionType::Land;
         self.next_y_index = yix + 1;
         true
     }
@@ -520,13 +470,16 @@ impl ColumnCursor {
     
     /// Build a new tile for a LOD > 0.
     fn build_new_tile(&self, loc: (u32, u32), size: (u32, u32)) -> RegionData {
+        //  Dummy name for higher LODs.
+        let name = format!("LOD{} {:?}", self.lod, loc);
+        //  Build a new tile.
         RegionData {
             grid: self.grid.clone(),
             region_coords_x: loc.0,
             region_coords_y: loc.1,
             size_x: size.0,
             size_y: size.1,
-            name: "???".to_string(),    // ***TEMP***
+            name,
             lod: self.lod,
         }
     }
@@ -553,7 +506,7 @@ impl ColumnCursor {
       
         //  Test next cell along Y axis.
         let loc = (self.recent_column_info.start.0, self.recent_column_info.start.1 + self.recent_column_info.size.1 * (self.next_y_index as u32));
-        match previous_lod_column_info.test_cell(loc) {
+        match previous_lod_column_info.test_four_cells(loc) {
             RecentRegionType::Unknown => {
                 //  Not ready to do this yet.
                 //  Try above LODs, then try again
@@ -575,38 +528,11 @@ impl ColumnCursor {
             }
         }
     }
-/*
-    /// True if advance is safe. That is, the previous LOD columns needed
-    /// to build this column are already done.
-    //  ***NEED A DATA STRUCTURE FOR EACH LOD THAT TELLS US WHETHER
-    //  ***EACH CELL IS ALREADY DONE, KNOWN EMPTY WATER, or NOT DONE YET***
-    //  ***SO TWO BITS PER CELL.***
-    //  ***MAP BELONGS TO NEXT HIGHER LOD
-    //  ***SET WHEN NEXT RETURNS A VALUE***
-    //  ***NEED TO KEEP ONLY THE LAST TWO COLUMNS?
-    //  *** Probably. Just keep an array of two columns x column length in region units with bounds from bounds calc.
-    //  *** When column advances, shift array.
-    //  ***  Offset issue is complicated but bounds calc already does most of the work.
-    //  ***ADVANCE - Check the four indicated entries.
-    //  *** All done - generate this item.
-    //  *** All empty water - set this item as empty water, skip returning item.
-    //  *** All done or empty water - generate this item.
-    //  *** All not done yet - return done for now.
-    fn is_advance_safe(&self) -> bool {
-        //  ***MORE***
-        todo!();
-    }
-*/
 }
 
 /// Get dimensions of a group.
 pub fn get_group_bounds(group: &Vec<RegionData>) -> Result<((u32, u32), (u32, u32)), Error> {
     //  Error if empty group.
-    //  ***BEGIN TEMP***
-    for v in group {
-        log::debug!(" Region loc: ({}, {}), size: ({}, {})", v.region_coords_x, v.region_coords_y, v.size_x, v.size_y);
-    }
-    //  ***END TEMP***
     if group.is_empty() {
         return Err(anyhow!("Empty viz group"));
     }
