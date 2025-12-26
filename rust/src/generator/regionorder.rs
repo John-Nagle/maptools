@@ -21,15 +21,7 @@
 //!     December, 2025.
 //
 use anyhow::{anyhow, Error};
-use common::Credentials;
-use common::{HeightField, UploadedRegionInfo};
-
-use std::collections::HashMap;
-use std::io::{Cursor, Write};
-use std::path::PathBuf;
-
-use crate::vizgroup::{CompletedGroups, RegionData, VizGroups};
-use image::{DynamicImage, ImageReader, RgbImage};
+use crate::vizgroup::{RegionData};
 
 /// Maximum LOD. It never gets this big, because there would have to be a viz group 2^LOD across for that to happen.
 const MAX_LOD: u8 = 16;
@@ -73,8 +65,6 @@ impl Iterator for SimpleColumnCursors {
 /// constructes higher LOD impostors.
 
 pub struct ColumnCursors {
-    /// Bounds of the entire region data
-    bounds: ((u32, u32), (u32, u32)),
     /// Cursors for each LOD
     cursors: Vec<ColumnCursor>,
     /// The regions
@@ -104,7 +94,6 @@ impl ColumnCursors {
             }
         }
         Self {
-            bounds,
             regions,
             cursors,
             working_lod: 0,
@@ -369,7 +358,7 @@ impl ColumnCursor {
         }
     }
     /// Mark individual region type
-    pub fn mark_region_type(&mut self, yix: usize, recent_region_type: RecentRegionType) {
+    fn mark_region_type(&mut self, yix: usize, recent_region_type: RecentRegionType) {
         log::debug!(
             "Try to mark LOD {} index {} as {:?}. Size {:?}",
             self.lod,
@@ -387,7 +376,7 @@ impl ColumnCursor {
     /// This relies in input being processed in x,y order.
     /// If this returns false, the markng was not done and we have to retry.
     /// This occurs when a column is complete.
-    pub fn mark_as_land(&mut self, loc: (u32, u32)) -> bool {
+    fn mark_as_land(&mut self, loc: (u32, u32)) -> bool {
         //  The update must be applied to row 0 of recent column info.
         //  If the location does not match, the recent column info must
         //  be adjusted.
@@ -451,7 +440,7 @@ impl ColumnCursor {
     }
 
     /// Advance to next region, for LOD 0 only.
-    pub fn advance_lod_0(&mut self, regions: &Vec<RegionData>) -> AdvanceStatus {
+    fn advance_lod_0(&mut self, regions: &Vec<RegionData>) -> AdvanceStatus {
         let n = self.region_data_index;
         if n < regions.len() {
             let region = &regions[n];
@@ -486,7 +475,7 @@ impl ColumnCursor {
 
     /// Advance to next region, for LOD > 0.
     /// This constructs LOD N entries based on LOD N-1.
-    pub fn advance_lod_n(&mut self, previous_lod_column_info: &RecentColumnInfo) -> AdvanceStatus {
+    fn advance_lod_n(&mut self, previous_lod_column_info: &RecentColumnInfo) -> AdvanceStatus {
         log::debug!("Advance LOD {}, next y {}, col {:?}", self.lod, self.next_y_index, self.recent_column_info.region_type_info[0]);  // ***TEMP***
         //  Check for out of columns. This is the EOF test.
         if self.recent_column_info.start.0 >= self.recent_column_info.lod_bounds.1.0 { 
@@ -604,7 +593,7 @@ fn test_region_order() {
     use common::test_logger;
     test_logger();
     //  Build test data
-    use super::vizgroup::vizgroup_test_patterns;
+    use super::vizgroup::{VizGroups, vizgroup_test_patterns};
     let test_data = vizgroup_test_patterns()[1].clone();
     let mut viz_groups = VizGroups::new(false);
     for item in test_data {
