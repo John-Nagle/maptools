@@ -117,6 +117,7 @@ impl TerrainGenerator {
                     size_x,
                     size_y,
                     name,
+                    lod: 0,
                 };
                 if let Some(completed_groups) = vizgroups.add_region_data(region_data) {
                     grids.push(completed_groups);

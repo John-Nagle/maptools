@@ -92,16 +92,11 @@ impl ColumnCursors {
         log::debug!("Group bounds: {:?}", bounds);
         assert!(!regions.is_empty()); // This is checked in get_group_bounds
         let base_region_size = (regions[0].size_x, regions[0].size_y);
-/*
-        //  ***NEED TO STOP GENERATING COLUMN CURSORS WHEN ONE REGION OF LOD ENCOMPASSES ENTIRE BOUNDS***
-        let cursors: Vec<_> = (0..MAX_LOD)
-            .map(|lod| ColumnCursor::new(bounds, base_region_size, lod))
-            .collect();
-*/
+        let grid = &regions[0].grid;
         //  Generate LODs unti one LOD covers the entire bounds.
         let mut cursors = Vec::new();
         for lod in 0..MAX_LOD {
-            let new_cursor = ColumnCursor::new(bounds, base_region_size, lod);
+            let new_cursor = ColumnCursor::new(bounds, base_region_size, lod, grid.clone());
             let done = new_cursor.recent_column_info.is_full_coverage();
             cursors.push(new_cursor);
             if done {
@@ -322,7 +317,6 @@ impl RecentColumnInfo {
         } else if x + self.size.0 == self.start.0 {
             &self.region_type_info[1]
         } else {
-            log::error!("Test cell for {:?} out of range in X for {:?}", loc, self);
             return RecentRegionType::Water;
         };
         //  Return element.
@@ -386,6 +380,8 @@ pub struct ColumnCursor {
     region_data_index: usize,
     /// LOD
     lod: u8,
+    /// Grid, for output
+    grid: String,
 }
 
 impl ColumnCursor {
@@ -394,6 +390,7 @@ impl ColumnCursor {
         bounds: ((u32, u32), (u32, u32)),
         base_region_size: (u32, u32),
         lod: u8,
+        grid: String,
     ) -> ColumnCursor {
         //  Calculate tile size at this LOD.
         let size_mult = 2_u32.pow(lod as u32);
@@ -404,6 +401,7 @@ impl ColumnCursor {
             next_y_index: 0,
             region_data_index: 0,
             lod,
+            grid,
         }
     }
     /// Mark individual region type
@@ -523,12 +521,13 @@ impl ColumnCursor {
     /// Build a new tile for a LOD > 0.
     fn build_new_tile(&self, loc: (u32, u32), size: (u32, u32)) -> RegionData {
         RegionData {
-            grid: "???".to_string(),    // ***TEMP***
+            grid: self.grid.clone(),
             region_coords_x: loc.0,
             region_coords_y: loc.1,
             size_x: size.0,
             size_y: size.1,
             name: "???".to_string(),    // ***TEMP***
+            lod: self.lod,
         }
     }
 
@@ -652,12 +651,6 @@ pub fn get_group_scan_limits(
     let lod_mult = 2_u32.pow(lod as u32);
     let step = (region_size.0 * lod_mult, region_size.1 * lod_mult);
     //  Now the tricky part. Round down the lower_left values to the next lower multiple of step.
-    //  ***UNTESTED***
-    //  ***NEED TO ROUND LOWER LEFT DOWN, and UPPER RIGHT UP***
-    //  ***LOWER LIMITS WILL ALWAYS BE NONNEGATIVE BECAUSE OF HOW ALIGNMENT WORKS***
-    //  ***UPPER LIMITS GET LARGER AS SIZE INCREASES***
-    //  ***WHEN LOD IS ONE REGION, WE ARE DONE***
-    //  ***WRONG new_ur is far too big***
     let new_ll = (
         (lower_left.0 / step.0) * step.0,
         (lower_left.1 / step.1) * step.1,
@@ -706,9 +699,10 @@ fn test_region_order() {
             prev_loc_opt = Some(loc);
         }
         //  Do test for one group
-        let mut column_cursors = ColumnCursors::new(group);
+        let column_cursors = ColumnCursors::new(group);
+        log::debug!("Generating lower LODs");
         for item in column_cursors {
-            log::debug!("Item: {:?}", item);
+            log::debug!(" Output item: {:?}", item);
         }
         // ***MORE***
     }

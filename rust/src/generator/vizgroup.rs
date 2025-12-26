@@ -24,6 +24,8 @@ use std::rc::{Rc, Weak};
 pub struct RegionData {
     /// Which grid
     pub grid: String,
+    /// Which LOD - zero for all data obtained from the world.
+    pub lod: u8,
     /// X
     pub region_coords_x: u32,
     /// Y
@@ -508,6 +510,7 @@ pub fn vizgroup_test_patterns() -> Vec<Vec<RegionData>> {
                         region_coords_y: *region_coords_y,
                         size_x: *size_x,
                         size_y: *size_y,
+                        lod: 0,
                         name: name.to_string(),
                     },
                 )
