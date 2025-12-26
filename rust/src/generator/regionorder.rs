@@ -79,6 +79,10 @@ pub struct ColumnCursors {
     cursors: Vec<ColumnCursor>,
     /// The regions
     regions: Vec<RegionData>,
+    /// Iteration state, LOD we are working on
+    working_lod: u8,
+    /// Was anything marked?
+    progress_made: bool,
 }
 
 impl ColumnCursors {
@@ -108,6 +112,8 @@ impl ColumnCursors {
             bounds,
             regions,
             cursors,
+            working_lod: 0,
+            progress_made: false,
         }
     }
 }
@@ -124,6 +130,7 @@ impl Iterator for ColumnCursors {
     /// This is to avoid the need to keep huge numbers of region images in memory
     /// at one time.
     fn next(&mut self) -> Option<Self::Item> {
+/*
         //  Look for the lowest LOD for which we can return an item.
         //  ***NEEDS MORE EXPLAINATION***
         'outer: loop {
@@ -144,7 +151,7 @@ impl Iterator for ColumnCursors {
                 match advance_status {
                     AdvanceStatus::None => continue,
                     AdvanceStatus::Data(region) => return Some(region),
-                    AdvanceStatus::Retry => {
+                    AdvanceStatus::Progress => {
                         //  Retry at outer loop level
                         need_retry = true;
                         continue;  
@@ -157,6 +164,50 @@ impl Iterator for ColumnCursors {
         }
         //  Can't advance on any LOD. Done.
         None
+*/
+        //  The main loop to find the next item to return.
+        // - Hold working LOD on Data(item) and Progress (i.e. water). Set progress_made.
+        // - Advance working_lod if None and progress_made.
+        // - Reset working_lod to 0 if None and !progress_made.
+        // - If hit lowest LOD (largest number) and progress_made not set, done.
+        loop {
+            //  EOF test
+            if self.working_lod as usize >= self.cursors.len() {
+                if self.progress_made {
+                    self.progress_made = false;
+                    self.working_lod = 0;
+                    continue;
+                }
+                break None;
+            }
+            let advance_status = if self.working_lod == 0 {
+                self.cursors[0].advance_lod_0(&self.regions)
+            } else {
+                //  We need to mutably access two elements of the same array.
+                let (prev, curr) = self.cursors.split_at_mut(self.working_lod as usize);
+                assert!(!prev.is_empty());
+                let prev = &prev[prev.len() - 1];
+                let curr: &mut ColumnCursor = &mut curr[0];
+                curr.advance_lod_n(&prev.recent_column_info)
+            };
+            //  If we have a winner, return it.
+            log::debug!("LOD {}, advance {:?}", self.working_lod, advance_status);
+            match advance_status {
+                AdvanceStatus::None => {
+                    self.progress_made = false;
+                    self.working_lod += 1;
+                    continue;
+                }
+                AdvanceStatus::Data(region) => {
+                    self.progress_made = true;
+                    break Some(region);
+                }
+                AdvanceStatus::Progress => {
+                    self.progress_made = true;
+                    continue;
+                }
+            }
+        }
     }
 }
 
@@ -317,11 +368,11 @@ impl RecentColumnInfo {
 
 #[derive(Debug)]
 enum AdvanceStatus {
-    /// None - EOF
+    /// None -- did not mark anything
     None,
-    /// Retry - go do this again
-    Retry,
-    /// Output - we have a result to return
+    /// Made some progress -- Marked something, go do this again
+    Progress,
+    /// Output -- we have a result to return
     Data(RegionData),
 }
 
@@ -460,7 +511,7 @@ impl ColumnCursor {
             let loc = (region.region_coords_x, region.region_coords_y);
             if !self.mark_as_land(loc) {
                 // We advanced a row, and must do this again.
-                return AdvanceStatus::Retry;
+                return AdvanceStatus::Progress;
             }
             self.region_data_index += 1;
             AdvanceStatus::Data(region.clone())
@@ -504,7 +555,7 @@ impl ColumnCursor {
             RecentRegionType::Unknown => {
                 //  Not ready to do this yet.
                 //  Try above LODs, then try again
-                AdvanceStatus::Retry
+                AdvanceStatus::None
             }
             RecentRegionType::Land => {
                 self.recent_column_info.region_type_info[0][self.next_y_index] = RecentRegionType::Land;
@@ -518,7 +569,7 @@ impl ColumnCursor {
                 //  Mark as a water tile to be skipped.
                 self.recent_column_info.region_type_info[0][self.next_y_index] = RecentRegionType::Water;
                 self.next_y_index += 1;
-                AdvanceStatus::Retry
+                AdvanceStatus::Progress
             }
         }
     }
