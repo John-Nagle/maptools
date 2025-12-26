@@ -251,4 +251,19 @@ Next steps:
    - Hierarchy, uniform sized regions.
      - Need non-uniform size detector.
      - Existing test case is not valid for hierarchy.
+     
+2025-12-25
+   Merry Xmas!
+   LOD loop control is all wrong.
+   Fixes:
+    - set fn to set Land, Water, with check for Unknown
+    - one loop - type Loop, but has self.working_lod as a loop counter.
+    - Two state variables: self.working_lod, self.progress_made
+    - New advance statuses: None, Data(item), Progress.
+      - Hold working LOD on Data(item) and Progress (i.e. water). Set progress_made.
+      - Advance working_lod if None and progress_made.
+      - Reset working_lod to 0 if None and !progress_made.
+      - If hit lowest LOD and progress_made not set, done.
+      - ***CHECK THIS***
+      
       

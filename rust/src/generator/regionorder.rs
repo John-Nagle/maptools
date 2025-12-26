@@ -356,6 +356,19 @@ impl ColumnCursor {
             lod,
         }
     }
+    /// Mark individual region type
+    pub fn mark_region_type(&mut self, yix: usize, recent_region_type: RecentRegionType) {
+        log::debug!(
+            "Try to mark LOD {} index {} as {:?}. Size {:?}",
+            self.lod,
+            yix,
+            recent_region_type,
+            self.recent_column_info.region_type_info[0].len()
+        );
+        assert_eq!(self.recent_column_info.region_type_info[0][yix], RecentRegionType::Unknown);
+        self.recent_column_info.region_type_info[0][yix] = recent_region_type;
+    }
+    
     /// Mark region as land.
     /// Not just the current cell, but the ones leading up to it.
     /// Previous untouched cells are marked as Water.
@@ -428,11 +441,13 @@ impl ColumnCursor {
         //  Fill as water up to, but not including, yix.
         log::debug!("Filling as water from {} to {} exclusive.", self.next_y_index, yix);
         for n in self.next_y_index .. yix {
-            assert_eq!(self.recent_column_info.region_type_info[0][n], RecentRegionType::Unknown);
-            self.recent_column_info.region_type_info[0][n] = RecentRegionType::Water;
+            self.mark_region_type(n, RecentRegionType::Water);
+            //////assert_eq!(self.recent_column_info.region_type_info[0][n], RecentRegionType::Unknown);
+            //////self.recent_column_info.region_type_info[0][n] = RecentRegionType::Water;
         }
-        assert_eq!(self.recent_column_info.region_type_info[0][yix], RecentRegionType::Unknown);
-        self.recent_column_info.region_type_info[0][yix] = RecentRegionType::Land;
+        self.mark_region_type(yix, RecentRegionType::Land);
+        //////assert_eq!(self.recent_column_info.region_type_info[0][yix], RecentRegionType::Unknown);
+        //////self.recent_column_info.region_type_info[0][yix] = RecentRegionType::Land;
         self.next_y_index = yix + 1;
         true
     }
