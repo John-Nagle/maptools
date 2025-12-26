@@ -194,7 +194,6 @@ impl Iterator for ColumnCursors {
             log::debug!("LOD {}, advance {:?}", self.working_lod, advance_status);
             match advance_status {
                 AdvanceStatus::None => {
-                    self.progress_made = false;
                     self.working_lod += 1;
                     continue;
                 }
@@ -537,14 +536,18 @@ impl ColumnCursor {
     /// This constructs LOD N entries based on LOD N-1.
     pub fn advance_lod_n(&mut self, previous_lod_column_info: &RecentColumnInfo) -> AdvanceStatus {
         log::debug!("Advance LOD {}, next y {}, col {:?}", self.lod, self.next_y_index, self.recent_column_info.region_type_info[0]);  // ***TEMP***
-        //////let fill_last = self.recent_column_info.region_type_info[0].len() -1;
+        //  Check for out of columns. This is the EOF test.
+        if self.recent_column_info.start.0 >= self.recent_column_info.lod_bounds.1.0 { 
+            log::debug!("LOD EOF 2 test passed: {} vs {}", self.recent_column_info.start.0, self.recent_column_info.lod_bounds.1.0);
+            return AdvanceStatus::None
+        }
         //  Test for done in Y axis.
         if self.next_y_index >= self.recent_column_info.region_type_info[0].len() {
             self.recent_column_info.shift();
             self.next_y_index = 0;
             //  Test for done in X axis
             if self.recent_column_info.start.0 >= self.recent_column_info.lod_bounds.1.0 { 
-                log::debug!("LOD EOF test passed: {} vs {}", self.recent_column_info.start.0, self.recent_column_info.lod_bounds.1.0);
+                log::debug!("LOD EOF 1 test passed: {} vs {}", self.recent_column_info.start.0, self.recent_column_info.lod_bounds.1.0);
                 return AdvanceStatus::None
             }
         }
