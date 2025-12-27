@@ -35,7 +35,7 @@ use std::path::PathBuf;
 use vizgroup::{CompletedGroups, RegionData, VizGroups};
 use image::{RgbImage, DynamicImage, ImageReader};
 use sculptmaker::{TerrainSculpt, TerrainSculptTexture};
-use regionorder::{get_group_bounds, get_group_scan_limits};
+use regionorder::{TileLods, check_group_suitable_for_lods, get_group_bounds, get_group_scan_limits};
 
 
 /// MySQL Credentials for uploading.
@@ -324,6 +324,47 @@ impl TerrainGenerator {
                 &height_field,
             )?;
             log::debug!("Region \"{}\": {}", region.name, height_field);
+        }
+        Ok(())
+    }
+    
+    /// Build an impostor for LOD 0, for which we should have the  height field.
+    fn build_impostor_lod_0(&mut self, region: &RegionData) -> Result<(), Error> {
+        let height_field = self.get_height_field_one_region(
+            region.grid.clone(),
+            region.region_coords_x,
+            region.region_coords_y,
+        )?;
+        self.build_impostor(
+            region,
+            region.lod,
+            &height_field,
+        )?;
+        log::debug!("Region \"{}\": {}", region.name, height_field);
+        Ok(())
+    }
+    
+    /// Build an impostor for LOD N.
+    fn build_impostor_for_lod(&mut self, region: RegionData) -> Result<(), Error> {
+        if region.lod == 0 {
+            self.build_impostor_lod_0(&region)?;
+        } else {
+            log::debug!("Build impostor for LOD {}, unimplemented", region.lod);   // ***TEMP***
+        }
+        Ok(())
+    }
+    
+    /// Process group, multi-LOD version
+    fn process_group_new(mut self, group: Vec<RegionData>) -> Result<(), Error> {
+        log::info!("Group: {} entries.", group.len());
+        if check_group_suitable_for_lods(&group)? {
+            for region in TileLods::new(group) {
+                self.build_impostor_for_lod(region)?;
+            }
+        } else {
+            for region in group {
+                self.build_impostor_for_lod(region)?;
+            }
         }
         Ok(())
     }

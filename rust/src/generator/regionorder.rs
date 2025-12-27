@@ -29,21 +29,21 @@ const MAX_LOD: u8 = 16;
 /// Simple version, without optimization.
 /// Just iterates over &Vec<RegionData>.
 /// No LODs other than 0.
-pub struct SimpleColumnCursors {
+pub struct SimpleTileLods {
     /// The regions
     regions: Vec<RegionData>,
     /// The cursor
     cursor: usize,
 }
 
-impl SimpleColumnCursors {
+impl SimpleTileLods {
     /// The regions
     pub fn new(regions: Vec<RegionData>) -> Self {
         Self { regions, cursor: 0 }
     }
 }
 
-impl Iterator for SimpleColumnCursors {
+impl Iterator for SimpleTileLods {
     type Item = RegionData;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -64,7 +64,7 @@ impl Iterator for SimpleColumnCursors {
 /// the lower LOD impostors to be constructed from recently
 /// constructes higher LOD impostors.
 
-pub struct ColumnCursors {
+pub struct TileLods {
     /// Cursors for each LOD
     cursors: Vec<ColumnCursor>,
     /// The regions
@@ -75,8 +75,8 @@ pub struct ColumnCursors {
     progress_made: bool,
 }
 
-impl ColumnCursors {
-    /// The cursors for the regions.
+impl TileLods {
+    /// The cursors for the levels of detail of regions.
     pub fn new(regions: Vec<RegionData>) -> Self {
         let bounds = get_group_bounds(&regions).expect("Invalid group bounds");
         log::debug!("Group bounds: {:?}", bounds);
@@ -102,10 +102,10 @@ impl ColumnCursors {
     }
 }
 
-impl Iterator for ColumnCursors {
+impl Iterator for TileLods {
     type Item = RegionData;
 
-    /// The iterator for ColumnCursors.
+    /// The iterator for TileLods.
     /// This returns the next RegionData for which an impostor is to be generated.
     /// A RegionData for LOD > 0 may not be returned until all four regions for the
     /// next higher LOD have been returned, or are known to be empty water regions.
@@ -323,7 +323,7 @@ enum AdvanceStatus {
 }
 
 /// Advance across a LOD one column at a time.
-pub struct ColumnCursor {
+struct ColumnCursor {
     /// The last two columns.
     recent_column_info: RecentColumnInfo,
     /// Current location for this LOD. One rectangle
@@ -339,7 +339,7 @@ pub struct ColumnCursor {
 
 impl ColumnCursor {
     /// Usual new
-    pub fn new(
+    fn new(
         bounds: ((u32, u32), (u32, u32)),
         base_region_size: (u32, u32),
         lod: u8,
@@ -519,6 +519,16 @@ impl ColumnCursor {
     }
 }
 
+/// Is this group suitable for multiple-LOD processing?
+pub fn check_group_suitable_for_lods(group: &Vec<RegionData>) -> Result<bool, Error> {
+    //  Put additional sanity checks here.
+    //  Return false if group is not homogeneous. It always is in SL. For OS, we don't try to do multi-region impostors.
+    Ok(!group
+        .iter()
+        .find(|v| v.size_x != group[0].size_x || v.size_y != group[0].size_y)
+        .is_some())
+}
+
 /// Get dimensions of a group.
 pub fn get_group_bounds(group: &Vec<RegionData>) -> Result<((u32, u32), (u32, u32)), Error> {
     //  Error if empty group.
@@ -614,7 +624,7 @@ fn test_region_order() {
             prev_loc_opt = Some(loc);
         }
         //  Do test for one group
-        let column_cursors = ColumnCursors::new(group);
+        let column_cursors = TileLods::new(group);
         log::debug!("Generating lower LODs");
         for item in column_cursors {
             log::debug!(" Output item: {:?}", item);

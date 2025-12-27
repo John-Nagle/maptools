@@ -36,7 +36,7 @@ pub struct RegionData {
     pub size_y: u32,
     /// Region name
     pub name: String,
-}
+}   
 
 impl std::fmt::Display for RegionData {
     /// Just name and location, no size.
