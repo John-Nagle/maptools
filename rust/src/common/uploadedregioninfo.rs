@@ -177,11 +177,9 @@ impl std::fmt::Display for HeightField {
     }
 }
 
-//  ***CHECK COLUMN/ROW ORDER***
 impl HeightField {
     /// New from elevs blob, the form used in SQL. One big blob, a flattened 2D array.
     /// size_x and size_y are size of the region, not the elevs data.
-    /// In the elevs blob, the X subscript goes fastest. ***WRONG***
     /// In the elevs blob, the Y subscript goes fastest.
     pub fn new_from_elevs_blob(
         elevs: &Vec<u8>,
@@ -202,8 +200,6 @@ impl HeightField {
                 samples_y
             ));
         }
-        //////let scale = if scale > 0.0 { 1.0 / scale } else {0.0};
-        //////let iterator = (0..).map(|n| ((elevs[n] as f32) / 256.0) * scale + offset);
         let iterator = (0..).map(|n| { u8_to_elev(elevs[n], scale, offset) });
         let heights =
             Array2D::from_iter_row_major(iterator, samples_x as usize, samples_y as usize)?;
@@ -267,26 +263,6 @@ impl HeightField {
     /// As one big flat u8 array.
     /// Returns scale, offset, values
     pub fn into_sculpt_array(&self) -> Result<(f32, f32, Vec<Vec<u8>>), Error> {
-/*
-        //  Calculate max and min.
-        if self.heights.column_len() == 0 {
-            return Err(anyhow!("Height field has no entries."));
-        }
-        let max = self
-            .heights
-            .elements_row_major_iter()
-            .max_by(|a, b| a.total_cmp(b))
-            .unwrap();
-        let min = self
-            .heights
-            .elements_row_major_iter()
-            .min_by(|a, b| a.total_cmp(b))
-            .unwrap();
-        //  Scale into 0..255
-        log::debug!("Into sculpt array, range {:5} .. {:5}", min, max);
-        //////let range = (max - min).max(0.001);
-        let (scale, offset) = elev_min_max_to_scale_offset(*min, *max);
-*/
         let (scale, offset) = self.get_scale_offset()?;
         let height_array = self
             .heights
@@ -299,8 +275,6 @@ impl HeightField {
                     .collect()
             })
             .collect();
-        ////////////let scale = 1.0 / range;
-        //////let offset = min;
         Ok((scale, offset, height_array))
     }
 }
