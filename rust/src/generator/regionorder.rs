@@ -520,14 +520,18 @@ impl ColumnCursor {
 }
 
 /// Is this group suitable for multiple-LOD processing?
-pub fn check_group_suitable_for_lods(group: &Vec<RegionData>) -> Result<bool, Error> {
-    //  Put additional sanity checks here.
-    //  Return false if group is not homogeneous. It always is in SL. For OS, we don't try to do multi-region impostors.
-    Ok(!group
+pub fn homogeneous_group_size(group: &Vec<RegionData>) -> Option<(u32, u32)> {
+    //  Return size of region if group is homogeneous. It always is in SL. For OS, we don't try to do multi-region impostors.
+    if !group.is_empty() && group
         .iter()
         .find(|v| v.size_x != group[0].size_x || v.size_y != group[0].size_y)
-        .is_some())
+        .is_none() {
+            Some((group[0].size_x, group[0].size_y))
+    } else {
+        None
+    }
 }
+
 
 /// Get dimensions of a group.
 pub fn get_group_bounds(group: &Vec<RegionData>) -> Result<((u32, u32), (u32, u32)), Error> {

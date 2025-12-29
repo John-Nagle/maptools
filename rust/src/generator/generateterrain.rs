@@ -35,7 +35,7 @@ use std::path::PathBuf;
 use vizgroup::{CompletedGroups, RegionData, VizGroups};
 use image::{RgbImage, DynamicImage, ImageReader};
 use sculptmaker::{TerrainSculpt, TerrainSculptTexture};
-use regionorder::{TileLods, check_group_suitable_for_lods, get_group_bounds, get_group_scan_limits};
+use regionorder::{TileLods, get_group_bounds, homogeneous_group_size, get_group_scan_limits};
 
 
 /// MySQL Credentials for uploading.
@@ -247,21 +247,25 @@ impl TerrainGenerator {
         grid: String,
         region_coords_x: u32,
         region_coords_y: u32,
+        region_size: (u32, u32),
         lod: u8) -> Result<HeightField, Error> {
         //  Not for LOD 0. We can't build that from other LODs.
         assert!(lod > 0);
+        //  Get a relevant region, or None if it's all water.
+        //  May need more checking for missing regions.
         let mut take = |lod, dx, dy| {
             let key = RegionLodKey { lod: 0, region_coords_x: region_coords_x + dx, region_coords_y: region_coords_y + dy };
             self.height_field_cache.take(&key)
-            .ok_or_else(|| anyhow!("No cached height field for {:?}", key))
         };
         //  Get the four height fields.
-        let h00 = take(lod - 1, 0, 0)?;
-        let h01 = take(lod - 1, 0, h00.size_y)?;
-        let h10 = take(lod - 1, h00.size_x, 0)?;
-        let h11 = take(lod - 1, h00.size_x, h00.size_y)?;
+        let height_fields = [
+            take(lod - 1, 0, 0),
+            take(lod - 1, 0, region_size.1),
+            take(lod - 1, region_size.0, 0),
+            take(lod - 1, region_size.0, region_size.1)
+        ];
         //  Generate combined height field;
-        let height_field = combine_height_fields(lod - 1, h00, h01, h10, h11)?;
+        let height_field = HeightField::combine(height_fields)?;
         let key = RegionLodKey { lod , region_coords_x, region_coords_y };
         self.height_field_cache.insert(key, height_field.clone());
         Ok(height_field)
@@ -421,7 +425,7 @@ impl TerrainGenerator {
     }
     
     /// Build an impostor for LOD N.
-    fn build_impostor_for_lod(&mut self, region: RegionData) -> Result<(), Error> {
+    fn build_impostor_for_lod(&mut self, region: RegionData, size: Option<(u32, u32)>) -> Result<(), Error> {
         if region.lod == 0 {
             self.build_impostor_lod_0(&region)?;
         } else {
@@ -433,15 +437,16 @@ impl TerrainGenerator {
     /// Process group, multi-LOD version
     fn process_group_new(mut self, group: Vec<RegionData>) -> Result<(), Error> {
         log::info!("Group: {} entries.", group.len());
-        if check_group_suitable_for_lods(&group)? {
+        let region_size_opt = homogeneous_group_size(&group);
+        if let Some(region_size) = region_size_opt {
             //  Do the LOD thing.
             for region in TileLods::new(group) {
-                self.build_impostor_for_lod(region)?;
+                self.build_impostor_for_lod(region, region_size_opt)?;
             }
         } else {
             //  LOD 0 only.
             for region in group {
-                self.build_impostor_for_lod(region)?;
+                self.build_impostor_for_lod(region, None)?;
             }
         }
         Ok(())

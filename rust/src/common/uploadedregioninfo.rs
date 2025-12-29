@@ -277,6 +277,17 @@ impl HeightField {
             .collect();
         Ok((scale, offset, height_array))
     }
+    
+    /// Combine four height fields into one, at lower resolution.
+    /// Input and output sizes are the same.
+    /// Order of input height fields is ll, lr, ul, ur.
+    pub fn combine(h: [Option<Self>;4]) ->  Result<Self, Error> {
+        if let Some(non_empty) = h.iter().find(|v| v.is_some()) {
+            todo!();
+        } else {
+            Err(anyhow!("Height field combine - all inputs were none."))
+        }
+    }
 }
 
 /// Conversions -- elevation min and max to scale and offset.
