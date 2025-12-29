@@ -209,19 +209,16 @@ impl TerrainGenerator {
     pub fn build_impostor(
         &mut self,
         region: &RegionData,
-        lod: u8,
         height_field: &HeightField,
     ) -> Result<(), Error> {
         if self.generate_mesh {
             self.build_impostor_mesh(
                 region,
-                lod,
                 height_field,
             )
         } else {
             self.build_impostor_sculpt(
                 region,
-                lod,
                 height_field,
             )
         }
@@ -231,11 +228,11 @@ impl TerrainGenerator {
     pub fn build_impostor_sculpt(
         &mut self,
         region: &RegionData,
-        lod: u8,
         height_field: &HeightField,
     ) -> Result<(), Error> {
         const IMPOSTOR_SCULPT_PREFIX: &str = "RS";
         const IMPOSTOR_TERRAIN_PREFIX: &str = "RT0";
+        let lod = region.lod;
         log::info!("Generating sculpt for \"{}\": {}", region.name, height_field);
         // TerrainSculpt was translated from Python with an LLM. NEEDS WORK
         let sculpt_impostor_name = region.name.clone(); // ***TEMP***
@@ -270,7 +267,6 @@ impl TerrainGenerator {
     pub fn build_impostor_mesh(
         &mut self,
         region: &RegionData,
-        lod: u8,
         height_field: &HeightField,
     ) -> Result<(), Error> {
         todo!("glTF mesh generation is not implemented yet");
@@ -320,7 +316,6 @@ impl TerrainGenerator {
             )?;
             self.build_impostor(
                 region,
-                lod,
                 &height_field,
             )?;
             log::debug!("Region \"{}\": {}", region.name, height_field);
@@ -337,7 +332,6 @@ impl TerrainGenerator {
         )?;
         self.build_impostor(
             region,
-            region.lod,
             &height_field,
         )?;
         log::debug!("Region \"{}\": {}", region.name, height_field);
