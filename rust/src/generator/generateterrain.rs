@@ -70,6 +70,55 @@ fn logger() {
     log::warn!("Logging to {:?}", LOG_FILE_NAME); // where the log is going
 }
 
+/// Key for cache of region info for all LODs.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct RegionLodKey {
+    /// Location in world of region (meters)
+    region_coords_x: u32,
+    /// Location in world of region (meters)
+    region_coords_y: u32, 
+    /// Level of detail.
+    lod: u8,
+}
+
+/// Height field cache.
+/// Height fields for LOD 0 come from the database.
+/// Height fields for lower LODs are computed by
+/// combining the height fields of four tiles.
+///
+/// Because of the order in which regionorder
+/// returns the desired regions and LODs, each
+/// heigh field is only needed once. So 
+/// obtaining a height field consumes it.
+/// This bounds the memory required.
+#[derive(Debug)]
+struct HeightFieldCache {
+    /// The cache
+    cache: HashMap<RegionLodKey, HeightField>,
+}
+
+impl HeightFieldCache {
+    /// Usual new
+    fn new() -> Self {
+        Self {
+            cache: HashMap::new(),
+        }
+    }
+    
+    /// Insert.
+    /// Panics on duplicate insert
+    fn insert(&mut self, key: RegionLodKey, height_map: HeightField) {
+        if self.cache.insert(key.clone(), height_map).is_some() {
+            panic!("Duplicate insert into height field cache: {:?}", key);
+        }
+    }
+    
+    /// Destructive remove 
+    fn take(&mut self, key: &RegionLodKey) -> Option<HeightField> {
+        self.cache.remove(key)
+    }
+}
+
 /// The terrain object generator
 struct TerrainGenerator {
     /// SQL connection
@@ -81,6 +130,8 @@ struct TerrainGenerator {
     corners_touch_connects: bool,
     /// Generate glTF mesh if on.
     generate_mesh: bool,
+    /// The height field cache
+    height_field_cache: HeightFieldCache,
 }
 
 impl TerrainGenerator {
@@ -96,6 +147,7 @@ impl TerrainGenerator {
             outdir,
             corners_touch_connects,
             generate_mesh,
+            height_field_cache: HeightFieldCache::new(),
         }
     }
 
@@ -182,6 +234,9 @@ impl TerrainGenerator {
             );
         }
         let height_field = height_fields.pop().unwrap()?;
+        //  Cache for later generation of lower LODs
+        let key = RegionLodKey { lod: 0, region_coords_x, region_coords_y };
+        self.height_field_cache.insert(key, height_field.clone());
         Ok(height_field)
     }
     
@@ -352,10 +407,12 @@ impl TerrainGenerator {
     fn process_group_new(mut self, group: Vec<RegionData>) -> Result<(), Error> {
         log::info!("Group: {} entries.", group.len());
         if check_group_suitable_for_lods(&group)? {
+            //  Do the LOD thing.
             for region in TileLods::new(group) {
                 self.build_impostor_for_lod(region)?;
             }
         } else {
+            //  LOD 0 only.
             for region in group {
                 self.build_impostor_for_lod(region)?;
             }
