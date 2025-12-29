@@ -240,6 +240,33 @@ impl TerrainGenerator {
         Ok(height_field)
     }
     
+    /// Get height field for multiple regions.
+    /// We fetch four regions and merge them.
+    pub fn get_height_field_multi_region(
+        &mut self,
+        grid: String,
+        region_coords_x: u32,
+        region_coords_y: u32,
+        lod: u8) -> Result<HeightField, Error> {
+        //  Not for LOD 0. We can't build that from other LODs.
+        assert!(lod > 0);
+        let mut take = |lod, dx, dy| {
+            let key = RegionLodKey { lod: 0, region_coords_x: region_coords_x + dx, region_coords_y: region_coords_y + dy };
+            self.height_field_cache.take(&key)
+            .ok_or_else(|| anyhow!("No cached height field for {:?}", key))
+        };
+        //  Get the four height fields.
+        let h00 = take(lod - 1, 0, 0)?;
+        let h01 = take(lod - 1, 0, h00.size_y)?;
+        let h10 = take(lod - 1, h00.size_x, 0)?;
+        let h11 = take(lod - 1, h00.size_x, h00.size_y)?;
+        //  Generate combined height field;
+        let height_field = combine_height_fields(lod - 1, h00, h01, h10, h11)?;
+        let key = RegionLodKey { lod , region_coords_x, region_coords_y };
+        self.height_field_cache.insert(key, height_field.clone());
+        Ok(height_field)
+    }
+    
     /// Encoded name for impostor asset file.
     /// The name contains all the info we need to generate the impostor.
     /// Format: RS_x_y_sx_sy_sz_offset_lod_waterlevel_name
@@ -428,6 +455,11 @@ impl TerrainGenerator {
         }
         Ok(())
     }
+}
+
+/// Combine height fields
+fn combine_height_fields(lod: u8, h00: HeightField, h01: HeightField, h10: HeightField, h11: HeightField) -> Result<HeightField, Error> {
+    todo!();
 }
 
 /// Actually do the work
