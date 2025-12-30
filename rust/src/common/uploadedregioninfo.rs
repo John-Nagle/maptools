@@ -281,12 +281,37 @@ impl HeightField {
     /// Combine four height fields into one, at lower resolution.
     /// Input and output sizes are the same.
     /// Order of input height fields is ll, lr, ul, ur.
+    //  ***WATER LEVEL IS A PROBLEM - What happens when we combine non-uniform water levels?***
     pub fn combine(h: [Option<Self>;4]) ->  Result<Self, Error> {
         if let Some(non_empty) = h.iter().find(|v| v.is_some()) {
+            let non_empty = non_empty.as_ref().unwrap();
+            //  Output array, which is 2x as big, -1.
+            //  ***CHECK ROWS/COLS***
+            let cnt_x = non_empty.heights.num_columns() * 2 - 1;
+            let cnt_y = non_empty.heights.num_rows() * 2 - 1;
+            
+            let mut heights = Array2D::filled_with(0.0, cnt_x, cnt_y);
+            //  ***IMPLEMENT COMBINING***
             todo!();
+            Ok(Self {
+                size_x: non_empty.size_x * 2,
+                size_y: non_empty.size_y * 2,
+                water_level: non_empty.water_level,
+                heights,
+            })
         } else {
             Err(anyhow!("Height field combine - all inputs were none."))
         }
+    }
+    
+    /// Halve the resolution of a height field.
+    /// Preserve values from all edge pixels 
+    /// so that adjacent tiles will match.
+    pub fn halve(&self) -> Self {
+        //  Must be odd sized.
+        assert_eq!(self.size_x % 2, 1);
+        assert_eq!(self.size_y % 2, 1);
+        todo!();
     }
 }
 
