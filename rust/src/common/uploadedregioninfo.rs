@@ -382,19 +382,21 @@ fn test_height_field() {
 
 #[test]
 /// Create four height maps and merge them.
+/// ARE ROWS AND COLUMNS REVERSED IN ARRAY2D? CODE ASSUMES THAT SUBSCRIPTS x, y are row, column. 
 fn test_combine() {
+    //  Construct rows
     let ll = vec![
-        vec![1.0, 2.0, 3.0, 4.0, 5.0],
         vec![101.0, 102.0, 103.0, 104.0, 105.0],
         vec![201.0, 202.0, 203.0, 204.0, 205.0],
         vec![301.0, 302.0, 303.0, 304.0, 305.0],
-        vec![401.0, 402.0, 403.0, 404.0, 405.0]];
+        vec![401.0, 402.0, 403.0, 404.0, 405.0],
+        vec![501.0, 502.0, 503.0, 504.0, 505.0]];
     let lr = vec![
-        vec![5.0, 6.0, 7.0, 8.0, 9.0],
         vec![105.0, 106.0, 107.0, 108.0, 109.0],
         vec![205.0, 206.0, 207.0, 208.0, 209.0],
         vec![305.0, 306.0, 307.0, 308.0, 309.0],
-        vec![405.0, 406.0, 407.0, 408.0, 409.0]];
+        vec![405.0, 406.0, 407.0, 408.0, 409.0],
+        vec![505.0, 506.0, 507.0, 508.0, 509.0]];
     let ul = vec![
         vec![501.0, 502.0, 503.0, 504.0, 505.0],
         vec![601.0, 602.0, 603.0, 604.0, 605.0],
@@ -408,7 +410,7 @@ fn test_combine() {
         vec![805.0, 806.0, 807.0, 808.0, 809.0],
         vec![905.0, 906.0, 907.0, 908.0, 909.0]];
     let make_heightfield = |v| {
-        let a = Array2D::from_rows(v).expect("Make heightfield failed");
+        let a = Array2D::from_columns(v).expect("Make heightfield failed");
         Some(HeightField {
             size_x: 5,
             size_y: 5,
@@ -424,9 +426,9 @@ fn test_combine() {
     let quadrants: [Option<HeightField>;4] = [lla, lra, ula, ura];
     let combined = HeightField::combine(quadrants).expect("HeightField combine failed");
     //  Check result
-    for x in 0..combined.heights.num_rows() {
-        for y in 0..combined.heights.num_columns() {
-            let expected = x as f32 + 1.0 + (y as f32) * 100.0;
+    for x in 0..combined.heights.num_columns() {
+        for y in 0..combined.heights.num_rows() {
+            let expected = x as f32 + 1.0 + (y as f32 + 1.0) * 100.0;
             let actual = combined.heights.get(x,y).unwrap();
             if expected != *actual {
                 panic!("Test combine failed at ({}, {}): expected {}, actual {}", x, y, expected, actual);
