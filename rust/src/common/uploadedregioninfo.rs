@@ -308,8 +308,8 @@ impl HeightField {
             //  So a height field for 0.256 has 257 entries.
             for i in 0..4 {
                 let (xstart, ystart) = INSERT_OFFSETS[i];
-                let xstart = xstart * non_empty.heights.num_columns() - 1;
-                let ystart = ystart * non_empty.heights.num_rows() - 1;
+                let xstart = if xstart == 0 {0} else { non_empty.heights.num_columns() - 1 };
+                let ystart = if ystart == 0 {0} else { non_empty.heights.num_rows() - 1 };
                 if let Some(from_height_field) = &h[i] {
                     set_quadrant(xstart, ystart, &from_height_field.heights);
                 }
@@ -426,7 +426,7 @@ fn test_combine() {
     //  Check result
     for x in 0..combined.heights.num_rows() {
         for y in 0..combined.heights.num_columns() {
-            let expected = x as f32 + 1.0 + (y as f32 + 1.0) * 100.0;
+            let expected = x as f32 + 1.0 + (y as f32) * 100.0;
             let actual = combined.heights.get(x,y).unwrap();
             if expected != *actual {
                 panic!("Test combine failed at ({}, {}): expected {}, actual {}", x, y, expected, actual);
