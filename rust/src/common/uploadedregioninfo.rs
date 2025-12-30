@@ -282,6 +282,9 @@ impl HeightField {
     /// Input and output sizes are the same.
     /// Order of input height fields is ll, lr, ul, ur.
     //  ***WATER LEVEL IS A PROBLEM - What happens when we combine non-uniform water levels?***
+    //  ***PUT IN CODE TO USE LOWEST WATER LEVEL OF SET***
+    //  ***BUT NEED TO THINK MORE ABOUT WATER LEVEL. MAY NEED TO MODIFY HEIGHT FIELD AND TEXTURE***
+    //  ***POSSIBLE SOLUTION: WHEN COMBINING, MIN HEIGHT IS WATER LEVEL AND THOSE CELLS BECOME WATER IMAGE IN THE IMAGE TEXTURE***
     pub fn combine(h: [Option<Self>;4]) ->  Result<Self, Error> {
         const INSERT_OFFSETS: [(usize, usize);4] = [(0,0), (1,0), (0,1), (1,1)];
         if let Some(non_empty) = h.iter().find(|v| v.is_some()) {
@@ -289,10 +292,9 @@ impl HeightField {
             //  Output array, which is 2x as big, -1.
             //  ***CHECK ROWS/COLS***
             let cnt_x = non_empty.heights.num_columns() * 2 - 1;
-            let cnt_y = non_empty.heights.num_rows() * 2 - 1;
-            
+            let cnt_y = non_empty.heights.num_rows() * 2 - 1;           
             let mut heights = Array2D::filled_with(0.0, cnt_x, cnt_y);
-            //  ***IMPLEMENT COMBINING***
+            //  Closure to copy an input array into an area of the output array.
             let mut set_quadrant = |xstart: usize, ystart: usize, v: &Array2D<f32>| {
                 for x in 0..v.num_columns() {
                     for y in 0..v.num_rows() {
@@ -376,6 +378,61 @@ fn test_height_field() {
     println!("hf_flat: {:?}", hf_flat);
     println!("hf_arrayform: {:?}", hf_arrayform);
     assert_eq!(hf_flat, hf_arrayform);
+}
+
+#[test]
+/// Create four height maps and merge them.
+fn test_combine() {
+    let ll = vec![
+        vec![1.0, 2.0, 3.0, 4.0, 5.0],
+        vec![101.0, 102.0, 103.0, 104.0, 105.0],
+        vec![201.0, 202.0, 203.0, 204.0, 205.0],
+        vec![301.0, 302.0, 303.0, 304.0, 305.0],
+        vec![401.0, 402.0, 403.0, 404.0, 405.0]];
+    let lr = vec![
+        vec![5.0, 6.0, 7.0, 8.0, 9.0],
+        vec![105.0, 106.0, 107.0, 108.0, 109.0],
+        vec![205.0, 206.0, 207.0, 208.0, 209.0],
+        vec![305.0, 306.0, 307.0, 308.0, 309.0],
+        vec![405.0, 406.0, 407.0, 408.0, 409.0]];
+    let ul = vec![
+        vec![501.0, 502.0, 503.0, 504.0, 505.0],
+        vec![601.0, 602.0, 603.0, 604.0, 605.0],
+        vec![701.0, 702.0, 703.0, 704.0, 705.0],
+        vec![801.0, 802.0, 803.0, 804.0, 805.0],
+        vec![901.0, 902.0, 903.0, 904.0, 905.0]];        
+    let ur = vec![
+        vec![505.0, 506.0, 507.0, 508.0, 509.0],
+        vec![605.0, 606.0, 607.0, 608.0, 609.0],
+        vec![705.0, 706.0, 707.0, 708.0, 709.0],
+        vec![805.0, 806.0, 807.0, 808.0, 809.0],
+        vec![905.0, 906.0, 907.0, 908.0, 909.0]];
+    let make_heightfield = |v| {
+        let a = Array2D::from_rows(v).expect("Make heightfield failed");
+        Some(HeightField {
+            size_x: 5,
+            size_y: 5,
+            water_level: 20.0,
+            heights: a
+            }
+        )
+    };
+    let lla = make_heightfield(&ll);
+    let lra = make_heightfield(&lr);
+    let ula = make_heightfield(&ul);
+    let ura = make_heightfield(&ur);
+    let quadrants: [Option<HeightField>;4] = [lla, lra, ula, ura];
+    let combined = HeightField::combine(quadrants).expect("HeightField combine failed");
+    //  Check result
+    for x in 0..combined.heights.num_rows() {
+        for y in 0..combined.heights.num_columns() {
+            let expected = x as f32 + 1.0 + (y as f32 + 1.0) * 100.0;
+            let actual = combined.heights.get(x,y).unwrap();
+            if expected != *actual {
+                panic!("Test combine failed at ({}, {}): expected {}, actual {}", x, y, expected, actual);
+            }
+        }
+    }
 }
 
 #[test]
