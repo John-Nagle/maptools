@@ -283,6 +283,7 @@ impl HeightField {
     /// Order of input height fields is ll, lr, ul, ur.
     //  ***WATER LEVEL IS A PROBLEM - What happens when we combine non-uniform water levels?***
     pub fn combine(h: [Option<Self>;4]) ->  Result<Self, Error> {
+        const INSERT_OFFSETS: [(usize, usize);4] = [(0,0), (1,0), (0,1), (1,1)];
         if let Some(non_empty) = h.iter().find(|v| v.is_some()) {
             let non_empty = non_empty.as_ref().unwrap();
             //  Output array, which is 2x as big, -1.
@@ -292,7 +293,25 @@ impl HeightField {
             
             let mut heights = Array2D::filled_with(0.0, cnt_x, cnt_y);
             //  ***IMPLEMENT COMBINING***
-            todo!();
+            let mut set_quadrant = |xstart: usize, ystart: usize, v: &Array2D<f32>| {
+                for x in 0..v.num_columns() {
+                    for y in 0..v.num_rows() {
+                        heights.set(x + xstart, y + ystart, *v.get(x, y).unwrap()).unwrap();
+                    }
+                }
+            };
+            //  Copy all four input arrays into the appropriate quadrant.
+            //  Note that there is an overlap of one row. 
+            //  This is intentional. Height fields are not pixels, but points.
+            //  So a height field for 0.256 has 257 entries.
+            for i in 0..4 {
+                let (xstart, ystart) = INSERT_OFFSETS[i];
+                let xstart = xstart * non_empty.heights.num_columns() - 1;
+                let ystart = ystart * non_empty.heights.num_rows() - 1;
+                if let Some(from_height_field) = &h[i] {
+                    set_quadrant(xstart, ystart, &from_height_field.heights);
+                }
+            }
             Ok(Self {
                 size_x: non_empty.size_x * 2,
                 size_y: non_empty.size_y * 2,
