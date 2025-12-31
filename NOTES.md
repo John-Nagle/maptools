@@ -266,4 +266,11 @@ Next steps:
       - If hit lowest LOD and progress_made not set, done.
       - ***CHECK THIS***
       
+2025-12-21
+    All coded, not working.
+    Out of order entry from vizgroup causing crash.
+    - Items returned in order 2, 3, 4, 5, 0.
+    - Does vizgroup guarantee order? It's supposed to.
+    - Add in-sequence check.
+      
       

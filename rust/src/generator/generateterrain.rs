@@ -427,6 +427,7 @@ impl TerrainGenerator {
     
     /// Build an impostor for LOD N.
     fn build_impostor_for_lod(&mut self, region: &RegionData, size: Option<(u32, u32)>) -> Result<(), Error> {
+        log::info!("Region \"{}\", LOD {} starting.", region.name, region.lod);
         let height_field = if region.lod == 0 {
             self.get_height_field_one_region(
                 region.grid.clone(),

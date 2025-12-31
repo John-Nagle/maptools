@@ -77,10 +77,14 @@ pub struct TileLods {
 
 impl TileLods {
     /// The cursors for the levels of detail of regions.
-    pub fn new(regions: Vec<RegionData>) -> Self {
+    pub fn new(mut regions: Vec<RegionData>) -> Self {
         let bounds = get_group_bounds(&regions).expect("Invalid group bounds");
         log::debug!("Group bounds: {:?}", bounds);
         assert!(!regions.is_empty()); // This is checked in get_group_bounds
+        //  Sort by X, Y. The input is usually almost in order, but not quite.
+        regions.sort_by_key(|v: &RegionData| (v.region_coords_x, v.region_coords_y));
+        //  Immutable after this point
+        let regions = regions;
         let base_region_size = (regions[0].size_x, regions[0].size_y);
         let grid = &regions[0].grid;
         //  Generate LODs unti one LOD covers the entire bounds.
@@ -415,6 +419,7 @@ impl ColumnCursor {
 
         assert_eq!(self.recent_column_info.start.0, loc.0); // on correct column
         let yix = self.recent_column_info.calc_y_index(loc.1);
+        log::debug!("Marking cell {} of column {:?}",  yix, self.recent_column_info.region_type_info[0]);
         assert_eq!(loc.1 % self.recent_column_info.size.1, 0);
         //  Duplicates not allowed.
         assert_eq!(
