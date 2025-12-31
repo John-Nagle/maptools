@@ -326,8 +326,24 @@ impl HeightField {
     }
     
     /// Average height at this point, interpolated.
+    /// xloc and yloc are indexes into the height array, but they are
+    /// not integers. We pick the appropriate cells and interpolate.
     fn average_height(&self, xloc: f32, yloc: f32) -> f32 {
-        todo!();
+        let x = xloc.floor() as usize;
+        let y = yloc.floor() as usize;
+        //  Cmbine four points.
+        //  ***MAX, or AVERAGE???***
+        //  Trying max for now.
+        const INSERT_OFFSETS: [(usize, usize);4] = [(0,0), (1,0), (0,1), (1,1)];
+        let mut height = f32::MIN;
+        //  Ignore out of range entries
+        for offsets in INSERT_OFFSETS {
+            if let Some(next_height) = self.heights.get(x + offsets.0, y + offsets.1) {
+                height = height.max(*next_height);
+            }
+        }
+        assert!(height > f32::MIN);
+        height
     }
     
     /// Halve the resolution of a height field.
@@ -335,8 +351,8 @@ impl HeightField {
     /// so that adjacent tiles will match.
     pub fn halve(&self) -> Self {
         //  Must be odd sized.
-        assert_eq!(self.size_x % 2, 1);
-        assert_eq!(self.size_y % 2, 1);
+        assert_eq!(self.heights.num_columns() % 2, 1);
+        assert_eq!(self.heights.num_rows() % 2, 1);
         //  Output size info.
         let cnt_x = (self.heights.num_columns() - 1) / 2 + 1;
         let cnt_y = (self.heights.num_rows() - 1) / 2 + 1;        
@@ -350,21 +366,20 @@ impl HeightField {
         //  Do the interior points.
         for x in 0..cnt_x {
             for y in 0..cnt_y {
-                let xloc = (x as f32 * self.size_x as f32) / (cnt_x as f32);
-                let yloc = (x as f32 * self.size_y as f32) / (cnt_y as f32);
+                let xloc = (x as f32 * self.heights.num_columns() as f32) / (cnt_x as f32);
+                let yloc = (x as f32 * self.heights.num_rows() as f32) / (cnt_y as f32);
                 let height = self.average_height(xloc, yloc);
                 heights.set(x, y, height).unwrap();
             }
         }
         //  Now do the edge points
-        todo!();    // ***MORE***
+        //////todo!();    // ***MORE***
         Self {
-                size_x: self.size_x,
-                size_y: self.size_y,
-                water_level: self.water_level,
-                heights,
-            }
-;
+            size_x: self.size_x,
+            size_y: self.size_y,
+            water_level: self.water_level,
+            heights,
+        }
     }
 }
 
@@ -467,6 +482,8 @@ fn test_combine() {
             }
         }
     }
+    //  Now halve this
+    let half_combined = HeightField::halve(&combined);
 }
 
 #[test]
