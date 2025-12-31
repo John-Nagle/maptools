@@ -265,7 +265,7 @@ impl TerrainGenerator {
             take(lod - 1, region_size.0, region_size.1)
         ];
         //  Generate combined height field;
-        let height_field = HeightField::combine(height_fields)?;
+        let height_field = HeightField::halve(&HeightField::combine(height_fields)?);
         let key = RegionLodKey { lod , region_coords_x, region_coords_y };
         self.height_field_cache.insert(key, height_field.clone());
         Ok(height_field)
@@ -387,7 +387,7 @@ impl TerrainGenerator {
     /// Process one visibiilty group.
     /// There's a lot to do here.
     /// Temp version - just generates impostors for all single regions.
-    pub fn process_group(&mut self, group: &Vec<RegionData>) -> Result<(), Error> {
+    pub fn _process_group(&mut self, group: &Vec<RegionData>) -> Result<(), Error> {
         let bounds = get_group_bounds(group)?;
         log::info!("Group: {} entries, bounds: {:?}", group.len(), bounds);
         //  ***TEST ONLY***
@@ -408,7 +408,7 @@ impl TerrainGenerator {
         }
         Ok(())
     }
-    
+/*    
     /// Build an impostor for LOD 0, for which we should have the  height field.
     fn build_impostor_lod_0(&mut self, region: &RegionData) -> Result<(), Error> {
         let height_field = self.get_height_field_one_region(
@@ -423,30 +423,46 @@ impl TerrainGenerator {
         log::debug!("Region \"{}\": {}", region.name, height_field);
         Ok(())
     }
+*/
     
     /// Build an impostor for LOD N.
-    fn build_impostor_for_lod(&mut self, region: RegionData, size: Option<(u32, u32)>) -> Result<(), Error> {
-        if region.lod == 0 {
-            self.build_impostor_lod_0(&region)?;
+    fn build_impostor_for_lod(&mut self, region: &RegionData, size: Option<(u32, u32)>) -> Result<(), Error> {
+        let height_field = if region.lod == 0 {
+            self.get_height_field_one_region(
+                region.grid.clone(),
+                region.region_coords_x,
+                region.region_coords_y,
+            )?
         } else {
-            log::debug!("Build impostor for LOD {}, unimplemented", region.lod);   // ***TEMP***
-        }
+            self.get_height_field_multi_region(
+                region.grid.clone(),
+                region.region_coords_x,
+                region.region_coords_y,               
+                (region.size_x, region.size_y),
+                region.lod,
+            )?
+        };
+        self.build_impostor(
+            region,
+            &height_field,
+        )?;
+        log::info!("Region \"{}\", LOD {} built.", region.name, region.lod);
         Ok(())
     }
     
     /// Process group, multi-LOD version
-    fn process_group_new(mut self, group: Vec<RegionData>) -> Result<(), Error> {
+    fn process_group(&mut self, group: Vec<RegionData>) -> Result<(), Error> {
         log::info!("Group: {} entries.", group.len());
         let region_size_opt = homogeneous_group_size(&group);
         if let Some(region_size) = region_size_opt {
             //  Do the LOD thing.
             for region in TileLods::new(group) {
-                self.build_impostor_for_lod(region, region_size_opt)?;
+                self.build_impostor_for_lod(&region, region_size_opt)?;
             }
         } else {
             //  LOD 0 only.
             for region in group {
-                self.build_impostor_for_lod(region, None)?;
+                self.build_impostor_for_lod(&region, None)?;
             }
         }
         Ok(())
@@ -455,16 +471,11 @@ impl TerrainGenerator {
     /// Process one grid, with multiple visibilty groups
     pub fn process_grid(&mut self, mut completed_groups: CompletedGroups) -> Result<(), Error> {
         completed_groups.sort_by(|a, b| b.len().partial_cmp(&a.len()).unwrap());
-        for group in &completed_groups {
+        for group in completed_groups {
             self.process_group(group)?;
         }
         Ok(())
     }
-}
-
-/// Combine height fields
-fn combine_height_fields(lod: u8, h00: HeightField, h01: HeightField, h10: HeightField, h11: HeightField) -> Result<HeightField, Error> {
-    todo!();
 }
 
 /// Actually do the work
