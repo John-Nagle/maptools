@@ -325,6 +325,11 @@ impl HeightField {
         }
     }
     
+    /// Average height at this point, interpolated.
+    fn average_height(&self, xloc: f32, yloc: f32) -> f32 {
+        todo!();
+    }
+    
     /// Halve the resolution of a height field.
     /// Preserve values from all edge pixels 
     /// so that adjacent tiles will match.
@@ -332,7 +337,34 @@ impl HeightField {
         //  Must be odd sized.
         assert_eq!(self.size_x % 2, 1);
         assert_eq!(self.size_y % 2, 1);
-        todo!();
+        //  Output size info.
+        let cnt_x = (self.heights.num_columns() - 1) / 2 + 1;
+        let cnt_y = (self.heights.num_rows() - 1) / 2 + 1;        
+        let mut heights = Array2D::filled_with(0.0, cnt_x, cnt_y);
+        //  This works like downsizing an image, only slightly differently.
+        //  Height field values are points, not pixels.
+        //  The edge points should not be averaged with interior points.
+        //  Because the number of points is odd (because covering 0 to 256 means 267 points)
+        //  there is not a 2:1 ratio between input and output pixels.
+        //  ***FILL IN HALF SIZED HEIGHT FIELD***
+        //  Do the interior points.
+        for x in 0..cnt_x {
+            for y in 0..cnt_y {
+                let xloc = (x as f32 * self.size_x as f32) / (cnt_x as f32);
+                let yloc = (x as f32 * self.size_y as f32) / (cnt_y as f32);
+                let height = self.average_height(xloc, yloc);
+                heights.set(x, y, height).unwrap();
+            }
+        }
+        //  Now do the edge points
+        todo!();    // ***MORE***
+        Self {
+                size_x: self.size_x,
+                size_y: self.size_y,
+                water_level: self.water_level,
+                heights,
+            }
+;
     }
 }
 
