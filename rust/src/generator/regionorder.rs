@@ -134,7 +134,13 @@ impl Iterator for TileLods {
                 break None;
             }
             let advance_status = if self.working_lod == 0 {
-                self.cursors[0].advance_lod_0(&self.regions)
+                //  Don't get another region until all lower LOD activity is complete.
+                if !self.progress_made {
+                    self.cursors[0].advance_lod_0(&self.regions) 
+                } else {
+                    self.working_lod += 1;
+                    continue;
+                }   
             } else {
                 //  We need to mutably access two elements of the same array.
                 let (prev, curr) = self.cursors.split_at_mut(self.working_lod as usize);
@@ -275,6 +281,7 @@ impl RecentColumnInfo {
         } else if x + self.size.0 == self.start.0 {
             &self.region_type_info[1]
         } else {
+            log::debug!("Tested cell of invalid row: x: {}, row 0: {}, row 1: {}", x, self.start.0, self.start.0 as i32 - self.size.0 as i32);
             return RecentRegionType::Water;
         };
         //  Return element.
@@ -312,6 +319,7 @@ impl RecentColumnInfo {
             return RecentRegionType::Water;
         }
         //  Not all water, but ready to process. Impostor as land.
+        log::debug!("Found four cells with land at {:?}", loc);
         RecentRegionType::Land
     }
 }

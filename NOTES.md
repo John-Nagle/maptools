@@ -272,5 +272,8 @@ Next steps:
     - Items returned in order 2, 3, 4, 5, 0.
     - Does vizgroup guarantee order? It's supposed to.
     - Add in-sequence check.
+    - Added sort. Fixed.
+    All LODs are not advancing in sync.
+    - Design problem?
       
       
