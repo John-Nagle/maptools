@@ -274,6 +274,18 @@ Next steps:
     - Add in-sequence check.
     - Added sort. Fixed.
     All LODs are not advancing in sync.
-    - Design problem?
+    - "Tested cell of invalid row: x: 100, row 0: 0, row 1: -100" should never happen.
+    
+ 2026-01-02
+ 
+    Not going well.
+    Need to rethink shift/scan loop.
+    - We can only scan if aligned with the previous LOD.
+      - Aligned means lower Y for working LOD is same as lower Y of above LOD.
+      - Not aligned half the time, because each LOD moves in 2x the jumps of previous.
+    - We must shift if the previous LOD is ahead of us.
+      - Ahead means Y of previous LOD by our height or more.
+        - Needs a loop to shift more than once?
+    - When we shift, the next lower LOD must be processed.
       
       
