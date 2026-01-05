@@ -21,6 +21,7 @@
 //!     December, 2025.
 //
 use anyhow::{anyhow, Error};
+use std::collections::VecDeque;
 use crate::vizgroup::{RegionData};
 
 /// Maximum LOD. It never gets this big, because there would have to be a viz group 2^LOD across for that to happen.
@@ -73,6 +74,8 @@ pub struct TileLods {
     working_lod: u8,
     /// Was anything marked?
     progress_made: bool,
+    /// Available results
+    regions_to_output: VecDeque<RegionData>,
 }
 
 impl TileLods {
@@ -102,13 +105,14 @@ impl TileLods {
             cursors,
             working_lod: 0,
             progress_made: false,
+            regions_to_output: VecDeque::new(),
         }
     }
 }
 
 impl Iterator for TileLods {
     type Item = RegionData;
-
+/*
     /// The iterator for TileLods.
     /// This returns the next RegionData for which an impostor is to be generated.
     /// A RegionData for LOD > 0 may not be returned until all four regions for the
@@ -166,6 +170,17 @@ impl Iterator for TileLods {
                 }
             }
         }
+    }
+*/
+
+    /// Next, new version
+    fn next(&mut self) -> Option<Self::Item> {
+        //  First, return item queued to go out, if any.
+        let item = self.regions_to_output.pop_front();
+        if item.is_some() {
+            return item
+        }
+        todo!();
     }
 }
 
@@ -530,6 +545,40 @@ impl ColumnCursor {
             }
         }
     }
+    
+    fn scan_lod_n(&mut self, previous_lod_column_info: &RecentColumnInfo) -> AdvanceStatus {
+        todo!();
+    }
+    
+    fn align_shift_n(&mut self, previous_lod_column_info: &RecentColumnInfo) {
+        todo!();
+    }
+    
+    fn row_finished_lod_n(&mut self, previous_lod_column_info: &RecentColumnInfo) {
+        todo!();
+    }
+    
+    fn is_aligned(&self) -> bool {
+        todo!();
+    }
+    
+    /// Display region type info as string. Useful for debug.
+    fn to_string(&self) -> String {
+        let mut s = String::new();
+        for col in 0..1 {           
+            for v in &self.recent_column_info.region_type_info[col] {
+                s.push(match v {
+                    RecentRegionType::Water => 'W',
+                    RecentRegionType::Land => 'L',
+                    RecentRegionType::Unknown => 'U'
+                });      
+            }
+        }
+        s.push('\n');
+        s
+    }
+    
+    //  ***NEW REGION ORDER CODE***
 }
 
 /// Is this group suitable for multiple-LOD processing?

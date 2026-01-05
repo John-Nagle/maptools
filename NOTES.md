@@ -282,10 +282,89 @@ Next steps:
     Need to rethink shift/scan loop.
     - We can only scan if aligned with the previous LOD.
       - Aligned means lower Y for working LOD is same as lower Y of above LOD.
-      - Not aligned half the time, because each LOD moves in 2x the jumps of previous.
-    - We must shift if the previous LOD is ahead of us.
+      - Each LOD is not aligned half the time, because each LOD moves in 2x the jumps of previous.
+    - LOD must shift column if the higher (smaller number) LOD is ahead of us.
       - Ahead means Y of previous LOD by our height or more.
+      - Don't shift if shift will not produce alignment.
         - Needs a loop to shift more than once?
-    - When we shift, the next lower LOD must be processed.
+    - Scan LODs from highest to lowest and scan if aligned.
+    - Stop scan when a non-aligned LOD is hit.
+    - How does completion work at end of input?
+      - Must get all LODs into alignment somehow.
+      - Need to generate dummy empty rows of water to run out the end?
+    - Distinguish between column is finished and doing a shift.
+      - ?
       
+2026-01-02
+
+    What's going on here.
+    
+    We have an ordered list of all the regions of interest. 
+    It's sparse; there are holes. That's LOD 0. We want to generate lower
+    level LOD lists of regions of interest. LOD 1 is a grid
+    of four region cells. LOD 2 is a grid of 16 region cells,
+    and so forth.
+    
+    The obvious way to do this would be to first create a large 2D array of
+    region records for LOD 0. Then, pass over it in units of 4 cells,
+    and create a quarter-sized 2D array of 4-cell blocks. If there's a cell
+    at LOD 0 for any of the cells of a 4-cell block, create the 4-cell
+    block as "Land". All unused cells become "Water".
+    
+    Repeat this for each lower (higher numbered) LOD until there is one giant
+    block that covers everything.
+    
+    This takes too much memory. So we try to do it sequentially. We only need
+    the last two columns of each LOD to create the next lower LOD.
+    So we only need to store two columns of history.
+    
+    Main loop within iterator:
+    
+    - Return first entry on output list, if any.
+    
+    - Read a new LOD 0 region. 
+      Add it to the output list, because higher (smaller LOD #) regions must precede
+      lower ones. The code that actually builds the region maps requires that.
+      
+    - If the current column is not the right one for the new region:
+      - Call column finished on the current column for LOD 0. Marks as water out to end.
+      - We just finished a column of LOD 0, and we have to tell the
+        lower LODs about that. 
+        - Iterate over LOD from 1..N.
+        - If LOD is not aligned, stop.
+        - If aligned, scan and finish LOD, perhaps recording a new region.
+        
+      - After the lower LODs have been updated, we shift the active
+        two columns to align for the new LOD 0 region. 
+        (What if there's a jump of more than one column in the LOD 0 region list?
+        Advance the column, and create a column of all water, until we align again.
+        Each time we do this, we do shift/align on all lower LODs. So all LODs are in sync.
+        
+      - Now we are aligned on columns. 
+         
+    - Mark the new region in column 0 of the two columns stored.
+      - Iterate over LOD from 1..N
+      - If LOD is not aligned, stop.
+      - If aligned, scan LOD, perhaps recording a new region.
+         
+    Finally, return first entry on output list. (There must be one until EOF).
+      
+      Lower LOD entries have three functions - scan, column finished, and align/shift.
+      - Scan: proceed across the row, looking for four cells valid above, and marking any skipped
+        cells as water. If we find a new valid cell, return its region info.
+        - Stop Y scan on first success, or return array of regions?
+        Caller will add such regions to the output list.
+        
+      - Column finished: mark the remaining cells in the row as water. No return data.
+      
+      - Align/Shift: The hard one. Shift the stored two columns until they align with the next
+        higher LOD. This is touchy and prone to off by one errors.
+        - Input is the current left (?) X of LOD 0.
+        - Anything shifted must already be water or land.
+      
+    - EOF on input:
+      - Finish the current row, and proceed as usual for that.
+      - Add dummy rows until all lower LODs report they are done (how?)
+      
+Complete, but correct?
       
