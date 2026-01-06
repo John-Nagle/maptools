@@ -68,8 +68,8 @@ impl Iterator for SimpleTileLods {
 pub struct TileLods {
     /// Cursors for each LOD
     cursors: Vec<ColumnCursor>,
-    /// The regions
-    regions: Vec<RegionData>,
+    /// The regions in
+    regions: VecDeque<RegionData>,
     /// Iteration state, LOD we are working on
     working_lod: u8,
     /// Was anything marked?
@@ -101,7 +101,7 @@ impl TileLods {
             }
         }
         Self {
-            regions,
+            regions: regions.into(),
             cursors,
             working_lod: 0,
             progress_made: false,
@@ -174,11 +174,52 @@ impl Iterator for TileLods {
 */
 
     /// Next, new version
+    /// This is an iterator, which turns the loops inside out and means we have
+    /// to maintain too much state.
     fn next(&mut self) -> Option<Self::Item> {
-        //  First, return item queued to go out, if any.
-        let item = self.regions_to_output.pop_front();
-        if item.is_some() {
-            return item
+        //  First, return region queued to be returned from the iterator, if any.
+        let region = self.regions_to_output.pop_front();
+        if region.is_some() {
+            return region
+        }
+        //  No region was queued to be returned.
+        //  So get a new input region.
+        if let Some(region) = self.regions.pop_front() {
+            //  We have a new region to handle.
+            //  Mark it in the current row.
+            let loc = (region.region_coords_x, region.region_coords_y);
+            if loc.0 == self.cursors[0].recent_column_info.start.0 {
+                //  Column has not changed.
+                self.cursors[0].mark_lod_0(loc);
+                assert!(self.regions_to_output.is_empty());
+                return Some(region);
+            } else {
+                //  Column has changed.
+                assert!(loc.0 > self.cursors[0].recent_column_info.start.0);
+                //  Finish out current row.
+                self.cursors[0].row_finished_lod_0();
+                //  Process lower LODs with current alignment.
+                //  ***SPECIAL CASE - first row of LOD 0, no previous row*** add check.
+                for lod in 1..self.cursors.len() {
+                    if !self.cursors[lod].is_aligned() { break };
+                    let (prev, curr) = self.cursors.split_at_mut(lod as usize);
+                    assert!(!prev.is_empty());
+                    let prev = &prev[prev.len() - 1];
+                    let curr: &mut ColumnCursor = &mut curr[0];
+                    if let AdvanceStatus::Data(region) = curr.scan_lod_n(&prev.recent_column_info) {
+                        //  A lower LOD region has been generated.
+                        self.regions_to_output.push_back(region);
+                    }
+                }
+                //  Done looking at lower LODs, now shift and align them
+                todo!();
+                todo!(); // process lower LODs, then shift.
+            }
+            todo!(); // ***MORE*** return a queued region
+        } else {
+            //  End of input.
+            //  Lower LODs must be flushed.
+            todo!();
         }
         todo!();
     }
@@ -546,7 +587,19 @@ impl ColumnCursor {
         }
     }
     
+    fn mark_lod_0(&mut self, loc: (u32, u32)) {
+        todo!();
+    }
+    
+    fn row_finished_lod_0(&mut self) {
+        todo!();
+    }
+    
+    /// Scan across this LOD for the next newly finished region based on information
+    /// from the next higher LOD.
+    /// That region can be returned.
     fn scan_lod_n(&mut self, previous_lod_column_info: &RecentColumnInfo) -> AdvanceStatus {
+        assert!(self.is_aligned());
         todo!();
     }
     
@@ -558,6 +611,8 @@ impl ColumnCursor {
         todo!();
     }
     
+    /// Is this region aligned in column with the region above?
+    /// If so, it is legitimate to update this LOD.
     fn is_aligned(&self) -> bool {
         todo!();
     }
