@@ -127,20 +127,27 @@ impl TileLods {
             let curr: &mut ColumnCursor = &mut curr[0];
             if let AdvanceStatus::Data(region) = curr.scan_lod_n(&prev.recent_column_info) {
                 //  A lower LOD region has been generated.
-                        self.regions_to_output.push_back(region);
+                self.regions_to_output.push_back(region);
             }
         }
         //  Done looking at lower LODs, now shift and align all LODs.
         //  LOD 0 always gets shifted at least once.
-        //  We may have to insert columns if loc.0 changes by more than one size.
-        //  We tell LOD 0 to shift, and then find out where it is.
-        //  After the shift, ***WHAT***
         self.cursors[0].recent_column_info.shift();    // Shift LOD 0
         //  Now shift the lower LODs, if this will bring them into alignment.
         //  LOD 1 gets shifted one in two times.
         //  LOD 2 gets shifted one in four times, etc.
-        for lod in 1..self.cursors.len() {
-            todo!() // ***MORE***
+        for lod in 1..self.cursors.len() {         
+            let can_shift = self.cursors[0].recent_column_info.start.0 == self.cursors[lod].recent_column_info.start.0 + self.cursors[lod].recent_column_info.size.0;
+            log::debug!("Scan and shift, LOD {}, lod 0 x at {}, LOD {} x at {}, size {}, can shift: {}",
+                lod, self.cursors[0].recent_column_info.start.0, lod, 
+                self.cursors[lod].recent_column_info.start.0, self.cursors[lod].recent_column_info.size.0, can_shift);
+            if can_shift {
+                self.cursors[lod].recent_column_info.shift();    // Shift LOD N
+                //  Should now be aligned.
+                assert_eq!(self.cursors[0].recent_column_info.start.0, self.cursors[lod].recent_column_info.start.0);
+            } else {
+                break;
+            }
         }
     }
 }
