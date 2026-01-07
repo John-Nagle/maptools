@@ -367,4 +367,10 @@ Next steps:
       - Add dummy rows until all lower LODs report they are done (how?)
       
 Complete, but correct?
+
+2026-01-06
+
+    Plugging away on above. Notes:
+    - Fill first columns of LOD with water to get started.
+    - Runout is scan then align until lowest LOD item is emitted.
       

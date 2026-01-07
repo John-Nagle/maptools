@@ -89,6 +89,8 @@ impl TileLods {
         //  Immutable after this point
         let regions = regions;
         let base_region_size = (regions[0].size_x, regions[0].size_y);
+        //  ***CHECK FOR AT LEAST 2X2***
+        //  ***MUST HAVE AS MANY COLUMNS AS ROWS*** expand columns if necessary
         let grid = &regions[0].grid;
         //  Generate LODs unti one LOD covers the entire bounds.
         let mut cursors = Vec::new();
@@ -106,6 +108,39 @@ impl TileLods {
             working_lod: 0,
             progress_made: false,
             regions_to_output: VecDeque::new(),
+        }
+    }
+    
+    /// Scan for newly finished blocks. Then shift down by one column of LOD 0.
+    fn scan_and_shift(&mut self) {
+        //////assert!(loc.0 > self.cursors[0].recent_column_info.start.0);
+        //  Advance by exactly one column.
+        //////assert!(loc.0, self.cursors[0].recent_column_info.start.0 + self.cursors[0].recent_column_info.size.0);
+        //  Finish out current column.
+        self.cursors[0].column_finished_lod_0();
+        //  Process lower LODs with current alignment.
+        for lod in 1..self.cursors.len() {
+            if !self.cursors[lod].is_aligned() { break };
+            let (prev, curr) = self.cursors.split_at_mut(lod as usize);
+            assert!(!prev.is_empty());
+            let prev = &prev[prev.len() - 1];
+            let curr: &mut ColumnCursor = &mut curr[0];
+            if let AdvanceStatus::Data(region) = curr.scan_lod_n(&prev.recent_column_info) {
+                //  A lower LOD region has been generated.
+                        self.regions_to_output.push_back(region);
+            }
+        }
+        //  Done looking at lower LODs, now shift and align all LODs.
+        //  LOD 0 always gets shifted at least once.
+        //  We may have to insert columns if loc.0 changes by more than one size.
+        //  We tell LOD 0 to shift, and then find out where it is.
+        //  After the shift, ***WHAT***
+        self.cursors[0].recent_column_info.shift();    // Shift LOD 0
+        //  Now shift the lower LODs, if this will bring them into alignment.
+        //  LOD 1 gets shifted one in two times.
+        //  LOD 2 gets shifted one in four times, etc.
+        for lod in 1..self.cursors.len() {
+            todo!() // ***MORE***
         }
     }
 }
@@ -196,10 +231,14 @@ impl Iterator for TileLods {
             } else {
                 //  Column has changed.
                 assert!(loc.0 > self.cursors[0].recent_column_info.start.0);
-                //  Finish out current row.
-                self.cursors[0].row_finished_lod_0();
+                let working_loc = loc;
+                while loc.0 > self.cursors[0].recent_column_info.start.0 {
+                    self.scan_and_shift();
+                }
+/*
+                //  Finish out current column.
+                self.cursors[0].column_finished_lod_0();
                 //  Process lower LODs with current alignment.
-                //  ***SPECIAL CASE - first row of LOD 0, no previous row*** add check.
                 for lod in 1..self.cursors.len() {
                     if !self.cursors[lod].is_aligned() { break };
                     let (prev, curr) = self.cursors.split_at_mut(lod as usize);
@@ -211,14 +250,23 @@ impl Iterator for TileLods {
                         self.regions_to_output.push_back(region);
                     }
                 }
-                //  Done looking at lower LODs, now shift and align them
-                todo!();
-                todo!(); // process lower LODs, then shift.
+                //  Done looking at lower LODs, now shift and align all LODs.
+                //  LOD 0 always gets shifted at least once.
+                //  We may have to insert columns if loc.0 changes by more than one size.
+                //  We tell LOD 0 to shift, and then find out where it is.
+                //  After the shift, ***WHAT***
+                self.cursors[0].shift();    // Shift LOD 0
+                for lod in 1..self.cursors.len() {
+                    todo!() // ***MORE***
+                }
+*/
             }
-            todo!(); // ***MORE*** return a queued region
+            //  There must always be a region queued at this point, because we pushed one at start.
+            self.regions_to_output.pop_front().unwrap();
         } else {
             //  End of input.
             //  Lower LODs must be flushed.
+            //  Mark entire column as water, then call scan and shift, until lowest LOD is completed.
             todo!();
         }
         todo!();
@@ -266,9 +314,10 @@ impl RecentColumnInfo {
         );
         let x_steps = (ur.0 - ll.0) / tile_size.0;
         let y_steps = (ur.1 - ll.1) / tile_size.1;
+        //  The off the edge row, row 1, starts as all water.
         let region_type_info = [
             vec![RecentRegionType::Unknown; x_steps as usize],
-            vec![RecentRegionType::Unknown; x_steps as usize],
+            vec![RecentRegionType::Water; x_steps as usize],
         ];        
         let lod_bounds = (ll, ur);
         let full_coverage = x_steps == 1 && y_steps == 1;
@@ -591,7 +640,7 @@ impl ColumnCursor {
         todo!();
     }
     
-    fn row_finished_lod_0(&mut self) {
+    fn column_finished_lod_0(&mut self) {
         todo!();
     }
     
@@ -607,7 +656,7 @@ impl ColumnCursor {
         todo!();
     }
     
-    fn row_finished_lod_n(&mut self, previous_lod_column_info: &RecentColumnInfo) {
+    fn column_finished_lod_n(&mut self, previous_lod_column_info: &RecentColumnInfo) {
         todo!();
     }
     
