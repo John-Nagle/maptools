@@ -235,41 +235,17 @@ impl Iterator for TileLods {
                 while loc.0 > self.cursors[0].recent_column_info.start.0 {
                     self.scan_and_shift();
                 }
-/*
-                //  Finish out current column.
-                self.cursors[0].column_finished_lod_0();
-                //  Process lower LODs with current alignment.
-                for lod in 1..self.cursors.len() {
-                    if !self.cursors[lod].is_aligned() { break };
-                    let (prev, curr) = self.cursors.split_at_mut(lod as usize);
-                    assert!(!prev.is_empty());
-                    let prev = &prev[prev.len() - 1];
-                    let curr: &mut ColumnCursor = &mut curr[0];
-                    if let AdvanceStatus::Data(region) = curr.scan_lod_n(&prev.recent_column_info) {
-                        //  A lower LOD region has been generated.
-                        self.regions_to_output.push_back(region);
-                    }
-                }
-                //  Done looking at lower LODs, now shift and align all LODs.
-                //  LOD 0 always gets shifted at least once.
-                //  We may have to insert columns if loc.0 changes by more than one size.
-                //  We tell LOD 0 to shift, and then find out where it is.
-                //  After the shift, ***WHAT***
-                self.cursors[0].shift();    // Shift LOD 0
-                for lod in 1..self.cursors.len() {
-                    todo!() // ***MORE***
-                }
-*/
             }
             //  There must always be a region queued at this point, because we pushed one at start.
-            self.regions_to_output.pop_front().unwrap();
+            let opt_region = self.regions_to_output.pop_front();
+            assert!(opt_region.is_some());
+            opt_region
         } else {
             //  End of input.
             //  Lower LODs must be flushed.
             //  Mark entire column as water, then call scan and shift, until lowest LOD is completed.
             todo!();
         }
-        todo!();
     }
 }
 
