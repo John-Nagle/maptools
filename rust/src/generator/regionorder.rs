@@ -90,7 +90,7 @@ impl TileLods {
         let regions = regions;
         let base_region_size = (regions[0].size_x, regions[0].size_y);
         //  ***CHECK FOR AT LEAST 2X2***
-        //  ***MUST HAVE AS MANY COLUMNS AS ROWS*** expand columns if necessary
+        //  ***MUST HAVE AS MANY COLUMNS AS ROWS*** add columns if necessary
         let grid = &regions[0].grid;
         //  Generate LODs unti one LOD covers the entire bounds.
         let mut cursors = Vec::new();
@@ -619,8 +619,33 @@ impl ColumnCursor {
         }
     }
     
+    /// Mark cell in use on LOD 0.
+    /// Columns must be aligned when this is called.
     fn mark_lod_0(&mut self, loc: (u32, u32)) {
-        todo!();
+        assert_eq!(self.recent_column_info.start.0, loc.0); // on correct column
+        let yix = self.recent_column_info.calc_y_index(loc.1);
+        log::debug!("Marking cell {} of column {:?}",  yix, self.recent_column_info.region_type_info[0]);
+        assert_eq!(loc.1 % self.recent_column_info.size.1, 0);
+        //  Duplicates not allowed.
+        assert_eq!(
+            self.recent_column_info.region_type_info[0][yix],
+            RecentRegionType::Unknown
+        );
+        //  Mark this as a land cell.
+        //  Fill as water up to new land cell.
+        log::debug!(
+            "Mark {:?}, index {} as land. Size {:?}",
+            loc,
+            yix,
+            self.recent_column_info.size
+        );
+        //  Fill as water up to, but not including, yix.
+        log::debug!("Filling as water from {} to {} exclusive.", self.next_y_index, yix);
+        for n in self.next_y_index .. yix {
+            self.mark_region_type(n, RecentRegionType::Water);
+        }
+        self.mark_region_type(yix, RecentRegionType::Land);
+        self.next_y_index = yix + 1;;
     }
     
     fn column_finished_lod_0(&mut self) {
