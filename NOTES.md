@@ -373,4 +373,12 @@ Complete, but correct?
     Plugging away on above. Notes:
     - Fill first columns of LOD with water to get started.
     - Runout is scan then align until lowest LOD item is emitted.
+    - Much further along.
+    
+2026-01-07
+
+    Almost ready to test:
+    TODO:
+    - Expand rows or colums as needed to make the work area square.
+    - Write EOF runout code.
       

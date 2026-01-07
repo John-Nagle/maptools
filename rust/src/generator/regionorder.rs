@@ -120,11 +120,12 @@ impl TileLods {
         self.cursors[0].column_finished_lod_0();
         //  Process lower LODs with current alignment.
         for lod in 1..self.cursors.len() {
-            if !self.cursors[lod].is_aligned() { break };
+            //////if !self.cursors[lod].is_aligned() { break };
             let (prev, curr) = self.cursors.split_at_mut(lod as usize);
             assert!(!prev.is_empty());
             let prev = &prev[prev.len() - 1];
             let curr: &mut ColumnCursor = &mut curr[0];
+            if !curr.is_aligned(&prev.recent_column_info) { break };
             if let AdvanceStatus::Data(region) = curr.scan_lod_n(&prev.recent_column_info) {
                 //  A lower LOD region has been generated.
                 self.regions_to_output.push_back(region);
@@ -236,6 +237,8 @@ impl Iterator for TileLods {
                 assert!(self.regions_to_output.is_empty());
                 return Some(region);
             } else {
+                //  Queue this region for output
+                self.regions_to_output.push_back(region.clone());
                 //  Column has changed.
                 assert!(loc.0 > self.cursors[0].recent_column_info.start.0);
                 let working_loc = loc;
@@ -251,6 +254,7 @@ impl Iterator for TileLods {
             //  End of input.
             //  Lower LODs must be flushed.
             //  Mark entire column as water, then call scan and shift, until lowest LOD is completed.
+            panic!("UNIMPLEMENTED runout");
             todo!();
         }
     }
@@ -457,6 +461,7 @@ impl ColumnCursor {
             grid,
         }
     }
+
     /// Mark individual region type
     fn mark_region_type(&mut self, yix: usize, recent_region_type: RecentRegionType) {
         log::debug!(
@@ -469,7 +474,7 @@ impl ColumnCursor {
         assert_eq!(self.recent_column_info.region_type_info[0][yix], RecentRegionType::Unknown);
         self.recent_column_info.region_type_info[0][yix] = recent_region_type;
     }
-    
+/*    
     /// Mark region as land.
     /// Not just the current cell, but the ones leading up to it.
     /// Previous untouched cells are marked as Water.
@@ -557,6 +562,7 @@ impl ColumnCursor {
             AdvanceStatus::None
         }
     }
+*/
     
     /// Build a new tile for a LOD > 0.
     fn build_new_tile(&self, loc: (u32, u32), size: (u32, u32)) -> RegionData {
@@ -670,7 +676,7 @@ impl ColumnCursor {
     /// from the next higher LOD.
     /// That region can be returned.
     fn scan_lod_n(&mut self, previous_lod_column_info: &RecentColumnInfo) -> AdvanceStatus {
-        assert!(self.is_aligned());
+        assert!(self.is_aligned(previous_lod_column_info));
         log::debug!("Scan LOD  {}, next y {}, col {:?}", self.lod, self.next_y_index, self.recent_column_info.region_type_info[0]);  // ***TEMP***
         //  Check for out of columns. This is the EOF test.
         if self.recent_column_info.start.0 >= self.recent_column_info.lod_bounds.1.0 { 
@@ -712,20 +718,11 @@ impl ColumnCursor {
             }
         }
     }
-/*    
-    fn align_shift_n(&mut self, previous_lod_column_info: &RecentColumnInfo) {
-        todo!();
-    }
-    
-    fn column_finished_lod_n(&mut self, previous_lod_column_info: &RecentColumnInfo) {
-        todo!();
-    }
-*/
     
     /// Is this region aligned in column with the region above?
     /// If so, it is legitimate to update this LOD.
-    fn is_aligned(&self) -> bool {
-        todo!();
+    fn is_aligned(&self, prev: &RecentColumnInfo) -> bool {
+        self.recent_column_info.start.0 == prev.start.0
     }
     
     /// Display region type info as string. Useful for debug.
@@ -748,6 +745,7 @@ impl ColumnCursor {
 }
 
 /// Is this group suitable for multiple-LOD processing?
+/// ***NEED CHECK THAT GROUP IS AT LEAST 2x2***
 pub fn homogeneous_group_size(group: &Vec<RegionData>) -> Option<(u32, u32)> {
     //  Return size of region if group is homogeneous. It always is in SL. For OS, we don't try to do multi-region impostors.
     if !group.is_empty() && group
@@ -817,6 +815,15 @@ pub fn get_group_scan_limits(
         ((upper_right.1 + step.1) / step.1) * step.1,
     );
     (new_ll, new_ur, step)
+}
+
+/// Same as get group scan limits, but make the resulting area square in terms of rows and columns.
+pub fn get_group_scan_limits_square(
+    bounds: ((u32, u32), (u32, u32)),
+    region_size: (u32, u32),
+    lod: u8,
+) -> ((u32, u32), (u32, u32), (u32, u32)) {
+    todo!(); // ***NOT YET***
 }
 
 /// Check loc order. Panic if error.
