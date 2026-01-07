@@ -648,8 +648,22 @@ impl ColumnCursor {
         self.next_y_index = yix + 1;;
     }
     
+    /// Finished with this column. Fill out to end.
     fn column_finished_lod_0(&mut self) {
-        todo!();
+        assert!(self.recent_column_info.region_type_info[0].len() > 0);
+        let fill_last = self.recent_column_info.region_type_info[0].len() -1;
+        if self.recent_column_info.region_type_info[0][fill_last] == RecentRegionType::Unknown {
+            //  This column is not full yet, so we have to fill it out to the end.
+            for n in self.next_y_index as usize .. fill_last + 1 {
+                assert_eq!(self.recent_column_info.region_type_info[0][n], RecentRegionType::Unknown);
+                self.recent_column_info.region_type_info[0][n] = RecentRegionType::Water;
+            }
+            //  At this point, all entries in the column should be known.
+            log::trace!("Col finished LOD 0: {:?}", self.recent_column_info.region_type_info[0]);  // ***TEMP***
+            
+        }
+        //  Column complete. All cells are land or water.
+        assert!(self.recent_column_info.region_type_info[0].iter().find(|&&v| v == RecentRegionType::Unknown).is_none());
     }
     
     /// Scan across this LOD for the next newly finished region based on information
@@ -657,9 +671,48 @@ impl ColumnCursor {
     /// That region can be returned.
     fn scan_lod_n(&mut self, previous_lod_column_info: &RecentColumnInfo) -> AdvanceStatus {
         assert!(self.is_aligned());
-        todo!();
+        log::debug!("Scan LOD  {}, next y {}, col {:?}", self.lod, self.next_y_index, self.recent_column_info.region_type_info[0]);  // ***TEMP***
+        //  Check for out of columns. This is the EOF test.
+        if self.recent_column_info.start.0 >= self.recent_column_info.lod_bounds.1.0 { 
+            log::debug!("LOD EOF 2 test passed: {} vs {}", self.recent_column_info.start.0, self.recent_column_info.lod_bounds.1.0);
+            return AdvanceStatus::None
+        }
+        //  Test for done in Y axis.
+        if self.next_y_index >= self.recent_column_info.region_type_info[0].len() {
+            self.recent_column_info.shift();
+            self.next_y_index = 0;
+            //  Test for done in X axis
+            if self.recent_column_info.start.0 >= self.recent_column_info.lod_bounds.1.0 { 
+                log::debug!("LOD EOF 1 test passed: {} vs {}", self.recent_column_info.start.0, self.recent_column_info.lod_bounds.1.0);
+                return AdvanceStatus::None
+            }
+        }
+      
+        //  Test next cell along Y axis.
+        let loc = (self.recent_column_info.start.0, self.recent_column_info.start.1 + self.recent_column_info.size.1 * (self.next_y_index as u32));
+        match previous_lod_column_info.test_four_cells(loc) {
+            RecentRegionType::Unknown => {
+                //  Not ready to do this yet.
+                //  Try above LODs, then try again
+                AdvanceStatus::None
+            }
+            RecentRegionType::Land => {
+                self.recent_column_info.region_type_info[0][self.next_y_index] = RecentRegionType::Land;
+                //  Generate and return a land tile.
+                let new_tile = self.build_new_tile(loc, self.recent_column_info.size);
+                log::debug!("New tile: {:?}", new_tile);
+                self.next_y_index += 1;
+                AdvanceStatus::Data(new_tile)
+            }
+            RecentRegionType::Water => {            
+                //  Mark as a water tile to be skipped.
+                self.recent_column_info.region_type_info[0][self.next_y_index] = RecentRegionType::Water;
+                self.next_y_index += 1;
+                AdvanceStatus::None
+            }
+        }
     }
-    
+/*    
     fn align_shift_n(&mut self, previous_lod_column_info: &RecentColumnInfo) {
         todo!();
     }
@@ -667,6 +720,7 @@ impl ColumnCursor {
     fn column_finished_lod_n(&mut self, previous_lod_column_info: &RecentColumnInfo) {
         todo!();
     }
+*/
     
     /// Is this region aligned in column with the region above?
     /// If so, it is legitimate to update this LOD.
