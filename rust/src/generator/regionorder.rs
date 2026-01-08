@@ -117,7 +117,7 @@ impl TileLods {
         //  Advance by exactly one column.
         //////assert!(loc.0, self.cursors[0].recent_column_info.start.0 + self.cursors[0].recent_column_info.size.0);
         //  Finish out current column.
-        self.cursors[0].column_finished_lod_0();
+        self.cursors[0].column_finished();
         //  Process lower LODs with current alignment.
         for lod in 1..self.cursors.len() {
             //////if !self.cursors[lod].is_aligned() { break };
@@ -255,13 +255,16 @@ impl Iterator for TileLods {
             //  Lower LODs must be flushed.
             //  Mark entire column as water, then call scan and shift, until lowest LOD is completed.
             //  Done when the lowest LOD is completed.
-            while self.cursors[self.cursors.len()-1].recent_column_info.region_type_info[0][0] == RecentRegionType::Unknown {
+            //  ***EOF TEST CAN RUN AWAY***
+            let mut runaway: usize = 0; // ***TEMP***
+            log::debug!("Runout start: lowest LOD is LOD {}", self.cursors.len()-1); 
+            while self.cursors[self.cursors.len()-1].recent_column_info.region_type_info[1][0] == RecentRegionType::Unknown {
                 log::debug!("Runout at EOF: at {:?}", self.cursors[0].recent_column_info.start);
                 log::debug!("Runout: next y index: {} for length {}", self.cursors[0].next_y_index, self.cursors[0].recent_column_info.region_type_info[0].len());
                 log::debug!("Runout: Col finished LOD 0: {:?}", self.cursors[0].recent_column_info.region_type_info[0]);  // ***TEMP***
                 //  This fills all with water.
-                self.cursors[0].column_finished_lod_0();
                 self.scan_and_shift();
+                if runaway > 100 { panic!("EOF runaway"); } else { runaway += 1; } // ***TEMP***
             }
             //  Return a region, or None if we're all done.
             self.regions_to_output. pop_front()
@@ -487,7 +490,7 @@ impl ColumnCursor {
     /// Current column is 0, previous column is 1.
     fn shift(&mut self) {
         log::debug!("Shift LOD {}, y index {}: {:?}", self.lod, self.next_y_index, self.recent_column_info.region_type_info[0]); // ***TEMP***
-        self.column_finished_lod_0();
+        self.column_finished();
         self.recent_column_info.shift_inner();
         self.next_y_index = 0;
     }
@@ -539,7 +542,7 @@ impl ColumnCursor {
     }
     
     /// Finished with this column. Fill out to end.
-    fn column_finished_lod_0(&mut self) {
+    fn column_finished(&mut self) {
         assert!(self.recent_column_info.region_type_info[0].len() > 0);
         let fill_last = self.recent_column_info.region_type_info[0].len() -1;
         log::debug!("Col finished LOD {} start, yix = {}: {:?}", self.lod, self.next_y_index, self.recent_column_info.region_type_info[0]);  // ***TEMP***
@@ -571,7 +574,6 @@ impl ColumnCursor {
         //  Test for done in Y axis.
         if self.next_y_index >= self.recent_column_info.region_type_info[0].len() {
             //  ***NEED TO FINISH LOD?***
-            self.column_finished_lod_0();
             self.shift();
             //  Test for done in X axis
             if self.recent_column_info.start.0 >= self.recent_column_info.lod_bounds.1.0 { 
