@@ -133,9 +133,7 @@ impl TileLods {
         }
         //  Done looking at lower LODs, now shift and align all LODs.
         //  LOD 0 always gets shifted at least once.
-        self.cursors[0].recent_column_info.shift();    // Shift LOD 0
-        //  Really ought to be part of shift?
-        self.cursors[0].next_y_index = 0;
+        self.cursors[0].shift();    // Shift LOD 0
         //  Now shift the lower LODs, if this will bring them into alignment.
         //  LOD 1 gets shifted one in two times.
         //  LOD 2 gets shifted one in four times, etc.
@@ -145,7 +143,7 @@ impl TileLods {
                 lod, self.cursors[0].recent_column_info.start.0, lod, 
                 self.cursors[lod].recent_column_info.start.0, self.cursors[lod].recent_column_info.size.0, can_shift);
             if can_shift {
-                self.cursors[lod].recent_column_info.shift();    // Shift LOD N
+                self.cursors[lod].shift();    // Shift LOD N
                 //  Should now be aligned.
                 assert_eq!(self.cursors[0].recent_column_info.start.0, self.cursors[lod].recent_column_info.start.0);
             } else {
@@ -358,7 +356,7 @@ impl RecentColumnInfo {
 
     /// Shift recent column info from current to previous column.
     /// Current column is 0, previous column is 1.
-    fn shift(&mut self) {
+    fn shift_inner(&mut self) {
         //  Columns must be totally filled in before a shift.
         assert!(self.region_type_info[0].iter().find(|&&v| v == RecentRegionType::Unknown).is_none());
         self.region_type_info[1] = self.region_type_info[0].clone();
@@ -483,95 +481,13 @@ impl ColumnCursor {
         assert_eq!(self.recent_column_info.region_type_info[0][yix], RecentRegionType::Unknown);
         self.recent_column_info.region_type_info[0][yix] = recent_region_type;
     }
-/*    
-    /// Mark region as land.
-    /// Not just the current cell, but the ones leading up to it.
-    /// Previous untouched cells are marked as Water.
-    /// This relies in input being processed in x,y order.
-    /// If this returns false, the markng was not done and we have to retry.
-    /// This occurs when a column is complete.
-    fn mark_as_land(&mut self, loc: (u32, u32)) -> bool {
-        //  The update must be applied to row 0 of recent column info.
-        //  If the location does not match, the recent column info must
-        //  be adjusted.
-        log::debug!(
-            "Try to mark {:?} as land. Size {:?}",
-            loc,
-            self.recent_column_info.size
-        );
-        assert!(self.recent_column_info.start.0 <= loc.0); // columns (X) must be in order
-        if self.recent_column_info.start.0 < loc.0 {
-            log::debug!("Column break.");
-            //  Column break. First, is this column full yet?
-            assert!(self.recent_column_info.region_type_info[0].len() > 0);
-            let fill_last = self.recent_column_info.region_type_info[0].len() -1;
-            if self.recent_column_info.region_type_info[0][fill_last] == RecentRegionType::Unknown {
-                //  This column is not full yet, so we have to fill it out to the end.
-                let fill_start = (loc.1 - self.recent_column_info.start.1) / self.recent_column_info.size.1 + 1;
-                log::trace!("Fill start: {}, fill last: {}", fill_start, fill_last);
-                for n in self.next_y_index as usize .. fill_last + 1 {
-                    assert_eq!(self.recent_column_info.region_type_info[0][n], RecentRegionType::Unknown);
-                    self.recent_column_info.region_type_info[0][n] = RecentRegionType::Water;
-                }
-                //  At this point, all entries in the column should be known.
-                log::trace!("Col: {:?}", self.recent_column_info.region_type_info[0]);  // ***TEMP***
-                assert!(self.recent_column_info.region_type_info[0].iter().find(|&&v| v == RecentRegionType::Unknown).is_none());
-                //  We won't do the insert; have to go around again and let the lower LODs have a chance.
-                self.next_y_index = fill_last;  // which is off the end by 1.
-                return false                    
-            } else {
-                //  This column is already full, and other LODs have been processed, so we can shift columns.
-                self.next_y_index = 0;
-                self.recent_column_info.shift();
-                log::debug!("Shifted columns. Col: {:?}", self.recent_column_info.region_type_info[1]);
-            }
-        }      
-
-        assert_eq!(self.recent_column_info.start.0, loc.0); // on correct column
-        let yix = self.recent_column_info.calc_y_index(loc.1);
-        log::debug!("Marking cell {} of column {:?}",  yix, self.recent_column_info.region_type_info[0]);
-        assert_eq!(loc.1 % self.recent_column_info.size.1, 0);
-        //  Duplicates not allowed.
-        assert_eq!(
-            self.recent_column_info.region_type_info[0][yix],
-            RecentRegionType::Unknown
-        );
-        //  Mark this as a land cell.
-        //  Fill as water up to new land cell.
-        log::debug!(
-            "Mark {:?}, index {} as land. Size {:?}",
-            loc,
-            yix,
-            self.recent_column_info.size
-        );
-        //  Fill as water up to, but not including, yix.
-        log::debug!("Filling as water from {} to {} exclusive.", self.next_y_index, yix);
-        for n in self.next_y_index .. yix {
-            self.mark_region_type(n, RecentRegionType::Water);
-        }
-        self.mark_region_type(yix, RecentRegionType::Land);
-        self.next_y_index = yix + 1;
-        true
+    
+    /// Shift recent column info from current to previous column.
+    /// Current column is 0, previous column is 1.
+    fn shift(&mut self) {
+        self.recent_column_info.shift_inner();
+        self.next_y_index = 0;
     }
-
-    /// Advance to next region, for LOD 0 only.
-    fn advance_lod_0(&mut self, regions: &Vec<RegionData>) -> AdvanceStatus {
-        let n = self.region_data_index;
-        if n < regions.len() {
-            let region = &regions[n];
-            let loc = (region.region_coords_x, region.region_coords_y);
-            if !self.mark_as_land(loc) {
-                // We advanced a row, and must do this again.
-                return AdvanceStatus::Progress;
-            }
-            self.region_data_index += 1;
-            AdvanceStatus::Data(region.clone())
-        } else {
-            //  End of input
-            AdvanceStatus::None
-        }
-    }
-*/
     
     /// Build a new tile for a LOD > 0.
     fn build_new_tile(&self, loc: (u32, u32), size: (u32, u32)) -> RegionData {
@@ -588,52 +504,6 @@ impl ColumnCursor {
             lod: self.lod,
         }
     }
-/*
-    /// Advance to next region, for LOD > 0.
-    /// This constructs LOD N entries based on LOD N-1.
-    fn advance_lod_n(&mut self, previous_lod_column_info: &RecentColumnInfo) -> AdvanceStatus {
-        log::debug!("Advance LOD {}, next y {}, col {:?}", self.lod, self.next_y_index, self.recent_column_info.region_type_info[0]);  // ***TEMP***
-        //  Check for out of columns. This is the EOF test.
-        if self.recent_column_info.start.0 >= self.recent_column_info.lod_bounds.1.0 { 
-            log::debug!("LOD EOF 2 test passed: {} vs {}", self.recent_column_info.start.0, self.recent_column_info.lod_bounds.1.0);
-            return AdvanceStatus::None
-        }
-        //  Test for done in Y axis.
-        if self.next_y_index >= self.recent_column_info.region_type_info[0].len() {
-            self.recent_column_info.shift();
-            self.next_y_index = 0;
-            //  Test for done in X axis
-            if self.recent_column_info.start.0 >= self.recent_column_info.lod_bounds.1.0 { 
-                log::debug!("LOD EOF 1 test passed: {} vs {}", self.recent_column_info.start.0, self.recent_column_info.lod_bounds.1.0);
-                return AdvanceStatus::None
-            }
-        }
-      
-        //  Test next cell along Y axis.
-        let loc = (self.recent_column_info.start.0, self.recent_column_info.start.1 + self.recent_column_info.size.1 * (self.next_y_index as u32));
-        match previous_lod_column_info.test_four_cells(loc) {
-            RecentRegionType::Unknown => {
-                //  Not ready to do this yet.
-                //  Try above LODs, then try again
-                AdvanceStatus::None
-            }
-            RecentRegionType::Land => {
-                self.recent_column_info.region_type_info[0][self.next_y_index] = RecentRegionType::Land;
-                //  Generate and return a land tile.
-                let new_tile = self.build_new_tile(loc, self.recent_column_info.size);
-                log::debug!("New tile: {:?}", new_tile);
-                self.next_y_index += 1;
-                AdvanceStatus::Data(new_tile)
-            }
-            RecentRegionType::Water => {            
-                //  Mark as a water tile to be skipped.
-                self.recent_column_info.region_type_info[0][self.next_y_index] = RecentRegionType::Water;
-                self.next_y_index += 1;
-                AdvanceStatus::Progress
-            }
-        }
-    }
-*/
     
     /// Mark cell in use on LOD 0.
     /// Columns must be aligned when this is called.
@@ -697,8 +567,7 @@ impl ColumnCursor {
         }
         //  Test for done in Y axis.
         if self.next_y_index >= self.recent_column_info.region_type_info[0].len() {
-            self.recent_column_info.shift();
-            self.next_y_index = 0;
+            self.shift();
             //  Test for done in X axis
             if self.recent_column_info.start.0 >= self.recent_column_info.lod_bounds.1.0 { 
                 log::debug!("LOD EOF 1 test passed: {} vs {}", self.recent_column_info.start.0, self.recent_column_info.lod_bounds.1.0);
