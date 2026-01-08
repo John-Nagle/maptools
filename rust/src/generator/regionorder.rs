@@ -358,6 +358,7 @@ impl RecentColumnInfo {
     /// Current column is 0, previous column is 1.
     fn shift_inner(&mut self) {
         //  Columns must be totally filled in before a shift.
+        log::debug!("Shift_inner: {:?}", self.region_type_info[0]); // ***TEMP***
         assert!(self.region_type_info[0].iter().find(|&&v| v == RecentRegionType::Unknown).is_none());
         self.region_type_info[1] = self.region_type_info[0].clone();
         self.region_type_info[0] = vec![RecentRegionType::Unknown; self.region_type_info[0].len()];
@@ -485,6 +486,8 @@ impl ColumnCursor {
     /// Shift recent column info from current to previous column.
     /// Current column is 0, previous column is 1.
     fn shift(&mut self) {
+        log::debug!("Shift LOD {}, y index {}: {:?}", self.lod, self.next_y_index, self.recent_column_info.region_type_info[0]); // ***TEMP***
+        self.column_finished_lod_0();
         self.recent_column_info.shift_inner();
         self.next_y_index = 0;
     }
@@ -539,7 +542,7 @@ impl ColumnCursor {
     fn column_finished_lod_0(&mut self) {
         assert!(self.recent_column_info.region_type_info[0].len() > 0);
         let fill_last = self.recent_column_info.region_type_info[0].len() -1;
-        log::debug!("Col finished LOD 0 start, yix = {}: {:?}", self.next_y_index, self.recent_column_info.region_type_info[0]);  // ***TEMP***
+        log::debug!("Col finished LOD {} start, yix = {}: {:?}", self.lod, self.next_y_index, self.recent_column_info.region_type_info[0]);  // ***TEMP***
         if self.recent_column_info.region_type_info[0][fill_last] == RecentRegionType::Unknown {
             //  This column is not full yet, so we have to fill it out to the end.
             for n in self.next_y_index as usize .. fill_last + 1 {
@@ -547,7 +550,7 @@ impl ColumnCursor {
                 self.recent_column_info.region_type_info[0][n] = RecentRegionType::Water;
             }
             //  At this point, all entries in the column should be known.
-            log::debug!("Col finished LOD 0 done, yix = {}: {:?}", self.next_y_index, self.recent_column_info.region_type_info[0]);  // ***TEMP***
+            log::debug!("Col finished LOD {} done, yix = {}: {:?}", self.lod, self.next_y_index, self.recent_column_info.region_type_info[0]);  // ***TEMP***
             
         }
         //  Column complete. All cells are land or water.
@@ -559,7 +562,7 @@ impl ColumnCursor {
     /// That region can be returned.
     fn scan_lod_n(&mut self, previous_lod_column_info: &RecentColumnInfo) -> AdvanceStatus {
         assert!(self.is_aligned(previous_lod_column_info));
-        log::debug!("Scan LOD  {}, next y {}, col {:?}", self.lod, self.next_y_index, self.recent_column_info.region_type_info[0]);  // ***TEMP***
+        log::debug!("Scan LOD {}, next y {}, col {:?}", self.lod, self.next_y_index, self.recent_column_info.region_type_info[0]);  // ***TEMP***
         //  Check for out of columns. This is the EOF test.
         if self.recent_column_info.start.0 >= self.recent_column_info.lod_bounds.1.0 { 
             log::debug!("LOD EOF 2 test passed: {} vs {}", self.recent_column_info.start.0, self.recent_column_info.lod_bounds.1.0);
@@ -567,6 +570,8 @@ impl ColumnCursor {
         }
         //  Test for done in Y axis.
         if self.next_y_index >= self.recent_column_info.region_type_info[0].len() {
+            //  ***NEED TO FINISH LOD?***
+            self.column_finished_lod_0();
             self.shift();
             //  Test for done in X axis
             if self.recent_column_info.start.0 >= self.recent_column_info.lod_bounds.1.0 { 
