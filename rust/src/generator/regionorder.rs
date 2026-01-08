@@ -254,8 +254,15 @@ impl Iterator for TileLods {
             //  End of input.
             //  Lower LODs must be flushed.
             //  Mark entire column as water, then call scan and shift, until lowest LOD is completed.
-            panic!("UNIMPLEMENTED runout");
-            todo!();
+            //  Done when the lowest LOD is completed.
+            while self.cursors[self.cursors.len()-1].recent_column_info.region_type_info[0][0] == RecentRegionType::Unknown {
+                log::debug!("Runout at EOF: at {:?}", self.cursors[0].recent_column_info.start);
+                //  This fills all with water.
+                self.cursors[0].column_finished_lod_0();
+                self.scan_and_shift();
+            }
+            //  Return a region, or None if we're all done.
+            self.regions_to_output. pop_front()
         }
     }
 }
@@ -420,8 +427,6 @@ impl RecentColumnInfo {
 enum AdvanceStatus {
     /// None -- did not mark anything
     None,
-    /// Made some progress -- Marked something, go do this again
-    Progress,
     /// Output -- we have a result to return
     Data(RegionData),
 }
@@ -579,7 +584,7 @@ impl ColumnCursor {
             lod: self.lod,
         }
     }
-
+/*
     /// Advance to next region, for LOD > 0.
     /// This constructs LOD N entries based on LOD N-1.
     fn advance_lod_n(&mut self, previous_lod_column_info: &RecentColumnInfo) -> AdvanceStatus {
@@ -624,6 +629,7 @@ impl ColumnCursor {
             }
         }
     }
+*/
     
     /// Mark cell in use on LOD 0.
     /// Columns must be aligned when this is called.
