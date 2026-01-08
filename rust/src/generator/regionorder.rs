@@ -134,6 +134,8 @@ impl TileLods {
         //  Done looking at lower LODs, now shift and align all LODs.
         //  LOD 0 always gets shifted at least once.
         self.cursors[0].recent_column_info.shift();    // Shift LOD 0
+        //  Really ought to be part of shift?
+        self.cursors[0].next_y_index = 0;
         //  Now shift the lower LODs, if this will bring them into alignment.
         //  LOD 1 gets shifted one in two times.
         //  LOD 2 gets shifted one in four times, etc.
@@ -257,6 +259,8 @@ impl Iterator for TileLods {
             //  Done when the lowest LOD is completed.
             while self.cursors[self.cursors.len()-1].recent_column_info.region_type_info[0][0] == RecentRegionType::Unknown {
                 log::debug!("Runout at EOF: at {:?}", self.cursors[0].recent_column_info.start);
+                log::debug!("Runout: next y index: {} for length {}", self.cursors[0].next_y_index, self.cursors[0].recent_column_info.region_type_info[0].len());
+                log::debug!("Runout: Col finished LOD 0: {:?}", self.cursors[0].recent_column_info.region_type_info[0]);  // ***TEMP***
                 //  This fills all with water.
                 self.cursors[0].column_finished_lod_0();
                 self.scan_and_shift();
@@ -634,6 +638,7 @@ impl ColumnCursor {
     /// Mark cell in use on LOD 0.
     /// Columns must be aligned when this is called.
     fn mark_lod_0(&mut self, loc: (u32, u32)) {
+        assert_eq!(self.lod, 0);    // LOD 0 only.
         assert_eq!(self.recent_column_info.start.0, loc.0); // on correct column
         let yix = self.recent_column_info.calc_y_index(loc.1);
         log::debug!("Marking cell {} of column {:?}",  yix, self.recent_column_info.region_type_info[0]);
@@ -657,13 +662,14 @@ impl ColumnCursor {
             self.mark_region_type(n, RecentRegionType::Water);
         }
         self.mark_region_type(yix, RecentRegionType::Land);
-        self.next_y_index = yix + 1;;
+        self.next_y_index = yix + 1;
     }
     
     /// Finished with this column. Fill out to end.
     fn column_finished_lod_0(&mut self) {
         assert!(self.recent_column_info.region_type_info[0].len() > 0);
         let fill_last = self.recent_column_info.region_type_info[0].len() -1;
+        log::debug!("Col finished LOD 0 start, yix = {}: {:?}", self.next_y_index, self.recent_column_info.region_type_info[0]);  // ***TEMP***
         if self.recent_column_info.region_type_info[0][fill_last] == RecentRegionType::Unknown {
             //  This column is not full yet, so we have to fill it out to the end.
             for n in self.next_y_index as usize .. fill_last + 1 {
@@ -671,7 +677,7 @@ impl ColumnCursor {
                 self.recent_column_info.region_type_info[0][n] = RecentRegionType::Water;
             }
             //  At this point, all entries in the column should be known.
-            log::trace!("Col finished LOD 0: {:?}", self.recent_column_info.region_type_info[0]);  // ***TEMP***
+            log::debug!("Col finished LOD 0 done, yix = {}: {:?}", self.next_y_index, self.recent_column_info.region_type_info[0]);  // ***TEMP***
             
         }
         //  Column complete. All cells are land or water.
