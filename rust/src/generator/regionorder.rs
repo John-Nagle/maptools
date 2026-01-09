@@ -667,13 +667,13 @@ pub fn get_group_scan_bounds(
     //  Convert them to cell units.
     //  Lower left rounds down.
     let lower_left_ix = (
-        (lower_left.0 / base_region_size.0) * base_region_size.0,
-        (lower_left.1 / base_region_size.0) * base_region_size.1,
+        (lower_left.0 / base_region_size.0),
+        (lower_left.1 / base_region_size.1),
     );
     //  Upper right rounds up.
     let upper_right_ix = (
-        ((upper_right.0 + base_region_size.0 - 1) / base_region_size.0) * base_region_size.0,
-        ((upper_right.1 + base_region_size.1 - 1) / base_region_size.1) * base_region_size.1,
+        ((upper_right.0 + base_region_size.0 - 1) / base_region_size.0),
+        ((upper_right.1 + base_region_size.1 - 1) / base_region_size.1),
     );
     let (lod, ll_ix, ur_ix) = get_enclosing_square((lower_left_ix, upper_right_ix))?;
     //  Convert back to meters.
@@ -706,15 +706,17 @@ pub fn get_enclosing_square(
         );
         //  Next, trial upper limits
         let new_ur_ix = (
-            ((upper_right_ix.0 + square_size) / square_size) * square_size,
-            ((upper_right_ix.1 + square_size) / square_size) * square_size,
+            //////((upper_right_ix.0 + square_size) / square_size) * square_size,
+            //////((upper_right_ix.1 + square_size) / square_size) * square_size,
+            new_ll_ix.0 + square_size,
+            new_ll_ix.1 + square_size,
         );
         //  Check if encloses
         if new_ur_ix.0 < upper_right_ix.0 || new_ur_ix.1 < upper_right_ix.1 {
             continue
         }
         //  We have a winner. Check it.
-        log::debug!("Enclosing square: LOD {}, {:?}, {:?}", lod, new_ll_ix, new_ur_ix);
+        log::debug!("Enclosing square: LOD {}, square size {}.  {:?}, {:?}", lod, square_size, new_ll_ix, new_ur_ix);
         //  Sanity checks on the geometry.
         assert!(new_ll_ix.0 <= lower_left_ix.0);
         assert!(new_ll_ix.1 <= lower_left_ix.1);
