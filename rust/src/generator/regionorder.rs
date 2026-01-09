@@ -713,6 +713,37 @@ pub fn get_group_scan_limits(
     (new_ll, new_ur, step)
 }
 
+pub fn _get_group_scan_bounds(
+    bounds: ((u32, u32), (u32, u32)),
+    region_size: (u32, u32),
+) -> Result <(u8, (u32, u32), (u32, u32)), Error> {
+    //  Get lower left and upper right.
+    let (lower_left, upper_right) = bounds;
+    //  Convert them to cell units.
+    //  Lower left rounds down.
+    let lower_left_ix = (
+        (lower_left.0 / region_size.0) * region_size.0,
+        (lower_left.1 / region_size.0) * region_size.1,
+    );
+    //  Upper right rounds up.
+    let upper_right_ix = (
+        ((upper_right.0 + region_size.0 - 1) / region_size.0) * region_size.0,
+        ((upper_right.1 + region_size.1 - 1) / region_size.1) * region_size.1,
+    );
+    let (lod, ll_ix, ur_ix) = get_enclosing_square((lower_left_ix, upper_right_ix))?;
+    //  Convert back to meters.
+    let new_ll = (
+        ll_ix.0 * region_size.0,
+        ll_ix.1 * region_size.1,
+    );
+    let new_ur = (
+        ur_ix.0 * region_size.0,
+        ur_ix.1 * region_size.1,
+    );
+    //  We don't compute step here because it's computed for each LOD.
+    Ok((lod, new_ll, new_ur))  
+}
+
 /// Compute the power of two square of cells which encloses the area of interest.
 /// The final output is the lowest LOD cell.
 /// This works in units of cells, not meters.
