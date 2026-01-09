@@ -72,8 +72,6 @@ pub struct TileLods {
     regions: VecDeque<RegionData>,
     /// Iteration state, LOD we are working on
     working_lod: u8,
-    /// Was anything marked?
-    progress_made: bool,
     /// Available results
     regions_to_output: VecDeque<RegionData>,
 }
@@ -95,8 +93,8 @@ impl TileLods {
         let grid = &regions[0].grid;
         //  Generate LODs unti one LOD covers the entire bounds.
         let mut cursors = Vec::new();
-        for lod in 0..max_lod {
-            let new_cursor = ColumnCursor::new(bounds, base_region_size, lod, grid.clone());
+        for lod in 0..(max_lod+1) {
+            let new_cursor = ColumnCursor::new((ll, ur), base_region_size, lod, grid.clone());
             let done = new_cursor.recent_column_info.is_full_coverage();
             cursors.push(new_cursor);
             if done {
@@ -110,7 +108,6 @@ impl TileLods {
             regions: regions.into(),
             cursors,
             working_lod: 0,
-            progress_made: false,
             regions_to_output: VecDeque::new(),
         }
     }
@@ -259,16 +256,17 @@ impl RecentColumnInfo {
             base_region_size.0 * scale,
             base_region_size.1 * scale,
         );
-        let x_steps = (ur.0 - ll.0) / tile_size.0;
+        //////let x_steps = (ur.0 - ll.0) / tile_size.0;
         let y_steps = (ur.1 - ll.1) / tile_size.1;
+        //////let y_steps = scale; // ***WRONG***
         //  The off the edge row, row 1, starts as all water.
         let region_type_info = [
-            vec![RecentRegionType::Unknown; x_steps as usize],
-            vec![RecentRegionType::Water; x_steps as usize],
+            vec![RecentRegionType::Unknown; y_steps as usize],
+            vec![RecentRegionType::Water; y_steps as usize],
         ];        
         let lod_bounds = (ll, ur);
-        let full_coverage = x_steps == 1 && y_steps == 1;
-        log::debug!("LOD {}, bounds {:?}, {} x_steps, {} y_steps, full coverage: {}", lod, bounds, x_steps, y_steps, full_coverage);
+        let full_coverage = y_steps == 1;
+        log::debug!("LOD {}, bounds {:?}, {} y_steps, full coverage: {}", lod, bounds, y_steps, full_coverage);
 
         Self {
             size: tile_size,	
