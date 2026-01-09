@@ -102,6 +102,9 @@ impl TileLods {
                 break
             }
         }
+        //  Must have at least 4 cells or lower LODs are impossible.
+        assert!(cursors.len() > 1);
+        assert!(cursors[0].recent_column_info.region_type_info[0].len() > 1);
         Self {
             regions: regions.into(),
             cursors,
@@ -258,7 +261,8 @@ impl Iterator for TileLods {
             //  ***EOF TEST CAN RUN AWAY***
             let mut runaway: usize = 0; // ***TEMP***
             log::debug!("Runout start: lowest LOD is LOD {}", self.cursors.len()-1); 
-            while self.cursors[self.cursors.len()-1].recent_column_info.region_type_info[1][0] == RecentRegionType::Unknown {
+            //  ***TERMINATION CONDITION MAY BE TOTALLY BOGUS TESTING AGAINST ROW 1***          
+            while self.cursors[self.cursors.len()-1].recent_column_info.region_type_info[0][0] == RecentRegionType::Unknown {
                 log::debug!("Runout at EOF: at {:?}", self.cursors[0].recent_column_info.start);
                 log::debug!("Runout: next y index: {} for length {}", self.cursors[0].next_y_index, self.cursors[0].recent_column_info.region_type_info[0].len());
                 log::debug!("Runout: Col finished LOD 0: {:?}", self.cursors[0].recent_column_info.region_type_info[0]);  // ***TEMP***
@@ -266,6 +270,7 @@ impl Iterator for TileLods {
                 self.scan_and_shift();
                 if runaway > 100 { panic!("EOF runaway"); } else { runaway += 1; } // ***TEMP***
             }
+            log::debug!("Runout done"); 
             //  Return a region, or None if we're all done.
             self.regions_to_output. pop_front()
         }
@@ -491,6 +496,7 @@ impl ColumnCursor {
     fn shift(&mut self) {
         log::debug!("Shift LOD {}, y index {}: {:?}", self.lod, self.next_y_index, self.recent_column_info.region_type_info[0]); // ***TEMP***
         self.column_finished();
+        log::debug!("Shift LOD {} column finished: {:?}", self.lod, self.recent_column_info.region_type_info[0]); // ***TEMP***
         self.recent_column_info.shift_inner();
         self.next_y_index = 0;
     }
@@ -751,9 +757,9 @@ fn test_region_order() {
             prev_loc_opt = Some(loc);
         }
         //  Do test for one group
-        let column_cursors = TileLods::new(group);
+        let tile_lods = TileLods::new(group);
         log::debug!("Generating lower LODs");
-        for item in column_cursors {
+        for item in tile_lods {
             log::debug!(" Output item: {:?}", item);
         }
         // ***MORE***
