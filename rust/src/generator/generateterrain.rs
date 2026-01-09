@@ -35,7 +35,7 @@ use std::path::PathBuf;
 use vizgroup::{CompletedGroups, RegionData, VizGroups};
 use image::{RgbImage, DynamicImage, ImageReader};
 use sculptmaker::{TerrainSculpt, TerrainSculptTexture};
-use regionorder::{TileLods, get_group_bounds, homogeneous_group_size, get_group_scan_limits};
+use regionorder::{TileLods, get_group_bounds, homogeneous_group_size};
 
 
 /// MySQL Credentials for uploading.
@@ -357,9 +357,7 @@ impl TerrainGenerator {
     ) -> Result<(), Error> {
         todo!("glTF mesh generation is not implemented yet");
     }
-    
-
-    
+/*    
     ///  Step through the regions of an entire LOD
     /// ***TEST ONLY***
     pub fn step_through_lod(&self, group: &Vec<RegionData>, lod: u8) -> Result<(), Error> {
@@ -406,21 +404,6 @@ impl TerrainGenerator {
             )?;
             log::debug!("Region \"{}\": {}", region.name, height_field);
         }
-        Ok(())
-    }
-/*    
-    /// Build an impostor for LOD 0, for which we should have the  height field.
-    fn build_impostor_lod_0(&mut self, region: &RegionData) -> Result<(), Error> {
-        let height_field = self.get_height_field_one_region(
-            region.grid.clone(),
-            region.region_coords_x,
-            region.region_coords_y,
-        )?;
-        self.build_impostor(
-            region,
-            &height_field,
-        )?;
-        log::debug!("Region \"{}\": {}", region.name, height_field);
         Ok(())
     }
 */

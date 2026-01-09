@@ -89,12 +89,13 @@ impl TileLods {
         //  Immutable after this point
         let regions = regions;
         let base_region_size = (regions[0].size_x, regions[0].size_y);
+        let (max_lod, ll,ur) = get_group_scan_bounds(bounds, base_region_size).expect("Group scan bounds calc failed");
         //  ***CHECK FOR AT LEAST 2X2***
         //  ***MUST HAVE AS MANY COLUMNS AS ROWS*** add columns if necessary
         let grid = &regions[0].grid;
         //  Generate LODs unti one LOD covers the entire bounds.
         let mut cursors = Vec::new();
-        for lod in 0..MAX_LOD {
+        for lod in 0..max_lod {
             let new_cursor = ColumnCursor::new(bounds, base_region_size, lod, grid.clone());
             let done = new_cursor.recent_column_info.is_full_coverage();
             cursors.push(new_cursor);
@@ -158,67 +159,6 @@ impl TileLods {
 
 impl Iterator for TileLods {
     type Item = RegionData;
-/*
-    /// The iterator for TileLods.
-    /// This returns the next RegionData for which an impostor is to be generated.
-    /// A RegionData for LOD > 0 may not be returned until all four regions for the
-    /// next higher LOD have been returned, or are known to be empty water regions.
-    /// The RegionData for a LOD > 0 should be returned as soon as all the needed
-    /// regions to build that group of four have been built.
-    /// This is to avoid the need to keep huge numbers of region images in memory
-    /// at one time.
-    fn next(&mut self) -> Option<Self::Item> {
-        //  The main loop to find the next item to return.
-        // - Hold working LOD on Data(item) and Progress (i.e. water). Set progress_made.
-        // - Advance working_lod if None and progress_made.
-        // - Reset working_lod to 0 if None and !progress_made.
-        // - If hit lowest LOD (largest number) and progress_made not set, done.
-        loop {
-            //  EOF test
-            if self.working_lod as usize >= self.cursors.len() {
-                if self.progress_made {
-                    self.progress_made = false;
-                    self.working_lod = 0;
-                    continue;
-                }
-                break None;
-            }
-            let advance_status = if self.working_lod == 0 {
-                //  Don't get another region until all lower LOD activity is complete.
-                if !self.progress_made {
-                    self.cursors[0].advance_lod_0(&self.regions) 
-                } else {
-                    self.working_lod += 1;
-                    continue;
-                }   
-            } else {
-                //  We need to mutably access two elements of the same array.
-                let (prev, curr) = self.cursors.split_at_mut(self.working_lod as usize);
-                assert!(!prev.is_empty());
-                let prev = &prev[prev.len() - 1];
-                let curr: &mut ColumnCursor = &mut curr[0];
-                curr.advance_lod_n(&prev.recent_column_info)
-            };
-            //  If we have a winner, return it.
-            log::debug!("LOD {}, advance {:?}", self.working_lod, advance_status);
-            match advance_status {
-                AdvanceStatus::None => {
-                    self.working_lod += 1;
-                    continue;
-                }
-                AdvanceStatus::Data(region) => {
-                    self.progress_made = true;
-                    break Some(region);
-                }
-                AdvanceStatus::Progress => {
-                    self.progress_made = true;
-                    continue;
-                }
-            }
-        }
-    }
-*/
-
     /// Next, new version
     /// This is an iterator, which turns the loops inside out and means we have
     /// to maintain too much state.
@@ -309,7 +249,10 @@ impl RecentColumnInfo {
     /// New. Sizes the recent column info for one LOD and
     /// fills in the array with Unknown.
     pub fn new(bounds: ((u32, u32), (u32, u32)), base_region_size: (u32, u32), lod: u8) -> Self {
-        let (ll, ur, size) = get_group_scan_limits(bounds, base_region_size, lod);
+        //////let (ll, ur, size) = get_group_scan_limits(bounds, base_region_size, lod);
+        //  All columns have same bounds. Only the resolution differs.
+        let ll = bounds.0;
+        let ur = bounds.1;
         log::debug!("New recent column info, LOD{}: ur: {:?}, ll: {:?}, base_region_size: {:?}", lod, ur, ll, base_region_size);    // ***TEMP***
         let scale = 2_u32.pow(lod as u32);
         let tile_size = (
@@ -328,7 +271,7 @@ impl RecentColumnInfo {
         log::debug!("LOD {}, bounds {:?}, {} x_steps, {} y_steps, full coverage: {}", lod, bounds, x_steps, y_steps, full_coverage);
 
         Self {
-            size,	
+            size: tile_size,	
             region_type_info,
             full_coverage,
             lod_bounds,
@@ -634,8 +577,6 @@ impl ColumnCursor {
         s.push('\n');
         s
     }
-    
-    //  ***NEW REGION ORDER CODE***
 }
 
 /// Is this group suitable for multiple-LOD processing?
@@ -686,7 +627,7 @@ pub fn get_group_bounds(group: &Vec<RegionData>) -> Result<((u32, u32), (u32, u3
         ),
     ))
 }
-
+/*
 /// For a group with given bounds, find the starting point and increments which will step
 /// a properly aligned rectangle for the given LOD over the bounds covering all rectangles within the bounds.
 /// This is pure math.
@@ -712,33 +653,37 @@ pub fn get_group_scan_limits(
     log::debug!("Group scan limits: step: {:?}, ll: {:?}, ur: {:?}", step, new_ll, new_ur);
     (new_ll, new_ur, step)
 }
+*/
 
-pub fn _get_group_scan_bounds(
+/// Get the bounds of the area of interest.
+/// This is expanded so that it's an aligned power of 2 square
+/// in region indices, then scaled up by meters.
+pub fn get_group_scan_bounds(
     bounds: ((u32, u32), (u32, u32)),
-    region_size: (u32, u32),
+    base_region_size: (u32, u32),
 ) -> Result <(u8, (u32, u32), (u32, u32)), Error> {
     //  Get lower left and upper right.
     let (lower_left, upper_right) = bounds;
     //  Convert them to cell units.
     //  Lower left rounds down.
     let lower_left_ix = (
-        (lower_left.0 / region_size.0) * region_size.0,
-        (lower_left.1 / region_size.0) * region_size.1,
+        (lower_left.0 / base_region_size.0) * base_region_size.0,
+        (lower_left.1 / base_region_size.0) * base_region_size.1,
     );
     //  Upper right rounds up.
     let upper_right_ix = (
-        ((upper_right.0 + region_size.0 - 1) / region_size.0) * region_size.0,
-        ((upper_right.1 + region_size.1 - 1) / region_size.1) * region_size.1,
+        ((upper_right.0 + base_region_size.0 - 1) / base_region_size.0) * base_region_size.0,
+        ((upper_right.1 + base_region_size.1 - 1) / base_region_size.1) * base_region_size.1,
     );
     let (lod, ll_ix, ur_ix) = get_enclosing_square((lower_left_ix, upper_right_ix))?;
     //  Convert back to meters.
     let new_ll = (
-        ll_ix.0 * region_size.0,
-        ll_ix.1 * region_size.1,
+        ll_ix.0 * base_region_size.0,
+        ll_ix.1 * base_region_size.1,
     );
     let new_ur = (
-        ur_ix.0 * region_size.0,
-        ur_ix.1 * region_size.1,
+        ur_ix.0 * base_region_size.0,
+        ur_ix.1 * base_region_size.1,
     );
     //  We don't compute step here because it's computed for each LOD.
     Ok((lod, new_ll, new_ur))  
@@ -780,15 +725,6 @@ pub fn get_enclosing_square(
         return Ok((lod, new_ll_ix, new_ur_ix))
     }
     return Err(anyhow!("Can't enclose the bounds {:?} with an alighed square of {}", bounds_ix, MAX_LOD))
-}
-
-/// Same as get group scan limits, but make the resulting area square in terms of rows and columns.
-pub fn get_group_scan_limits_square(
-    bounds: ((u32, u32), (u32, u32)),
-    region_size: (u32, u32),
-    lod: u8,
-) -> ((u32, u32), (u32, u32), (u32, u32)) {
-    todo!(); // ***NOT YET***
 }
 
 /// Check loc order. Panic if error.
