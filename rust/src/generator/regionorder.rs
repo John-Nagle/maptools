@@ -690,6 +690,7 @@ pub fn get_group_bounds(group: &Vec<RegionData>) -> Result<((u32, u32), (u32, u3
 /// For a group with given bounds, find the starting point and increments which will step
 /// a properly aligned rectangle for the given LOD over the bounds covering all rectangles within the bounds.
 /// This is pure math.
+/// ***WRONG*** Not rounding down to a power of 2 x 
 pub fn get_group_scan_limits(
     bounds: ((u32, u32), (u32, u32)),
     region_size: (u32, u32),
@@ -708,7 +709,46 @@ pub fn get_group_scan_limits(
         ((upper_right.0 + step.0) / step.0) * step.0,
         ((upper_right.1 + step.1) / step.1) * step.1,
     );
+    log::debug!("Group scan limits: step: {:?}, ll: {:?}, ur: {:?}", step, new_ll, new_ur);
     (new_ll, new_ur, step)
+}
+
+/// Compute the power of two square of cells which encloses the area of interest.
+/// The final output is the lowest LOD cell.
+/// This works in units of cells, not meters.
+pub fn get_enclosing_square(
+    bounds_ix: ((u32, u32), (u32, u32))) -> Result<(u8, (u32, u32), (u32, u32)), Error> {     
+    let (lower_left_ix, upper_right_ix) = bounds_ix; 
+    //  Try increasing LODs until we get one that works.
+    for lod in 1..MAX_LOD {
+        //  Size of square
+        let square_size = 2_u32.pow(lod.into());
+        //  First find the lower limits.
+        let new_ll_ix = (
+            (lower_left_ix.0 / square_size) * square_size,
+            (lower_left_ix.1 / square_size) * square_size,
+        );
+        //  Next, trial upper limits
+        let new_ur_ix = (
+            ((upper_right_ix.0 + square_size) / square_size) * square_size,
+            ((upper_right_ix.1 + square_size) / square_size) * square_size,
+        );
+        //  Check if encloses
+        if new_ur_ix.0 < upper_right_ix.0 || new_ur_ix.1 < upper_right_ix.1 {
+            continue
+        }
+        //  We have a winner. Check it.
+        log::debug!("Enclosing square: LOD {}, {:?}, {:?}", lod, new_ll_ix, new_ur_ix);
+        //  Sanity checks on the geometry.
+        assert!(new_ll_ix.0 <= lower_left_ix.0);
+        assert!(new_ll_ix.1 <= lower_left_ix.1);
+        assert!(new_ur_ix.0 >= upper_right_ix.0);
+        assert!(new_ur_ix.1 >= upper_right_ix.1);
+        assert_eq!(new_ur_ix.0 - new_ll_ix.0, square_size);
+        assert_eq!(new_ur_ix.1 - new_ll_ix.1, square_size);
+        return Ok((lod, new_ll_ix, new_ur_ix))
+    }
+    return Err(anyhow!("Can't enclose the bounds {:?} with an alighed square of {}", bounds_ix, MAX_LOD))
 }
 
 /// Same as get group scan limits, but make the resulting area square in terms of rows and columns.

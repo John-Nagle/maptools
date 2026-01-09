@@ -381,4 +381,10 @@ Complete, but correct?
     TODO:
     - Expand rows or colums as needed to make the work area square.
     - Write EOF runout code.
+    
+2026-01-08
+    LOD alignment problems.
+    Each LOD must be aligned on a power of 2 times the x and y sizes. They're not.
+    
+
       
