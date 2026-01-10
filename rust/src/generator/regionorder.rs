@@ -126,6 +126,7 @@ impl TileLods {
             assert!(!prev.is_empty());
             let prev = &prev[prev.len() - 1];
             let curr: &mut ColumnCursor = &mut curr[0];
+            log::debug!("Scan LOD {}. Prev: {:?}  Curr: {:?}", lod, prev.recent_column_info, curr.recent_column_info); // ***TEMP***
             if !curr.is_aligned(&prev.recent_column_info) { break };
             if let AdvanceStatus::Data(region) = curr.scan_lod_n(&prev.recent_column_info) {
                 //  A lower LOD region has been generated.
@@ -185,6 +186,9 @@ impl Iterator for TileLods {
                 while loc.0 > self.cursors[0].recent_column_info.start.0 {
                     self.scan_and_shift();
                 }
+                //  Aligned now, push new item.
+                assert_eq!(loc.0, self.cursors[0].recent_column_info.start.0);
+                self.cursors[0].mark_lod_0(loc);
             }
             //  There must always be a region queued at this point, because we pushed one at start.
             let opt_region = self.regions_to_output.pop_front();
@@ -198,8 +202,10 @@ impl Iterator for TileLods {
             //  ***EOF TEST CAN RUN AWAY***
             let mut runaway: usize = 0; // ***TEMP***
             log::debug!("Runout start: lowest LOD is LOD {}", self.cursors.len()-1); 
-            //  ***TERMINATION CONDITION MAY BE TOTALLY BOGUS TESTING AGAINST ROW 1***          
-            while self.cursors[self.cursors.len()-1].recent_column_info.region_type_info[0][0] == RecentRegionType::Unknown {
+            //  ***TERMINATION CONDITION MAY BE TOTALLY BOGUS TESTING AGAINST ROW 1***    
+            self.scan_and_shift();      
+            //////while self.cursors[self.cursors.len()-1].recent_column_info.region_type_info[0][0] == RecentRegionType::Unknown {
+            while self.cursors[self.cursors.len()-1].recent_column_info.start.0 <= self.cursors[self.cursors.len()-1].recent_column_info.lod_bounds.1.0 {
                 log::debug!("Runout at EOF: at {:?}", self.cursors[0].recent_column_info.start);
                 log::debug!("Runout: next y index: {} for length {}", self.cursors[0].next_y_index, self.cursors[0].recent_column_info.region_type_info[0].len());
                 log::debug!("Runout: Col finished LOD 0: {:?}", self.cursors[0].recent_column_info.region_type_info[0]);  // ***TEMP***
@@ -370,7 +376,7 @@ impl RecentColumnInfo {
             return RecentRegionType::Water;
         }
         //  Not all water, but ready to process. Impostor as land.
-        log::debug!("Found four cells with land at {:?}", loc);
+        log::debug!("Found four cells with some land at {:?}", loc);
         RecentRegionType::Land
     }
 }
