@@ -332,20 +332,20 @@ impl RecentColumnInfo {
     fn test_cell(&self, loc: (u32, u32)) -> RecentRegionType {
         let (x, y) = loc;
         //  Check that X is within bounds.
-        //  Low limit is previous row.
-        //  High limit is current row.
-        let row = if x == self.start.0 {
+        //  Low limit is previous column.
+        //  High limit is current column.
+        let column = if x == self.start.0 {
             &self.region_type_info[0]
         } else if x + self.size.0 == self.start.0 {
             &self.region_type_info[1]
         } else {
-            log::debug!("Tested cell of invalid row: x: {}, row 0: {}, row 1: {}", x, self.start.0, self.start.0 as i32 - self.size.0 as i32);
+            log::debug!("Tested cell of invalid column: x: {}, column 0: {}, column 1: {}", x, self.start.0, self.start.0 as i32 - self.size.0 as i32);
             return RecentRegionType::Water;
         };
         //  Return element.
         assert_eq!(y % self.size.1, 0);
         //  If out of range, treat as water.
-        let result = if let Some(v) = row.get((y / self.size.1) as usize) {
+        let result = if let Some(v) = column.get(((y - self.start.1) / self.size.1) as usize) {
             *v
         } else {
             RecentRegionType::Water
@@ -565,8 +565,11 @@ impl ColumnCursor {
     
     /// Is this region aligned in column with the region above?
     /// If so, it is legitimate to update this LOD.
+    
     fn is_aligned(&self, prev: &RecentColumnInfo) -> bool {
-        self.recent_column_info.start.0 == prev.start.0
+        //  Appropriate test is curr.start == prev.start - prev.size
+        //  This is written as curr.start + prev.size == prev.start to avoid unsigned underflow.
+        self.recent_column_info.start.0 + prev.size.0 == prev.start.0
     }
     
     /// Display region type info as string. Useful for debug.
