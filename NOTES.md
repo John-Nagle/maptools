@@ -386,5 +386,8 @@ Complete, but correct?
     LOD alignment problems.
     Each LOD must be aligned on a power of 2 times the x and y sizes. They're not.
     
+2016-01-09
+    Alignment OK. Runout has problems.
+    
 
       

@@ -205,6 +205,7 @@ impl Iterator for TileLods {
             //  ***TERMINATION CONDITION MAY BE TOTALLY BOGUS TESTING AGAINST ROW 1***    
             self.scan_and_shift();      
             //////while self.cursors[self.cursors.len()-1].recent_column_info.region_type_info[0][0] == RecentRegionType::Unknown {
+            //  ***PROBABLY SHOULD BE STRICTLY LESS FOR LOOP TERMINATION TEST***
             while self.cursors[self.cursors.len()-1].recent_column_info.start.0 <= self.cursors[self.cursors.len()-1].recent_column_info.lod_bounds.1.0 {
                 log::debug!("Runout at EOF: at {:?}", self.cursors[0].recent_column_info.start);
                 log::debug!("Runout: next y index: {} for length {}", self.cursors[0].next_y_index, self.cursors[0].recent_column_info.region_type_info[0].len());
@@ -344,11 +345,13 @@ impl RecentColumnInfo {
         //  Return element.
         assert_eq!(y % self.size.1, 0);
         //  If out of range, treat as water.
-        if let Some(v) = row.get((y / self.size.1) as usize) {
+        let result = if let Some(v) = row.get((y / self.size.1) as usize) {
             *v
         } else {
             RecentRegionType::Water
-        }
+        };
+        log::debug!("Test cell: loc {:?}, yix: {}, result: {:?}", loc, y/self.size.1, result);
+        result
     }
 
     /// Test a 4-cell quadrant for status.
