@@ -389,5 +389,24 @@ Complete, but correct?
 2016-01-09
     Alignment OK. Runout has problems.
     
+2016-01-12
+    Scan logic is wrong. We must scan lower LODs each time we insert land or water.
+    Not doing that.
+    
+    The only scanning takes place at end of a column.
+    
+    So, after mark_lod_0, we need to do a scan of lod_n. No shifting. If there's an
+    aligned lower LOD, mark it, possibly emitting a region as output.
+    
+    But when we're marking an odd (not aligned with a lower LOD) column, we can't
+    mark lower LODs. So we're just accumulating marks.
+    
+    The effect is that we're going to build up a backlog of lower LOD tiles that can't
+    go out until the entire column has been marked and we're starting on the next column.
+    So this will have more work in progress than was anticipated. A whole row, perhaps a few thousand tiles.
+    Could be several gigabytes of RAM, since the images are in there.
+    
+    Given that, do we want to do all the lower LOD work at the end of each LOD 0 column? Simpler.
+    
 
       

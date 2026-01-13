@@ -121,17 +121,15 @@ impl TileLods {
         self.cursors[0].column_finished();
         //  Process lower LODs with current alignment.
         for lod in 1..self.cursors.len() {
-            //////if !self.cursors[lod].is_aligned() { break };
             let (prev, curr) = self.cursors.split_at_mut(lod as usize);
             assert!(!prev.is_empty());
             let prev = &prev[prev.len() - 1];
             let curr: &mut ColumnCursor = &mut curr[0];
             log::debug!("Scan LOD {}. Prev: {:?}  Curr: {:?}", lod, prev.recent_column_info, curr.recent_column_info); // ***TEMP***
             if !curr.is_aligned(&prev.recent_column_info) { break };
-            if let AdvanceStatus::Data(region) = curr.scan_lod_n(&prev.recent_column_info) {
-                //  A lower LOD region has been generated.
-                self.regions_to_output.push_back(region);
-            }
+            let mut new_tiles = curr.scan_lod_n(&prev.recent_column_info);
+            //  A lower LOD region has been generated.
+            self.regions_to_output.append(&mut new_tiles);
         }
         //  Done looking at lower LODs, now shift and align all LODs.
         //  LOD 0 always gets shifted at least once.
@@ -469,6 +467,8 @@ impl ColumnCursor {
     
     /// Mark cell in use on LOD 0.
     /// Columns must be aligned when this is called.
+    /// ***MUST CHECK LOWER LODS ON EACH MARK OF LAND***
+    /// ***WHAT ABOUT MARKS OF WATER - YES, THAT TOO***
     fn mark_lod_0(&mut self, loc: (u32, u32)) {
         assert_eq!(self.lod, 0);    // LOD 0 only.
         assert_eq!(self.recent_column_info.start.0, loc.0); // on correct column
@@ -519,7 +519,7 @@ impl ColumnCursor {
     /// Scan across this LOD for the next newly finished region based on information
     /// from the next higher LOD.
     /// That region can be returned.
-    fn scan_lod_n(&mut self, previous_lod_column_info: &RecentColumnInfo) -> AdvanceStatus {
+    fn _scan_lod_n(&mut self, previous_lod_column_info: &RecentColumnInfo) -> AdvanceStatus {
         assert!(self.is_aligned(previous_lod_column_info));
         log::debug!("Scan LOD {}, next y {}, col {:?}", self.lod, self.next_y_index, self.recent_column_info.region_type_info[0]);  // ***TEMP***
         //  Check for out of columns. This is the EOF test.
@@ -561,6 +561,33 @@ impl ColumnCursor {
                 AdvanceStatus::None
             }
         }
+    }
+    
+    /// Scan all of a column of LOD n, returning any new tiles.
+    fn scan_lod_n(&mut self, previous_lod_column_info: &RecentColumnInfo) -> VecDeque<RegionData> {
+        assert!(self.is_aligned(previous_lod_column_info));
+        let mut new_tiles = VecDeque::new();
+        for n in 0..self.recent_column_info.region_type_info[0].len() {
+            let loc = (self.recent_column_info.start.0, self.recent_column_info.start.1 + self.recent_column_info.size.1 * (n as u32));
+            match previous_lod_column_info.test_four_cells(loc) {
+                RecentRegionType::Unknown => {
+                    //  The previous LOD should be completely filled in now.
+                    panic!("Scan of LOD {}: found Unknown tile at index {} of {:?}", 
+                        self.lod, n, previous_lod_column_info.region_type_info);
+                }
+                RecentRegionType::Land => {
+                    //  Generate and return a land tile.
+                    let new_tile = self.build_new_tile(loc, self.recent_column_info.size);
+                    log::debug!("New tile: {:?}", new_tile);
+                    self.mark_region_type(n, RecentRegionType::Land);
+                    new_tiles.push_back(new_tile);
+                }
+                RecentRegionType::Water => {  
+                    self.mark_region_type(n, RecentRegionType::Water);   
+                }    
+            }
+        }
+        new_tiles
     }
     
     /// Is this region aligned in column with the region above?
