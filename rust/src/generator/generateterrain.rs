@@ -254,15 +254,17 @@ impl TerrainGenerator {
         //  Get a relevant region, or None if it's all water.
         //  May need more checking for missing regions.
         let mut take = |lod, dx, dy| {
-            let key = RegionLodKey { lod: 0, region_coords_x: region_coords_x + dx, region_coords_y: region_coords_y + dy };
+            let key = RegionLodKey { lod, region_coords_x: region_coords_x + dx, region_coords_y: region_coords_y + dy };
+            log::debug!("Multi region height field needed for LOD {}: {:?}", key.lod, (key.region_coords_x, key.region_coords_y));  // ***TEMP***
             self.height_field_cache.take(&key)
         };
         //  Get the four height fields.
+        //  Region size here is the full sized impostor, so we have to divide by 2 to get the size of the 4 squares that make it up.
         let height_fields = [
             take(lod - 1, 0, 0),
-            take(lod - 1, 0, region_size.1),
-            take(lod - 1, region_size.0, 0),
-            take(lod - 1, region_size.0, region_size.1)
+            take(lod - 1, 0, region_size.1 / 2),
+            take(lod - 1, region_size.0 / 2, 0),
+            take(lod - 1, region_size.0 / 2, region_size.1 / 2)
         ];
         //  Generate combined height field;
         let height_field = HeightField::halve(&HeightField::combine(height_fields)?);
