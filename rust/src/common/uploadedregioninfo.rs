@@ -367,7 +367,7 @@ impl HeightField {
         for x in 0..cnt_x {
             for y in 0..cnt_y {
                 let xloc = (x as f32 * self.heights.num_columns() as f32) / (cnt_x as f32);
-                let yloc = (x as f32 * self.heights.num_rows() as f32) / (cnt_y as f32);
+                let yloc = (y as f32 * self.heights.num_rows() as f32) / (cnt_y as f32);
                 let height = self.average_height(xloc, yloc);
                 heights.set(x, y, height).unwrap();
             }
