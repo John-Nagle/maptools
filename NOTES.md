@@ -408,5 +408,9 @@ Complete, but correct?
     
     Given that, do we want to do all the lower LOD work at the end of each LOD 0 column? Simpler.
     
+2026-01-13
+
+    Beginning to work. Generates sculpt textures, but they have a blue line running vertically through them.
+    
 
       

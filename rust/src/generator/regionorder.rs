@@ -70,8 +70,6 @@ pub struct TileLods {
     cursors: Vec<ColumnCursor>,
     /// The regions in
     regions: VecDeque<RegionData>,
-    /// Iteration state, LOD we are working on
-    working_lod: u8,
     /// Available results
     regions_to_output: VecDeque<RegionData>,
 }
@@ -107,16 +105,13 @@ impl TileLods {
         Self {
             regions: regions.into(),
             cursors,
-            working_lod: 0,
             regions_to_output: VecDeque::new(),
         }
     }
     
     /// Scan for newly finished blocks. Then shift down by one column of LOD 0.
     fn scan_and_shift(&mut self) {
-        //////assert!(loc.0 > self.cursors[0].recent_column_info.start.0);
         //  Advance by exactly one column.
-        //////assert!(loc.0, self.cursors[0].recent_column_info.start.0 + self.cursors[0].recent_column_info.size.0);
         //  Finish out current column.
         self.cursors[0].column_finished();
         //  Process lower LODs with current alignment.
@@ -202,7 +197,6 @@ impl Iterator for TileLods {
             log::debug!("Runout start: lowest LOD is LOD {}", self.cursors.len()-1); 
             //  ***TERMINATION CONDITION MAY BE TOTALLY BOGUS TESTING AGAINST ROW 1***    
             self.scan_and_shift();      
-            //////while self.cursors[self.cursors.len()-1].recent_column_info.region_type_info[0][0] == RecentRegionType::Unknown {
             //  ***PROBABLY SHOULD BE STRICTLY LESS FOR LOOP TERMINATION TEST***
             while self.cursors[self.cursors.len()-1].recent_column_info.start.0 <= self.cursors[self.cursors.len()-1].recent_column_info.lod_bounds.1.0 {
                 log::debug!("Runout at EOF: at {:?}", self.cursors[0].recent_column_info.start);
@@ -251,7 +245,6 @@ impl RecentColumnInfo {
     /// New. Sizes the recent column info for one LOD and
     /// fills in the array with Unknown.
     pub fn new(bounds: ((u32, u32), (u32, u32)), base_region_size: (u32, u32), lod: u8) -> Self {
-        //////let (ll, ur, size) = get_group_scan_limits(bounds, base_region_size, lod);
         //  All columns have same bounds. Only the resolution differs.
         let ll = bounds.0;
         let ur = bounds.1;
@@ -261,9 +254,7 @@ impl RecentColumnInfo {
             base_region_size.0 * scale,
             base_region_size.1 * scale,
         );
-        //////let x_steps = (ur.0 - ll.0) / tile_size.0;
         let y_steps = (ur.1 - ll.1) / tile_size.1;
-        //////let y_steps = scale; // ***WRONG***
         //  The off the edge row, row 1, starts as all water.
         let region_type_info = [
             vec![RecentRegionType::Unknown; y_steps as usize],
@@ -312,7 +303,7 @@ impl RecentColumnInfo {
     /// Current column is 0, previous column is 1.
     fn shift_inner(&mut self) {
         //  Columns must be totally filled in before a shift.
-        log::debug!("Shift_inner: {:?}", self.region_type_info[0]); // ***TEMP***
+        log::trace!("Shift_inner: {:?}", self.region_type_info[0]); // ***TEMP***
         assert!(self.region_type_info[0].iter().find(|&&v| v == RecentRegionType::Unknown).is_none());
         self.region_type_info[1] = self.region_type_info[0].clone();
         self.region_type_info[0] = vec![RecentRegionType::Unknown; self.region_type_info[0].len()];
@@ -337,7 +328,7 @@ impl RecentColumnInfo {
         } else if x + self.size.0 == self.start.0 {
             &self.region_type_info[1]
         } else {
-            log::debug!("Tested cell of invalid column: x: {}, column 0: {}, column 1: {}", x, self.start.0, self.start.0 as i32 - self.size.0 as i32);
+            log::trace!("Tested cell of invalid column: x: {}, column 0: {}, column 1: {}", x, self.start.0, self.start.0 as i32 - self.size.0 as i32);
             return RecentRegionType::Water;
         };
         //  Return element.
@@ -348,7 +339,7 @@ impl RecentColumnInfo {
         } else {
             RecentRegionType::Water
         };
-        log::debug!("Test cell: loc {:?}, yix: {}, result: {:?}", loc, y/self.size.1, result);
+        log::trace!("Test cell: loc {:?}, yix: {}, result: {:?}", loc, y/self.size.1, result);
         result
     }
 
@@ -380,14 +371,6 @@ impl RecentColumnInfo {
         log::debug!("Found four cells with some land at {:?}", loc);
         RecentRegionType::Land
     }
-}
-
-#[derive(Debug)]
-enum AdvanceStatus {
-    /// None -- did not mark anything
-    None,
-    /// Output -- we have a result to return
-    Data(RegionData),
 }
 
 /// Advance across a LOD one column at a time.
@@ -429,7 +412,7 @@ impl ColumnCursor {
     /// Mark individual region type
     fn mark_region_type(&mut self, yix: usize, recent_region_type: RecentRegionType) {
         log::debug!(
-            "Try to mark LOD {} index {} as {:?}. Size {:?}",
+            "Mark LOD {} index {} as {:?}. Size {:?}",
             self.lod,
             yix,
             recent_region_type,
@@ -442,7 +425,6 @@ impl ColumnCursor {
     /// Shift recent column info from current to previous column.
     /// Current column is 0, previous column is 1.
     fn shift(&mut self) {
-        log::debug!("Shift LOD {}, y index {}: {:?}", self.lod, self.next_y_index, self.recent_column_info.region_type_info[0]); // ***TEMP***
         self.column_finished();
         log::debug!("Shift LOD {} column finished: {:?}", self.lod, self.recent_column_info.region_type_info[0]); // ***TEMP***
         self.recent_column_info.shift_inner();
@@ -466,9 +448,6 @@ impl ColumnCursor {
     }
     
     /// Mark cell in use on LOD 0.
-    /// Columns must be aligned when this is called.
-    /// ***MUST CHECK LOWER LODS ON EACH MARK OF LAND***
-    /// ***WHAT ABOUT MARKS OF WATER - YES, THAT TOO***
     fn mark_lod_0(&mut self, loc: (u32, u32)) {
         assert_eq!(self.lod, 0);    // LOD 0 only.
         assert_eq!(self.recent_column_info.start.0, loc.0); // on correct column
@@ -489,7 +468,6 @@ impl ColumnCursor {
             self.recent_column_info.size
         );
         //  Fill as water up to, but not including, yix.
-        log::debug!("Filling as water from {} to {} exclusive.", self.next_y_index, yix);
         for n in self.next_y_index .. yix {
             self.mark_region_type(n, RecentRegionType::Water);
         }
@@ -514,53 +492,6 @@ impl ColumnCursor {
         }
         //  Column complete. All cells are land or water.
         assert!(self.recent_column_info.region_type_info[0].iter().find(|&&v| v == RecentRegionType::Unknown).is_none());
-    }
-    
-    /// Scan across this LOD for the next newly finished region based on information
-    /// from the next higher LOD.
-    /// That region can be returned.
-    fn _scan_lod_n(&mut self, previous_lod_column_info: &RecentColumnInfo) -> AdvanceStatus {
-        assert!(self.is_aligned(previous_lod_column_info));
-        log::debug!("Scan LOD {}, next y {}, col {:?}", self.lod, self.next_y_index, self.recent_column_info.region_type_info[0]);  // ***TEMP***
-        //  Check for out of columns. This is the EOF test.
-        if self.recent_column_info.start.0 >= self.recent_column_info.lod_bounds.1.0 { 
-            log::debug!("LOD EOF 2 test passed: {} vs {}", self.recent_column_info.start.0, self.recent_column_info.lod_bounds.1.0);
-            return AdvanceStatus::None
-        }
-        //  Test for done in Y axis.
-        if self.next_y_index >= self.recent_column_info.region_type_info[0].len() {
-            //  ***NEED TO FINISH LOD?***
-            self.shift();
-            //  Test for done in X axis
-            if self.recent_column_info.start.0 >= self.recent_column_info.lod_bounds.1.0 { 
-                log::debug!("LOD EOF 1 test passed: {} vs {}", self.recent_column_info.start.0, self.recent_column_info.lod_bounds.1.0);
-                return AdvanceStatus::None
-            }
-        }
-      
-        //  Test next cell along Y axis.
-        let loc = (self.recent_column_info.start.0, self.recent_column_info.start.1 + self.recent_column_info.size.1 * (self.next_y_index as u32));
-        match previous_lod_column_info.test_four_cells(loc) {
-            RecentRegionType::Unknown => {
-                //  Not ready to do this yet.
-                //  Try above LODs, then try again
-                AdvanceStatus::None
-            }
-            RecentRegionType::Land => {
-                self.recent_column_info.region_type_info[0][self.next_y_index] = RecentRegionType::Land;
-                //  Generate and return a land tile.
-                let new_tile = self.build_new_tile(loc, self.recent_column_info.size);
-                log::debug!("New tile: {:?}", new_tile);
-                self.next_y_index += 1;
-                AdvanceStatus::Data(new_tile)
-            }
-            RecentRegionType::Water => {            
-                //  Mark as a water tile to be skipped.
-                self.recent_column_info.region_type_info[0][self.next_y_index] = RecentRegionType::Water;
-                self.next_y_index += 1;
-                AdvanceStatus::None
-            }
-        }
     }
     
     /// Scan all of a column of LOD n, returning any new tiles.
@@ -664,33 +595,6 @@ pub fn get_group_bounds(group: &Vec<RegionData>) -> Result<((u32, u32), (u32, u3
         ),
     ))
 }
-/*
-/// For a group with given bounds, find the starting point and increments which will step
-/// a properly aligned rectangle for the given LOD over the bounds covering all rectangles within the bounds.
-/// This is pure math.
-/// ***WRONG*** Not rounding down to a power of 2 x 
-pub fn get_group_scan_limits(
-    bounds: ((u32, u32), (u32, u32)),
-    region_size: (u32, u32),
-    lod: u8,
-) -> ((u32, u32), (u32, u32), (u32, u32)) {
-    //  Get lower left and upper right
-    let (lower_left, upper_right) = bounds;
-    let lod_mult = 2_u32.pow(lod as u32);
-    let step = (region_size.0 * lod_mult, region_size.1 * lod_mult);
-    //  Now the tricky part. Round down the lower_left values to the next lower multiple of step.
-    let new_ll = (
-        (lower_left.0 / step.0) * step.0,
-        (lower_left.1 / step.1) * step.1,
-    );
-    let new_ur = (
-        ((upper_right.0 + step.0) / step.0) * step.0,
-        ((upper_right.1 + step.1) / step.1) * step.1,
-    );
-    log::debug!("Group scan limits: step: {:?}, ll: {:?}, ur: {:?}", step, new_ll, new_ur);
-    (new_ll, new_ur, step)
-}
-*/
 
 /// Get the bounds of the area of interest.
 /// This is expanded so that it's an aligned power of 2 square
@@ -743,8 +647,6 @@ pub fn get_enclosing_square(
         );
         //  Next, trial upper limits
         let new_ur_ix = (
-            //////((upper_right_ix.0 + square_size) / square_size) * square_size,
-            //////((upper_right_ix.1 + square_size) / square_size) * square_size,
             new_ll_ix.0 + square_size,
             new_ll_ix.1 + square_size,
         );
