@@ -411,6 +411,8 @@ Complete, but correct?
 2026-01-13
 
     Beginning to work. Generates sculpt textures, but they have a blue line running vertically through them.
+    - Fixed that.
+    - Scale is off by a factor of 2. combine/halve is wrong.
     
 
       

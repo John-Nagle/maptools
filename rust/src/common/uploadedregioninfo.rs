@@ -484,6 +484,7 @@ fn test_combine() {
     }
     //  Now halve this
     let half_combined = HeightField::halve(&combined);
+    println!("Halved combined: {:?}", half_combined);
 }
 
 #[test]
