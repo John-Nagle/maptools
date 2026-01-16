@@ -27,37 +27,6 @@ use crate::vizgroup::{RegionData};
 /// Maximum LOD. It never gets this big, because there would have to be a viz group 2^LOD across for that to happen.
 const MAX_LOD: u8 = 16;
 
-/// Simple version, without optimization.
-/// Just iterates over &Vec<RegionData>.
-/// No LODs other than 0.
-pub struct SimpleTileLods {
-    /// The regions
-    regions: Vec<RegionData>,
-    /// The cursor
-    cursor: usize,
-}
-
-impl SimpleTileLods {
-    /// The regions
-    pub fn new(regions: Vec<RegionData>) -> Self {
-        Self { regions, cursor: 0 }
-    }
-}
-
-impl Iterator for SimpleTileLods {
-    type Item = RegionData;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.cursor < self.regions.len() {
-            let i = self.cursor;
-            self.cursor += 1;
-            Some(self.regions[i].clone())
-        } else {
-            None
-        }
-    }
-}
-
 /// All the column cursors for all the LODs.
 ///
 /// The goal here is to return all the regions that
@@ -175,7 +144,6 @@ impl Iterator for TileLods {
                 self.regions_to_output.push_back(region.clone());
                 //  Column has changed.
                 assert!(loc.0 > self.cursors[0].recent_column_info.start.0);
-                let working_loc = loc;
                 while loc.0 > self.cursors[0].recent_column_info.start.0 {
                     self.scan_and_shift();
                 }
@@ -378,10 +346,8 @@ struct ColumnCursor {
     /// The last two columns.
     recent_column_info: RecentColumnInfo,
     /// Current location for this LOD. One rectangle
-    /// past the last one filled in.
+    /// past the last one filled in. LOD 0 only.
     next_y_index: usize,
-    /// Index into region data, for LOD 0 only
-    region_data_index: usize,
     /// LOD
     lod: u8,
     /// Grid, for output
@@ -397,13 +363,11 @@ impl ColumnCursor {
         grid: String,
     ) -> ColumnCursor {
         //  Calculate tile size at this LOD.
-        let size_mult = 2_u32.pow(lod as u32);
         let recent_column_info = RecentColumnInfo::new(bounds, base_region_size, lod);
         let next_loc = recent_column_info.start;
         Self {
             recent_column_info,
             next_y_index: 0,
-            region_data_index: 0,
             lod,
             grid,
         }
@@ -411,7 +375,7 @@ impl ColumnCursor {
 
     /// Mark individual region type
     fn mark_region_type(&mut self, yix: usize, recent_region_type: RecentRegionType) {
-        log::debug!(
+        log::trace!(
             "Mark LOD {} index {} as {:?}. Size {:?}",
             self.lod,
             yix,
@@ -475,7 +439,7 @@ impl ColumnCursor {
         self.next_y_index = yix + 1;
     }
     
-    /// Finished with this column. Fill out to end.
+    /// Finished with this LOD 0 column. Fill out to end.
     fn column_finished(&mut self) {
         assert!(self.recent_column_info.region_type_info[0].len() > 0);
         let fill_last = self.recent_column_info.region_type_info[0].len() -1;
@@ -531,7 +495,7 @@ impl ColumnCursor {
     }
     
     /// Display region type info as string. Useful for debug.
-    fn to_string(&self) -> String {
+    fn _to_string(&self) -> String {
         let mut s = String::new();
         for col in 0..1 {           
             for v in &self.recent_column_info.region_type_info[col] {
@@ -668,13 +632,6 @@ pub fn get_enclosing_square(
     return Err(anyhow!("Can't enclose the bounds {:?} with an alighed square of {}", bounds_ix, MAX_LOD))
 }
 
-/// Check loc order. Panic if error.
-/// This module assumes everything is in strictly increasing sequence. So we check.
-pub fn check_loc_sequence(a: (u32, u32), b: (u32, u32)) {
-    if a.0 > b.0 || (a.0 == b.0 && a.1 >= b.1) {
-        panic!("Locations out of sequence: a {:?} >= b {:?}", a, b);
-    }
-}
 
 //  Unit test
 #[test]
@@ -682,6 +639,14 @@ pub fn check_loc_sequence(a: (u32, u32), b: (u32, u32)) {
 fn test_region_order() {
     //  Set up logging
     use common::test_logger;
+    // Check loc order. Panic if error.
+    // This module assumes everything is in strictly increasing sequence. So we check.
+    fn check_loc_sequence(a: (u32, u32), b: (u32, u32)) {
+        if a.0 > b.0 || (a.0 == b.0 && a.1 >= b.1) {
+            panic!("Locations out of sequence: a {:?} >= b {:?}", a, b);
+        }
+    }
+
     test_logger();
     //  Build test data
     use super::vizgroup::{VizGroups, vizgroup_test_patterns};

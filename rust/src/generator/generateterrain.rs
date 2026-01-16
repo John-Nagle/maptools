@@ -35,7 +35,7 @@ use std::path::PathBuf;
 use vizgroup::{CompletedGroups, RegionData, VizGroups};
 use image::{RgbImage, DynamicImage, ImageReader};
 use sculptmaker::{TerrainSculpt, TerrainSculptTexture};
-use regionorder::{TileLods, get_group_bounds, homogeneous_group_size};
+use regionorder::{TileLods, homogeneous_group_size};
 
 
 /// MySQL Credentials for uploading.
