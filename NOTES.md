@@ -413,6 +413,10 @@ Complete, but correct?
     Beginning to work. Generates sculpt textures, but they have a blue line running vertically through them.
     - Fixed that.
     - Scale is off by a factor of 2. combine/halve is wrong.
+      - No, using wrong image
+      
+2016-01-14
+   Getting reasonable sculpts but Z offsets for individual regions are being combined wrong.
     
 
       
