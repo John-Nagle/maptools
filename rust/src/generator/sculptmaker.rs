@@ -5,17 +5,11 @@
 // License: GPL
 
 use image::{Rgb, RgbImage, ImageReader, DynamicImage};
-//////use serde::Deserialize;
-//////use serde_json;
 use std::cmp::{max, min};
 use std::hash::{Hash, Hasher, DefaultHasher};
 use std::f64;
 use anyhow::{anyhow, Error};
-use std::io::{Write, Cursor};
-//////use std::fs::File;
-//////use std::io::{BufReader, Read};
-//////use std::path::Path;
-//////use std::process;
+use std::io::{Cursor};
 
 /// Calculate hash for duplicate check.
 fn calc_rgbimage_hash(img: &RgbImage) -> u64 {
@@ -147,7 +141,7 @@ pub struct TerrainSculptTexture {
 
 impl TerrainSculptTexture {
     /// Usual new, doesn't do any real work
-    pub fn new(region_coords_x: u32, region_coords_y: u32, lod: u8, texture_name: &str) -> Self {
+    pub fn new(region_coords_x: u32, region_coords_y: u32, lod: u8, _texture_name: &str) -> Self {
         Self {
             region_coords_x,
             region_coords_y,
@@ -159,8 +153,8 @@ impl TerrainSculptTexture {
     /// Actually makes the image and stores it in Self.
     /// Temporary dumb version - just gets what the SL map has.
     /// Need to generate our own larger images.
-    /// Need to adjust resolution.
-    pub fn makeimage(&mut self, resolution: u32) -> Result<(), Error> {
+    /// Need to add ability to adjust resolution.
+    pub fn makeimage(&mut self, _resolution: u32) -> Result<(), Error> {
         //  ***NEED TO GET OS PREFIX FROM - WHERE? ***
         const URL_PREFIX: &str = "https://secondlife-maps-cdn.akamaized.net/map-";
         let img = Self::fetch_terrain_image(URL_PREFIX, self.region_coords_x, self.region_coords_y, self.lod)?;
