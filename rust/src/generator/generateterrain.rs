@@ -20,7 +20,6 @@ mod regionorder;
 mod vizgroup;
 use anyhow::{anyhow, Error};
 use chrono::{NaiveDateTime, Utc};
-use common::Credentials;
 use common::{HeightField, UploadedRegionInfo};
 use envie::Envie;
 use getopts::Options;
@@ -48,7 +47,6 @@ use regionorder::{TileLods, homogeneous_group_size};
 ///
 /// The table name is hard-coded.
 ///
-const UPLOAD_CREDS_FILE: &str = "generate_credentials.txt";
 /// Environment variables for obtaining owner info.
 /// ***ADD VALUES FOR OPEN SIMULATOR***
 const _OWNER_NAME: &str = "HTTP_X_SECONDLIFE_OWNER_NAME";
@@ -68,6 +66,7 @@ fn logger() {
 }
 
 /// Key for cache of region info for all LODs.
+/// All cache items must be from the same grid.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct RegionLodKey {
     /// Location in world of region (meters)
@@ -230,7 +229,7 @@ impl TerrainGenerator {
     /// We fetch four regions and merge them.
     pub fn get_height_field_multi_region(
         &mut self,
-        grid: String,
+        _grid: String,
         region_coords_x: u32,
         region_coords_y: u32,
         region_size: (u32, u32),
@@ -347,7 +346,7 @@ impl TerrainGenerator {
     }
     
     /// Build an impostor for LOD N.
-    fn build_impostor_for_lod(&mut self, region: &RegionData, size: Option<(u32, u32)>) -> Result<(), Error> {
+    fn build_impostor_for_lod(&mut self, region: &RegionData, _region_size_opt: Option<(u32, u32)>) -> Result<(), Error> {
         log::info!("Region \"{}\", LOD {} starting.", region.name, region.lod);
         let height_field = if region.lod == 0 {
             self.get_height_field_one_region(
