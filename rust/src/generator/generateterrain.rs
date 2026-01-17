@@ -28,12 +28,9 @@ use log::LevelFilter;
 use mysql::prelude::{AsStatement, Queryable};
 use mysql::{params, PooledConn};
 use mysql::{Conn, Opts, OptsBuilder, Pool};
-use serde::Deserialize;
 use std::collections::HashMap;
-use std::io::{Write, Cursor};
 use std::path::PathBuf;
 use vizgroup::{CompletedGroups, RegionData, VizGroups};
-use image::{RgbImage, DynamicImage, ImageReader};
 use sculptmaker::{TerrainSculpt, TerrainSculptTexture};
 use regionorder::{TileLods, homogeneous_group_size};
 
@@ -54,7 +51,7 @@ use regionorder::{TileLods, homogeneous_group_size};
 const UPLOAD_CREDS_FILE: &str = "generate_credentials.txt";
 /// Environment variables for obtaining owner info.
 /// ***ADD VALUES FOR OPEN SIMULATOR***
-const OWNER_NAME: &str = "HTTP_X_SECONDLIFE_OWNER_NAME";
+const _OWNER_NAME: &str = "HTTP_X_SECONDLIFE_OWNER_NAME";
 /// Size of output terrain sculpt textures, pixels.
 const TERRAIN_SCULPT_TEXTURE_SIZE: u32 = 256;
 
@@ -178,17 +175,6 @@ impl TerrainGenerator {
         )?;
         grids.push(vizgroups.end_grid());
         Ok(grids)
-    }
-
-    /// Which region impostors do we need to create?
-    /// This filters the results of the transitive closure based on what's in the database and the servers.
-    ///
-    /// Transitive closure tells us if regions are in the same VizGroup.
-    /// Then we must check the database of impostored regions to tie VizGroups to viz_group IDs.
-    //  ***WE MAY HAVE TO MERGE AND SPLIT HERE***
-    //  ***NEED TO RUN ALL EXISTING REGIONS THROUGH TRANSITIVE CLOSURE***
-    pub fn needed_regions(&self, completed_groups: &Vec<CompletedGroups>) -> Result<(), Error> {
-        todo!();
     }
 
     /// Get elevation data for one region.
@@ -354,61 +340,11 @@ impl TerrainGenerator {
     /// Build the impostor as a glTF mesh.
     pub fn build_impostor_mesh(
         &mut self,
-        region: &RegionData,
-        height_field: &HeightField,
+        _region: &RegionData,
+        _height_field: &HeightField,
     ) -> Result<(), Error> {
         todo!("glTF mesh generation is not implemented yet");
     }
-/*    
-    ///  Step through the regions of an entire LOD
-    /// ***TEST ONLY***
-    pub fn step_through_lod(&self, group: &Vec<RegionData>, lod: u8) -> Result<(), Error> {
-        let bounds = get_group_bounds(group)?;
-        let upper_right = bounds.1;
-        //  Zero sized groups already filtered.
-        let region_size = (group[0].size_x, group[0].size_y);
-        let (ll, ur, step) = get_group_scan_limits(bounds, region_size, lod);
-        for x in (ll.0 .. ur.0).step_by(step.0 as usize) {
-            for y in (ll.1 .. ur.1).step_by(step.1 as usize) {
-                log::debug!("LOD #{}: step ({}, {})", lod, x, y); 
-            }
-        }
-        Ok(())    
-    }
-    
-    /// Test only
-    pub fn step_through_all_lods(&self, group: &Vec<RegionData>) -> Result<(), Error> {
-        for lod in 0..8 {
-            self.step_through_lod(group, lod)?;
-        }
-        Ok(())
-    }
-
-    /// Process one visibiilty group.
-    /// There's a lot to do here.
-    /// Temp version - just generates impostors for all single regions.
-    pub fn _process_group(&mut self, group: &Vec<RegionData>) -> Result<(), Error> {
-        let bounds = get_group_bounds(group)?;
-        log::info!("Group: {} entries, bounds: {:?}", group.len(), bounds);
-        //  ***TEST ONLY***
-        self.step_through_all_lods(group)?;         // ***TEMP***
-                                                     //  Dumb version, just do single-size regions.
-        let lod = 0; // single regions only
-        for region in group {
-            let height_field = self.get_height_field_one_region(
-                region.grid.clone(),
-                region.region_coords_x,
-                region.region_coords_y,
-            )?;
-            self.build_impostor(
-                region,
-                &height_field,
-            )?;
-            log::debug!("Region \"{}\": {}", region.name, height_field);
-        }
-        Ok(())
-    }
-*/
     
     /// Build an impostor for LOD N.
     fn build_impostor_for_lod(&mut self, region: &RegionData, size: Option<(u32, u32)>) -> Result<(), Error> {
@@ -440,7 +376,7 @@ impl TerrainGenerator {
     fn process_group(&mut self, group: Vec<RegionData>) -> Result<(), Error> {
         log::info!("Group: {} entries.", group.len());
         let region_size_opt = homogeneous_group_size(&group);
-        if let Some(region_size) = region_size_opt {
+        if region_size_opt.is_some() && group.len() > 1 {
             //  Do the LOD thing.
             for region in TileLods::new(group) {
                 self.build_impostor_for_lod(&region, region_size_opt)?;

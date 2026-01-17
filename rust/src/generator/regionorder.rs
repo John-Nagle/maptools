@@ -364,7 +364,6 @@ impl ColumnCursor {
     ) -> ColumnCursor {
         //  Calculate tile size at this LOD.
         let recent_column_info = RecentColumnInfo::new(bounds, base_region_size, lod);
-        let next_loc = recent_column_info.start;
         Self {
             recent_column_info,
             next_y_index: 0,
