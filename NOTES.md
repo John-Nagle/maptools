@@ -415,8 +415,16 @@ Complete, but correct?
     - Scale is off by a factor of 2. combine/halve is wrong.
       - No, using wrong image
       
-2016-01-14
+2026-01-14
    Getting reasonable sculpts but Z offsets for individual regions are being combined wrong.
+
+2026-01-17
+   Good results. Now add checking for duplicates in database, and add hash value to region_impostors.
+   Then need to update LSL scripts, and add a function to create a JSON file in the format the viewers
+   currently understand.
+   - Hash is 16 hex digits. Add to region_impostors as height_hash CHAR(16). Add to faces_json as "hash" for each texture item.
+     - Viewer never uses these fields.
+     - Plan ahead for more detailed models.
     
 
       

@@ -9,7 +9,6 @@ Because they're displayed beyond draw distance, the sim servers don't know about
 server which tracks their UUIDs and provides that information to the viewer.
 
 ## Impostor creation
-### 
 
 ## Database
 
