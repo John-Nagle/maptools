@@ -192,6 +192,9 @@ impl TerrainDownloadHandler {
                 mesh_uuid: convert_uuid(row.get_opt(12).ok_or_else(|| anyhow!("mesh_uuid is invalid"))??,),
                 sculpt_uuid: convert_uuid(row.get_opt(13).ok_or_else(|| anyhow!("mesh_uuid is invalid"))??,),
                 water_height: row.get_opt(14).ok_or_else(|| anyhow!("water_height is null"))??,
+                //  Fields not used by the viewer
+                mesh_hash: None,
+                sculpt_hash: None,
                 faces,
             };
             log::debug!("{:?}",rd);

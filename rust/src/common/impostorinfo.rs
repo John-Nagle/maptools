@@ -46,9 +46,13 @@ pub struct RegionImpostorData {
     /// By convention, mainland is estate id 1.
     pub viz_group: u32,
     /// The object geometry, as a sculpt image.
-    pub sculpt_uuid: Option<Uuid>,
+    pub sculpt_uuid: Option<Uuid>,    
+    /// Hash of the info used to build the sculpt, for change detection.
+    pub sculpt_hash: Option<String>,
     /// The object geometry, as a mesh object. If both are present, use mesh.
     pub mesh_uuid: Option<Uuid>,
+    /// Hash of the info used to buld the mesh, for change detection.
+    pub mesh_hash: Option<String>,
     /// Base of object is at this level. 
     /// Should be zero unless this is a mountain range.
     pub elevation_offset: f32,

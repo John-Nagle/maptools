@@ -41,7 +41,9 @@ CREATE TABLE IF NOT EXISTS region_impostors (
     impostor_lod TINYINT NOT NULL,
     viz_group INT NOT NULL,
     mesh_uuid CHAR(36) DEFAULT NULL,
+    mesh_hash CHAR(16) DEFAULT NULL,
     sculpt_uuid CHAR(36) DEFAULT NULL,
+    sculpt_hash CHAR(16) DEFAULT NULL,
     water_height FLOAT NOT NULL,
     creator VARCHAR(63) NOT NULL,
     creation_time TIMESTAMP NOT NULL,
@@ -50,9 +52,3 @@ CREATE TABLE IF NOT EXISTS region_impostors (
     INDEX(grid, viz_group),
     INDEX(name)
 )
-
--- What to do about faces? Another table? Or 8 slots here?
--- "faces": [ 
--- { "base_texture_uuid": "acde070d-8c4c-4f0d-9d8a-162843c10333",
--- "emissive_texture_uuid": null
- }
