@@ -64,6 +64,19 @@ fn logger() {
     log::warn!("Logging to {:?}", LOG_FILE_NAME); // where the log is going
 }
 
+/// Hash info for all components of one tile.
+/// Used for unduplication.
+pub type TileHash = String;     // actually 16 hex chars
+struct TileHashes {
+    /// Sculpt hash
+    sculpt_hash: Option<String>,
+    /// Mesh hash
+    mesh_hash: Option<String>,
+    /// Hashes of all the textures.
+    /// For meshes, there can be up to 8. Sculpts only have one.
+    texture_hashes: Vec<Option<String>>,
+}
+
 /// Key for cache of region info for all LODs.
 /// All cache items must be from the same grid.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -275,6 +288,11 @@ impl TerrainGenerator {
         let sz = scale;
         let water_level = height_field.water_level;
         Ok(format!("{}_{}_{}_{}_{}_{:.2}_{:.2}_{}_{:.2}_0x{:016x}", prefix, x, y, sx, sy, sz, offset, lod, water_level, hash))
+    }
+    
+    /// Get all the hash values for one tile.
+    fn get_hashes_one_tile(&mut self, grid: &str, region_loc_x: u32, region_loc_y: u32, impostor_lod: u8) -> Result<TileHashes, Error> {
+        todo!();
     }
 
     /// Build the impostor
