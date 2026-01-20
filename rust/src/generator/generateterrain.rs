@@ -19,7 +19,7 @@ mod sculptmaker;
 mod regionorder;
 mod vizgroup;
 use anyhow::{anyhow, Error};
-use common::{HeightField};
+use common::{HeightField, RegionImpostorFaceData};
 use envie::Envie;
 use getopts::Options;
 use log::LevelFilter;
@@ -64,9 +64,11 @@ fn logger() {
     log::warn!("Logging to {:?}", LOG_FILE_NAME); // where the log is going
 }
 
+   
 /// Hash info for all components of one tile.
 /// Used for unduplication.
 /// Hashes here are 16 hex characters.
+#[derive(Debug, Clone)]
 struct TileHashes {
     /// Sculpt UUID
     sculpt_uuid: Option<String>,
@@ -76,9 +78,9 @@ struct TileHashes {
     mesh_uuid: Option<String>,
     /// Mesh hash
     mesh_hash: Option<String>,
-    /// Hashes of all the textures.
+    /// Hashes of all the textures are included in face data
     /// For meshes, there can be up to 8. Sculpts only have one.
-    texture_hashes: Vec<Option<(String, String)>>,
+    face_data: Vec<RegionImpostorFaceData>,
 }
 
 /// Key for cache of region info for all LODs.
@@ -296,28 +298,41 @@ impl TerrainGenerator {
     
     /// Get all the hash values for one tile.
     /// This is used to see if the tile has already been uploaded.
-    fn get_hashes_one_tile(&mut self, grid: &str, region_loc_x: u32, region_loc_y: u32, impostor_lod: u8) -> Result<TileHashes, Error> {
+    fn get_hashes_one_tile(&mut self, grid: &str, region_loc_x: u32, region_loc_y: u32, impostor_lod: u8) -> Result<Option<TileHashes>, Error> {
         const SQL_SELECT: &str = r"SELECT sculpt_uuid, sculpt_hash, mesh_uuid, mesh_hash, faces_json
             FROM region_impostors
             WHERE LOWER(grid) = :grid AND region_coords_x = :region_coords_x AND region_coords_y = :region_coords_y AND impostor_lod = :impostor_lod";
-        let mut tile_hashes = self.conn.exec_map(
+        let tile_hashes = self.conn.exec_map(
             SQL_SELECT,
             params! { grid, region_loc_x, region_loc_y, impostor_lod },
             |(sculpt_uuid, sculpt_hash, mesh_uuid, mesh_hash, faces_json)| {
-                let faces_json: String = faces_json;
-                let texture_hashes = vec![];    // ****TEMP***
-
+                let faces_json: String = faces_json;    // type inference needs a hint here
+                let face_data: Vec<RegionImpostorFaceData> = match serde_json::from_str(&faces_json) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        log::error!("Invalid stored JSON for tile at {} ({}, {}) lod {}: {:?}",
+                            grid, region_loc_x, region_loc_y, impostor_lod, e);
+                        //  Return empty vector on error
+                        vec![]
+                    }
+                };
                 TileHashes {
                     sculpt_uuid,
                     sculpt_hash,
                     mesh_uuid,
                     mesh_hash,
-                    texture_hashes,
+                    face_data,
                 }
             },
         )?;
-
-        todo!();
+        //  There should be zero or one hits in the database.
+        //  More than one indicates a bad SQL table configuration.
+        match tile_hashes.len() {
+            0 => Ok(None),
+            1 => Ok(Some(tile_hashes[0].clone())),
+            _ => Err(anyhow!("Duplicate entry for tile at  {} ({}, {}) lod {}",
+                  grid, region_loc_x, region_loc_y, impostor_lod)),
+        }
     }
 
     /// Build the impostor

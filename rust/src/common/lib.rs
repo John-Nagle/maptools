@@ -11,5 +11,5 @@ pub use fcgisocketsetup::init_fcgi;
 pub use minifcgi::{Handler, Request, Response, run};
 pub use uploadedregioninfo::{UploadedRegionInfo, HeightField};
 pub use uploadedregioninfo::{elev_min_max_to_scale_offset, elev_to_u8, u8_to_elev};
-pub use impostorinfo::{RegionImpostorReply, RegionImpostorData, RegionImpostorLod};
+pub use impostorinfo::{RegionImpostorReply, RegionImpostorData, RegionImpostorFaceData, RegionImpostorLod};
 pub use testlogger::{test_logger};
