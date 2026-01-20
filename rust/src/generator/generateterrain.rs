@@ -301,7 +301,7 @@ impl TerrainGenerator {
     fn get_hashes_one_tile(&mut self, grid: &str, region_loc_x: u32, region_loc_y: u32, impostor_lod: u8) -> Result<Option<TileHashes>, Error> {
         const SQL_SELECT: &str = r"SELECT sculpt_uuid, sculpt_hash, mesh_uuid, mesh_hash, faces_json
             FROM region_impostors
-            WHERE LOWER(grid) = :grid AND region_coords_x = :region_coords_x AND region_coords_y = :region_coords_y AND impostor_lod = :impostor_lod";
+            WHERE LOWER(grid) = :grid AND region_loc_x = :region_loc_x AND region_loc_y = :region_loc_y AND impostor_lod = :impostor_lod";
         let tile_hashes = self.conn.exec_map(
             SQL_SELECT,
             params! { grid, region_loc_x, region_loc_y, impostor_lod },
@@ -341,6 +341,8 @@ impl TerrainGenerator {
         region: &RegionData,
         height_field: &HeightField,
     ) -> Result<(), Error> {
+        let hash_info_opt = self. get_hashes_one_tile(&region.grid, region.region_coords_x, region.region_coords_y, region.lod)?;
+        log::debug!("Hash info: {:?}", hash_info_opt);
         if self.generate_mesh {
             self.build_impostor_mesh(
                 region,
