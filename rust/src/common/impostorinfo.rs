@@ -78,6 +78,10 @@ pub struct RegionImpostorFaceData {
     /// Emissive texture, to show what's lit at night.
     /// For now, this is future expansion.
     pub emissive_texture_uuid: Option<Uuid>,
+    /// Hash to avoid unnecessary asset uploads.
+    pub base_texture_hash: String,
+    /// Hash to avoid unnecessary asset uploads
+    pub emissive_texture_hash: Option<String>,
 }
 
 impl RegionImpostorFaceData {
