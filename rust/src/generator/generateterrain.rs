@@ -64,6 +64,13 @@ fn logger() {
     log::warn!("Logging to {:?}", LOG_FILE_NAME); // where the log is going
 }
 
+/// Type of UUID
+pub enum UuidUsage {
+    Texture,
+    Sculpt,
+    Mesh
+}
+
    
 /// Hash info for all components of one tile.
 /// Used for unduplication.
@@ -332,6 +339,25 @@ impl TerrainGenerator {
             1 => Ok(Some(tile_hashes[0].clone())),
             _ => Err(anyhow!("Duplicate entry for tile at  {} ({}, {}) lod {}",
                   grid, region_loc_x, region_loc_y, impostor_lod)),
+        }
+    }
+    
+    /// Does this UUID exist on the asset server?
+    pub fn test_uuid_valid(&mut self, uuid: uuid::Uuid, url_prefix: &str, _uuid_usage: UuidUsage) -> Result<bool, Error> {
+        let url = url_prefix.to_string() + &uuid.to_string();
+        let mut resp = ureq::head(&url)
+            //////.set("User-Agent", USERAGENT)
+            .header("Content-Type", "any") // 
+            .call();
+        match resp {
+            Ok(_) => Ok(true),
+            Err(ureq::Error::StatusCode(code)) => {
+                match code {
+                    404 => Ok(false),
+                    _ => Err(anyhow!("HTTP Error {} checking url {}", code, url))
+                }
+            }
+            Err(e) => Err(anyhow!("Error {:?} checking url {}", e, url))
         }
     }
 
