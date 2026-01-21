@@ -113,6 +113,7 @@ impl TileHashes {
     
     /// Does this UUID exist on the asset server?
     /// Returns true if there is no URL prefix available, indicating we don't know how to query the asset server.
+    /// This is a backup check for lost assets; it's not essential to operation.
     fn test_uuid_valid(terrain_generator: &TerrainGenerator, uuid: uuid::Uuid, _uuid_usage: UuidUsage) -> Result<bool, Error> {
         let url_prefix = if let Some(url_prefix) = &terrain_generator.url_prefix_opt {
             url_prefix
