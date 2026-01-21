@@ -31,6 +31,7 @@ use std::path::PathBuf;
 use vizgroup::{CompletedGroups, RegionData, VizGroups};
 use sculptmaker::{TerrainSculpt, TerrainSculptTexture};
 use regionorder::{TileLods, homogeneous_group_size};
+use ureq::{Agent};
 
 
 /// MySQL Credentials for uploading.
@@ -51,6 +52,8 @@ use regionorder::{TileLods, homogeneous_group_size};
 const _OWNER_NAME: &str = "HTTP_X_SECONDLIFE_OWNER_NAME";
 /// Size of output terrain sculpt textures, pixels.
 const TERRAIN_SCULPT_TEXTURE_SIZE: u32 = 256;
+/// User agent for talking to asset server
+const TERRAIN_GENERATOR_USER_AGENT: &str = "animats.info impostor asset system";
 
 /// Debug logging
 fn logger() {
@@ -88,6 +91,50 @@ struct TileHashes {
     /// Hashes of all the textures are included in face data
     /// For meshes, there can be up to 8. Sculpts only have one.
     face_data: Vec<RegionImpostorFaceData>,
+}
+
+impl TileHashes {
+    /// Is this terrain model known?
+    pub fn is_model_known(&self, terrain_generator: &TerrainGenerator) -> Result<bool, Error> {
+        todo!();
+    }
+    
+    /// Is this texture known?
+    pub fn is_texture_known(&self, terrain_generator: &TerrainGenerator, texture_ix: usize) -> Result<bool, Error> {
+        if texture_ix < self.face_data.len() {
+            let face_item = &self.face_data[texture_ix];
+            todo!();    // ***NEED HASH DATA WHICH IS NOT IN FACE DATA YET***
+            
+        } else {
+            //  Not known
+            Ok(false)
+        }
+    }
+    
+    /// Does this UUID exist on the asset server?
+    /// Returns true if there is no URL prefix available, indicating we don't know how to query the asset server.
+    fn test_uuid_valid(terrain_generator: &TerrainGenerator, uuid: uuid::Uuid, _uuid_usage: UuidUsage) -> Result<bool, Error> {
+        let url_prefix = if let Some(url_prefix) = &terrain_generator.url_prefix_opt {
+            url_prefix
+        } else {
+            return Ok(true)
+        };
+        let url = url_prefix.to_string() + &uuid.to_string();
+        let mut resp = terrain_generator.agent.head(&url)
+            .header("Content-Type", "any") // 
+            .call();
+        log::debug!("Test UUID valid. {} -> {:?}", url, resp);
+        match resp {
+            Ok(_) => Ok(true),
+            Err(ureq::Error::StatusCode(code)) => {
+                match code {
+                    404 => Ok(false),
+                    _ => Err(anyhow!("HTTP Error {} checking url {}", code, url))
+                }
+            }
+            Err(e) => Err(anyhow!("Error {:?} checking url {}", e, url))
+        }
+    }
 }
 
 /// Key for cache of region info for all LODs.
@@ -144,8 +191,12 @@ impl HeightFieldCache {
 struct TerrainGenerator {
     /// SQL connection
     conn: PooledConn,
+    /// Network connection pool
+    agent: Agent,
     /// Output directory
     outdir: PathBuf,
+    /// Asset server URL prefix
+    url_prefix_opt: Option<String>,
     /// Are regions with only corners touching adjacent?
     /// Set to true for Open Simulator grids
     corners_touch_connects: bool,
@@ -160,12 +211,20 @@ impl TerrainGenerator {
     pub fn new(
         conn: PooledConn,
         outdir: PathBuf,
+        url_prefix_opt: Option<String>,
         corners_touch_connects: bool,
         generate_mesh: bool,
     ) -> Self {
+        //  HTTP connection pool, used to validate UUIDs against asset server.
+        let config = Agent::config_builder()
+            .user_agent(TERRAIN_GENERATOR_USER_AGENT)
+            .build();
+        let agent: Agent = config.into();
         Self {
             conn,
+            agent,
             outdir,
+            url_prefix_opt,
             corners_touch_connects,
             generate_mesh,
             height_field_cache: HeightFieldCache::new(),
@@ -342,25 +401,6 @@ impl TerrainGenerator {
         }
     }
     
-    /// Does this UUID exist on the asset server?
-    pub fn test_uuid_valid(&mut self, uuid: uuid::Uuid, url_prefix: &str, _uuid_usage: UuidUsage) -> Result<bool, Error> {
-        let url = url_prefix.to_string() + &uuid.to_string();
-        let mut resp = ureq::head(&url)
-            //////.set("User-Agent", USERAGENT)
-            .header("Content-Type", "any") // 
-            .call();
-        match resp {
-            Ok(_) => Ok(true),
-            Err(ureq::Error::StatusCode(code)) => {
-                match code {
-                    404 => Ok(false),
-                    _ => Err(anyhow!("HTTP Error {} checking url {}", code, url))
-                }
-            }
-            Err(e) => Err(anyhow!("Error {:?} checking url {}", e, url))
-        }
-    }
-
     /// Build the impostor
     pub fn build_impostor(
         &mut self,
@@ -485,11 +525,11 @@ impl TerrainGenerator {
 }
 
 /// Actually do the work
-fn run(pool: Pool, outdir: PathBuf, grid: String, generate_mesh: bool) -> Result<(), Error> {
+fn run(pool: Pool, outdir: PathBuf, grid: String, url_prefix_opt: Option<String>, generate_mesh: bool) -> Result<(), Error> {
     let corners_touch_connects = false; // for now, SL only.
     let conn = pool.get_conn()?;
     let mut terrain_generator =
-        TerrainGenerator::new(conn, outdir, generate_mesh, corners_touch_connects);
+        TerrainGenerator::new(conn, outdir, url_prefix_opt, generate_mesh, corners_touch_connects);
     let mut grids = terrain_generator.transitive_closure(&grid)?;
     if grids.is_empty() {
         return Err(anyhow!("Grid \"{}\" not found.", grid));
@@ -511,7 +551,7 @@ fn print_usage(program: &str, opts: Options) {
 }
 
 /// Set up options, credentials, and database connection.
-fn setup() -> Result<(Pool, PathBuf, String, bool), Error> {
+fn setup() -> Result<(Pool, PathBuf, String, Option<String>, bool), Error> {
     //  Usual options processing
     let args: Vec<String> = std::env::args().collect();
     let program = args[0].clone();
@@ -526,6 +566,7 @@ fn setup() -> Result<(Pool, PathBuf, String, bool), Error> {
     );
     opts.optflag("m", "mesh", "Generate glTF mesh, not sculpt image");
     opts.optopt("g", "grid", "Only output for this grid", "NAME");
+    opts.optopt("p", "prefix", "Asset server URL prefix for validating assets", "NAME");
     opts.optflag("h", "help", "Print this help menu.");
     opts.optflag("v", "verbose", "Verbose mode.");
     let matches = match opts.parse(&args[1..]) {
@@ -542,6 +583,7 @@ fn setup() -> Result<(Pool, PathBuf, String, bool), Error> {
     let credsfile = matches.opt_str("c");
     let verbose = matches.opt_present("v");
     let grid = matches.opt_str("g");
+    let url_prefix_opt = matches.opt_str("p");
     let generate_mesh = matches.opt_present("m");
     if outdir.is_none() || credsfile.is_none() || grid.is_none() {
         print_usage(&program, opts);
@@ -587,7 +629,7 @@ fn setup() -> Result<(Pool, PathBuf, String, bool), Error> {
     }
     log::info!("Connected to database.");
     //  Setup complete. Return what's needed to run.
-    Ok((pool, outdir, grid, generate_mesh))
+    Ok((pool, outdir, grid, url_prefix_opt, generate_mesh))
 }
 
 /// Main program.
@@ -595,7 +637,7 @@ fn setup() -> Result<(Pool, PathBuf, String, bool), Error> {
 fn main() {
     logger();
     match setup() {
-        Ok((pool, outdir, grid, mesh)) => match run(pool, outdir, grid, mesh) {
+        Ok((pool, outdir, grid, url_prefix_opt, mesh)) => match run(pool, outdir, grid, url_prefix_opt, mesh) {
             Ok(_) => {}
             Err(e) => {
                 panic!("Failed: {:?}", e);
