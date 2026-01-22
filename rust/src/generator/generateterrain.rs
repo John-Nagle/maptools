@@ -78,6 +78,7 @@ pub enum UuidUsage {
 /// Hash info for all components of one tile.
 /// Used for unduplication.
 /// Hashes here are 16 hex characters.
+/// This info comes from the region_impostors table in the terrain database.
 #[derive(Debug, Clone)]
 struct TileHashes {
     /// Sculpt UUID
@@ -100,14 +101,36 @@ impl TileHashes {
     }
     
     /// Is this texture known?
-    pub fn is_texture_known(&self, terrain_generator: &TerrainGenerator, texture_ix: usize) -> Result<bool, Error> {
+    pub fn is_texture_known(&self, terrain_generator: &TerrainGenerator, texture_ix: usize, base_texture_hash: &String, emissive_texture_hash: &Option<String>)
+        -> bool {
         if texture_ix < self.face_data.len() {
             let face_item = &self.face_data[texture_ix];
-            todo!();    // ***NEED HASH DATA WHICH IS NOT IN FACE DATA YET***
-            
+            if &face_item.base_texture_hash != base_texture_hash {
+                log::debug!("New base texture hash {} different from stored value {}, texture has changed.", base_texture_hash, face_item.base_texture_hash);
+                return false
+            }
+            if let Some(emissive_texture_hash) = emissive_texture_hash {
+                if let Some(stored_emissive_texture_hash) = &face_item.emissive_texture_hash {
+                    if stored_emissive_texture_hash != emissive_texture_hash {
+                        log::debug!("New emissive texture hash {} different from stored value {:?}, texture has changed.", 
+                        emissive_texture_hash, face_item.emissive_texture_hash);
+                        false
+                    } else {
+                        log::info!("Texture hashes match, no change.");
+                        true
+                    }
+                } else {
+                    //  No stored emissive hash, but new emissive hash present. Changed.
+                    false
+                }
+            } else {
+                //  No emissive hash in use, OK.
+                log::info!("Texture hash matches, no change.");
+                true
+            }
         } else {
             //  Not known
-            Ok(false)
+            false
         }
     }
     
