@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS raw_terrain_heights (
     creation_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     confirmer VARCHAR(63) DEFAULT NULL,
     confirmation_time TIMESTAMP DEFAULT NULL,
-    UNIQUE INDEX (grid, region_coords_x, region_coords_y),
+    UNIQUE INDEX (grid, region_loc_x, region_loc_y),
     INDEX(name)
     )
     
