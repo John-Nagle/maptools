@@ -87,9 +87,9 @@ impl TerrainUploadHandler {
         region_info: &UploadedRegionInfo,
         params: &HashMap<String, String>,
     ) -> Result<(), Error> {
-        const SQL_INSERT: &str = r"INSERT INTO raw_terrain_heights (grid, region_coords_x, region_coords_y, samples_x, samples_y, size_x, size_y, name, scale, offset, elevs,  water_level, creator) 
+        const SQL_INSERT: &str = r"INSERT INTO raw_terrain_heights (grid, region_loc_x, region_loc_y, samples_x, samples_y, region_size_x, region_size_y, name, scale, offset, elevs,  water_level, creator) 
             VALUES
-            (:grid, :region_coords_x, :region_coords_y, :samples_x, :samples_y, :size_x, :size_y, :name, :scale, :offset, :elevs, :water_level, :creator)";
+            (:grid, :region_loc_x, :region_loc_y, :samples_x, :samples_y, :region_size_x, :region_size_y, :name, :scale, :offset, :elevs, :water_level, :creator)";
         let creator = &self.owner_name
             .as_ref()
             .ok_or_else(|| anyhow!("No owner name from auth"))?;    // should fail upstream, not here.
@@ -97,10 +97,10 @@ impl TerrainUploadHandler {
         let values = params! {
         //////"table" => RAW_TERRAIN_HEIGHTS,
         "grid" => region_info.grid.clone(),
-        "region_coords_x" => region_info.region_coords[0],
-        "region_coords_y" => region_info.region_coords[1],
-        "size_x" => region_info.get_size()[0],
-        "size_y" => region_info.get_size()[1],
+        "region_loc_x" => region_info.region_coords[0],
+        "region_loc_y" => region_info.region_coords[1],
+        "region_size_x" => region_info.get_size()[0],
+        "region_size_y" => region_info.get_size()[1],
         "name" => region_info.name.clone(),
         "scale" => region_info.scale,
         "offset" => region_info.offset,	
@@ -123,18 +123,18 @@ impl TerrainUploadHandler {
     ) -> Result<(), Error> {
         const SQL_FULL_UPDATE: &str = r"UPDATE raw_terrain_heights 
             SET samples_x = :samples_x, samples_y = :samples_y, scale = :scale, offset = :offset, elevs = :elevs, water_level = :water_level, creator = :creator,
-                size_x = :size_x, size_y = :size_y, name = :name, confirmation_time = NOW(), confirmer = NULL
-            WHERE LOWER(grid) = :grid AND region_coords_x = :region_coords_x AND region_coords_y = :region_coords_y";           
+                region_size_x = :region_size_x, region_size_y = :region_size_y, name = :name, confirmation_time = NOW(), confirmer = NULL
+            WHERE LOWER(grid) = :grid AND region_loc_x = :region_loc_x AND region_loc_y = :region_loc_y";           
         let creator = &self.owner_name
             .as_ref()
             .ok_or_else(|| anyhow!("No owner name from auth"))?;    // should fail upstream, not here.
         let samples = region_info.get_samples()?;
         let values = params! {
         "grid" => region_info.grid.clone(),
-        "region_coords_x" => region_info.region_coords[0],
-        "region_coords_y" => region_info.region_coords[1],
-        "size_x" => region_info.get_size()[0],
-        "size_y" => region_info.get_size()[1],
+        "region_loc_x" => region_info.region_coords[0],
+        "region_loc_y" => region_info.region_coords[1],
+        "region_size_x" => region_info.get_size()[0],
+        "region_size_y" => region_info.get_size()[1],
         "name" => region_info.name.clone(),
         "scale" => region_info.scale,
         "offset" => region_info.offset,	
@@ -177,14 +177,14 @@ impl TerrainUploadHandler {
     ) -> Result<(), Error> {
         const SQL_CONFIRMATION_UPDATE: &str = r"UPDATE raw_terrain_heights
             SET confirmation_time = NOW(), confirmer = :confirmer
-            WHERE LOWER(grid) = :grid AND region_coords_x = :region_coords_x AND region_coords_y = :region_coords_y";           
+            WHERE LOWER(grid) = :grid AND region_loc_x = :region_loc_x AND region_loc_y = :region_loc_y";           
         let confirmer = &self.owner_name
             .as_ref()
             .ok_or_else(|| anyhow!("No owner name from auth"))?;    // should fail upstream, not here.
         let values = params! {
         "grid" => region_info.grid.clone(),
-        "region_coords_x" => region_info.region_coords[0],
-        "region_coords_y" => region_info.region_coords[1],
+        "region_loc_x" => region_info.region_coords[0],
+        "region_loc_y" => region_info.region_coords[1],
         "confirmer" => confirmer };
         log::debug!("SQL confirmation update: {:?}", values);
         self.conn.exec_drop(SQL_CONFIRMATION_UPDATE, values)?;
@@ -200,21 +200,21 @@ impl TerrainUploadHandler {
         
         let samples = region_info.get_samples()?;
         let grid = &region_info.grid;
-        let region_coords_x = region_info.region_coords[0];
-        let region_coords_y = region_info.region_coords[1];
+        let region_loc_x = region_info.region_coords[0];
+        let region_loc_y = region_info.region_coords[1];
         let new_elevs= region_info.get_elevs_as_blob()?;
-        const SQL_SELECT: &str = r"SELECT size_x, size_y, samples_x, samples_y, scale, offset, elevs, name, water_level
+        const SQL_SELECT: &str = r"SELECT region_size_x, region_size_y, samples_x, samples_y, scale, offset, elevs, name, water_level
             FROM raw_terrain_heights
-            WHERE LOWER(grid) = :grid AND region_coords_x = :region_coords_x AND region_coords_y = :region_coords_y";
+            WHERE LOWER(grid) = :grid AND region_loc_x = :region_loc_x AND region_loc_y = :region_loc_y";
         let is_sames = self.conn.exec_map(
             SQL_SELECT,
-            params! { grid, region_coords_x, region_coords_y },
-            |(size_x, size_y, samples_x, samples_y, scale, offset, elevs, name, water_level) : (u32, u32, u32, u32, f32, f32, Vec<u8>, String, f32)| {
+            params! { grid, region_loc_x, region_loc_y },
+            |(region_size_x, region_size_y, samples_x, samples_y, scale, offset, elevs, name, water_level) : (u32, u32, u32, u32, f32, f32, Vec<u8>, String, f32)| {
                 //  Is the stored data identical to what we just read from the region?
                 log::trace!("Elevs:\n{:?} vs\n{:?}", elevs, new_elevs); // ***TEMP***
                 let is_same = 
-                    size_x == region_info.get_size()[0] && 
-                    size_y == region_info.get_size()[1] &&
+                    region_size_x == region_info.get_size()[0] && 
+                    region_size_y == region_info.get_size()[1] &&
                     samples_x == samples[0] && 
                     samples_y == samples[1] &&
                     (scale - region_info.scale).abs() < Self::ELEV_ERROR_TOLERANCE  &&
