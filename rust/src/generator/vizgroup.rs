@@ -27,13 +27,13 @@ pub struct RegionData {
     /// Which LOD - zero for all data obtained from the world.
     pub lod: u8,
     /// X
-    pub region_coords_x: u32,
+    pub region_loc_x: u32,
     /// Y
-    pub region_coords_y: u32,
+    pub region_loc_y: u32,
     /// X size
-    pub size_x: u32,
+    pub region_size_x: u32,
     /// Y size
-    pub size_y: u32,
+    pub region_size_y: u32,
     /// Region name
     pub name: String,
 }   
@@ -44,7 +44,7 @@ impl std::fmt::Display for RegionData {
         write!(
             f,
             "\"{}\" ({}, {})",
-            self.name, self.region_coords_x, self.region_coords_y
+            self.name, self.region_loc_x, self.region_loc_y
         )
     }
 }
@@ -141,9 +141,9 @@ impl LiveBlock {
     /// Called while iterating over a single column.
     fn y_adjacent(&self, bref: &LiveBlockLink, tolerance: u32) -> bool {
         let b = bref.borrow();
-        assert!(self.region_data.region_coords_y <= b.region_data.region_coords_y); // ordered properly, a < b in Y
-        self.region_data.region_coords_y + self.region_data.size_y + tolerance
-            >= b.region_data.region_coords_y
+        assert!(self.region_data.region_loc_y <= b.region_data.region_loc_y); // ordered properly, a < b in Y
+        self.region_data.region_loc_y + self.region_data.region_size_y + tolerance
+            >= b.region_data.region_loc_y
     }
 
     /// xy-adjacent - true if adjacent in x and y, on different columns.
@@ -151,14 +151,14 @@ impl LiveBlock {
     fn xy_adjacent(&self, bref: &LiveBlockLink, tolerance: u32) -> bool {
         let b = bref.borrow();
         assert!(
-            self.region_data.region_coords_x + self.region_data.size_x
-                <= b.region_data.region_coords_x
+            self.region_data.region_loc_x + self.region_data.region_size_x
+                <= b.region_data.region_loc_x
         ); // columns must be adjacent in X.
            //  True if overlaps in Y.
-        let a0 = self.region_data.region_coords_y;
-        let a1 = a0 + self.region_data.size_y + tolerance;
-        let b0 = b.region_data.region_coords_y;
-        let b1 = b0 + b.region_data.size_y + tolerance;
+        let a0 = self.region_data.region_loc_y;
+        let a1 = a0 + self.region_data.region_size_y + tolerance;
+        let b0 = b.region_data.region_loc_y;
+        let b1 = b0 + b.region_data.region_size_y + tolerance;
         let overlap = a0 < b1 && a1 >= b0;
         log::trace!(
             "XY-adjacent test: overlap: ({}, {}) vs ({}, {}) overlap: {}",
@@ -193,7 +193,7 @@ impl LiveBlocks {
     fn purge_below_x_limit(&mut self, x_limit: u32) {
         self.live_blocks.retain(|_, v| {
             let bk = v.borrow();
-            bk.region_data.region_coords_x + bk.region_data.size_x > x_limit
+            bk.region_data.region_loc_x + bk.region_data.region_size_x > x_limit
         });
     }
 }
@@ -318,8 +318,8 @@ impl VizGroups {
                         prev.1.borrow_mut().blocks_touch(curr)
                     }
 
-                    if curr.borrow().region_data.region_coords_y
-                        < prev.1.borrow().region_data.region_coords_y
+                    if curr.borrow().region_data.region_loc_y
+                        < prev.1.borrow().region_data.region_loc_y
                     {
                         curr_opt = curr_iter.next();
                     } else {
@@ -348,8 +348,8 @@ impl VizGroups {
         for item in &mut self.column {
             if let Some(prev) = prev_opt {
                 assert!(
-                    prev.borrow().region_data.region_coords_y
-                        <= item.borrow().region_data.region_coords_y,
+                    prev.borrow().region_data.region_loc_y
+                        <= item.borrow().region_data.region_loc_y,
                     "VizGroup data not sorted into increasing order in Y"
                 );
                 if prev.borrow().y_adjacent(item, self.tolerance) {
@@ -368,12 +368,12 @@ impl VizGroups {
         log::debug!("End column. {} regions.", self.column.len());
         if !self.column.is_empty() {
             //  Purge now-dead live blocks. This will be all of them on SL, but wide regions on OS may not be ready to die yet.
-            let x_limit = self.column[0].borrow().region_data.region_coords_x;
+            let x_limit = self.column[0].borrow().region_data.region_loc_x;
             self.live_blocks.purge_below_x_limit(x_limit);
             //  Add new live blocks.
             //  Put all the blocks in the column into the B-tree of live blocks.
             while let Some(b) = self.column.pop() {
-                let y = b.borrow().region_data.region_coords_y;
+                let y = b.borrow().region_data.region_loc_y;
                 self.live_blocks.live_blocks.insert(y, b);
             }
             log::debug!("{} live blocks", self.live_blocks.live_blocks.len());
@@ -404,9 +404,9 @@ impl VizGroups {
             if region_data.grid != prev.grid {
                 self.end_column();
                 result = Some(self.end_grid());
-            } else if region_data.region_coords_x != prev.region_coords_x {
+            } else if region_data.region_loc_x != prev.region_loc_x {
                 assert!(
-                    region_data.region_coords_x >= prev.region_coords_x,
+                    region_data.region_loc_x >= prev.region_loc_x,
                     "VizGroup data not sorted into increasing order in X"
                 );
                 self.end_column();
@@ -436,7 +436,7 @@ impl VizGroups {
 #[cfg(test)]
 pub fn vizgroup_test_patterns() -> Vec<Vec<RegionData>> {
     /// Test pattern 1
-    /// Format: RegionData { grid, region_coords_x, region_coords_y, size_x, size_y, name };
+    /// Format: RegionData { grid, region_loc_x, region_loc_y, region_size_x, region_size_y, name };
     const TEST_PATTERN_0: [(&str, u32, u32, u32, u32, &str); 25] = [
         ("Test", 0, 0, 100, 100, "Bottom left"),
         ("Test", 0, 100, 100, 100, "Left 100"),
@@ -504,12 +504,12 @@ pub fn vizgroup_test_patterns() -> Vec<Vec<RegionData>> {
         .map(|v| {
             v.iter()
                 .map(
-                    |(grid, region_coords_x, region_coords_y, size_x, size_y, name)| RegionData {
+                    |(grid, region_loc_x, region_loc_y, region_size_x, region_size_y, name)| RegionData {
                         grid: grid.to_string(),
-                        region_coords_x: *region_coords_x,
-                        region_coords_y: *region_coords_y,
-                        size_x: *size_x,
-                        size_y: *size_y,
+                        region_loc_x: *region_loc_x,
+                        region_loc_y: *region_loc_y,
+                        region_size_x: *region_size_x,
+                        region_size_y: *region_size_y,
                         lod: 0,
                         name: name.to_string(),
                     },

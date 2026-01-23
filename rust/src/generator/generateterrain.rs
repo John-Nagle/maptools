@@ -166,9 +166,9 @@ impl TileHashes {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct RegionLodKey {
     /// Location in world of region (meters)
-    region_coords_x: u32,
+    region_loc_x: u32,
     /// Location in world of region (meters)
-    region_coords_y: u32, 
+    region_loc_y: u32, 
     /// Level of detail.
     lod: u8,
 }
@@ -261,17 +261,17 @@ impl TerrainGenerator {
         let mut grids = Vec::new();
         log::info!("Build start"); // ***TEMP***
                                    //  The loop here is sequential data processing with control breaks when an index field changes.
-        const SQL_SELECT: &str = r"SELECT grid, region_coords_x, region_coords_y, size_x, size_y, name FROM raw_terrain_heights WHERE LOWER(grid) = :grid ORDER BY grid, region_coords_x, region_coords_y ";
+        const SQL_SELECT: &str = r"SELECT grid, region_loc_x, region_loc_y, region_size_x, region_size_y, name FROM raw_terrain_heights WHERE LOWER(grid) = :grid ORDER BY grid, region_loc_x, region_loc_y ";
         let _all_regions = self.conn.exec_map(
             SQL_SELECT,
             params! { grid },
-            |(grid, region_coords_x, region_coords_y, size_x, size_y, name)| {
+            |(grid, region_loc_x, region_loc_y, region_size_x, region_size_y, name)| {
                 let region_data = RegionData {
                     grid,
-                    region_coords_x,
-                    region_coords_y,
-                    size_x,
-                    size_y,
+                    region_loc_x,
+                    region_loc_y,
+                    region_size_x,
+                    region_size_y,
                     name,
                     lod: 0,
                 };
@@ -288,21 +288,21 @@ impl TerrainGenerator {
     pub fn get_height_field_one_region(
         &mut self,
         grid: String,
-        region_coords_x: u32,
-        region_coords_y: u32,
+        region_loc_x: u32,
+        region_loc_y: u32,
     ) -> Result<HeightField, Error> {
-        const SQL_SELECT: &str = r"SELECT size_x, size_y, samples_x, samples_y, scale, offset, elevs, name, water_level
+        const SQL_SELECT: &str = r"SELECT region_size_x, region_size_y, samples_x, samples_y, scale, offset, elevs, name, water_level
                 FROM raw_terrain_heights
-                WHERE LOWER(grid) = :grid AND region_coords_x = :region_coords_x AND region_coords_y = :region_coords_y";
+                WHERE LOWER(grid) = :grid AND region_loc_x = :region_loc_x AND region_loc_y = :region_loc_y";
         let grid_for_msg = grid.clone();
         let mut height_fields = self.conn.exec_map(
             SQL_SELECT,
-            params! { grid, region_coords_x, region_coords_y },
-            |(size_x, size_y, samples_x, samples_y, scale, offset, elevs, name, water_level)| {
+            params! { grid, region_loc_x, region_loc_y },
+            |(region_size_x, region_size_y, samples_x, samples_y, scale, offset, elevs, name, water_level)| {
                 let _name_v: String = name;
                 let _water_level_v: f32 = water_level;
                 let height_field = HeightField::new_from_elevs_blob(
-                    &elevs, samples_x, samples_y, size_x, size_y, scale, offset, water_level,
+                    &elevs, samples_x, samples_y, region_size_x, region_size_y, scale, offset, water_level,
                 );
                 height_field
             },
@@ -310,8 +310,8 @@ impl TerrainGenerator {
         if height_fields.is_empty() {
             return Err(anyhow!(
                 "No raw terrain data for region at ({},{}) on \"{}\"",
-                region_coords_x,
-                region_coords_y,
+                region_loc_x,
+                region_loc_y,
                 grid_for_msg
             ));
         }
@@ -321,14 +321,14 @@ impl TerrainGenerator {
             //  SQL indices should make this impossible.
             log::error!(
                 "More than one region data set for region at ({},{}) on \"{}\"",
-                region_coords_x,
-                region_coords_y,
+                region_loc_x,
+                region_loc_y,
                 grid_for_msg
             );
         }
         let height_field = height_fields.pop().unwrap()?;
         //  Cache for later generation of lower LODs
-        let key = RegionLodKey { lod: 0, region_coords_x, region_coords_y };
+        let key = RegionLodKey { lod: 0, region_loc_x, region_loc_y };
         self.height_field_cache.insert(key, height_field.clone());
         Ok(height_field)
     }
@@ -338,8 +338,8 @@ impl TerrainGenerator {
     pub fn get_height_field_multi_region(
         &mut self,
         _grid: String,
-        region_coords_x: u32,
-        region_coords_y: u32,
+        region_loc_x: u32,
+        region_loc_y: u32,
         region_size: (u32, u32),
         lod: u8) -> Result<HeightField, Error> {
         //  Not for LOD 0. We can't build that from other LODs.
@@ -347,8 +347,8 @@ impl TerrainGenerator {
         //  Get a relevant region, or None if it's all water.
         //  May need more checking for missing regions.
         let mut take = |lod, dx, dy| {
-            let key = RegionLodKey { lod, region_coords_x: region_coords_x + dx, region_coords_y: region_coords_y + dy };
-            log::debug!("Multi region height field needed for LOD {}: {:?}", key.lod, (key.region_coords_x, key.region_coords_y));  // ***TEMP***
+            let key = RegionLodKey { lod, region_loc_x: region_loc_x + dx, region_loc_y: region_loc_y + dy };
+            log::debug!("Multi region height field needed for LOD {}: {:?}", key.lod, (key.region_loc_x, key.region_loc_y));  // ***TEMP***
             self.height_field_cache.take(&key)
         };
         //  Get the four height fields.
@@ -361,7 +361,7 @@ impl TerrainGenerator {
         ];
         //  Generate combined height field;
         let height_field = HeightField::halve(&HeightField::combine(height_fields)?);
-        let key = RegionLodKey { lod , region_coords_x, region_coords_y };
+        let key = RegionLodKey { lod , region_loc_x, region_loc_y };
         self.height_field_cache.insert(key, height_field.clone());
         Ok(height_field)
     }
@@ -376,11 +376,11 @@ impl TerrainGenerator {
         lod: u8,
         hash: u64,
     ) -> Result<String, Error> {
-        let x = region.region_coords_x;
-        let y = region.region_coords_y;
+        let x = region.region_loc_x;
+        let y = region.region_loc_y;
         let (scale, offset) = height_field.get_scale_offset()?;
-        let sx = region.size_x;
-        let sy = region.size_y;
+        let sx = region.region_size_x;
+        let sy = region.region_size_y;
         let sz = scale;
         let water_level = height_field.water_level;
         Ok(format!("{}_{}_{}_{}_{}_{:.2}_{:.2}_{}_{:.2}_0x{:016x}", prefix, x, y, sx, sy, sz, offset, lod, water_level, hash))
@@ -431,7 +431,7 @@ impl TerrainGenerator {
         region: &RegionData,
         height_field: &HeightField,
     ) -> Result<(), Error> {
-        let hash_info_opt = self. get_hashes_one_tile(&region.grid, region.region_coords_x, region.region_coords_y, region.lod)?;
+        let hash_info_opt = self. get_hashes_one_tile(&region.grid, region.region_loc_x, region.region_loc_y, region.lod)?;
         log::debug!("Hash info: {:?}", hash_info_opt);
         if self.generate_mesh {
             self.build_impostor_mesh(
@@ -469,7 +469,7 @@ impl TerrainGenerator {
         sculpt_image_path.push(sculpt_name.to_owned() + ".png");
         
         log::info!("Generating texture for  \"{}\"", sculpt_image_path.display());
-        let mut terrain_image = TerrainSculptTexture::new(region.region_coords_x, region.region_coords_y, lod, &region.name);
+        let mut terrain_image = TerrainSculptTexture::new(region.region_loc_x, region.region_loc_y, lod, &region.name);
         terrain_image.makeimage(TERRAIN_SCULPT_TEXTURE_SIZE)?;
         let hash = terrain_image.get_hash()?;
         let terrain_image_name = Self::impostor_name(IMPOSTOR_TERRAIN_PREFIX, region, height_field, lod, hash)?;
@@ -495,20 +495,20 @@ impl TerrainGenerator {
     }
     
     /// Build an impostor for LOD N.
-    fn build_impostor_for_lod(&mut self, region: &RegionData, _region_size_opt: Option<(u32, u32)>) -> Result<(), Error> {
+    fn build_impostor_for_lod(&mut self, region: &RegionData, _region_region_size_opt: Option<(u32, u32)>) -> Result<(), Error> {
         log::info!("Region \"{}\", LOD {} starting.", region.name, region.lod);
         let height_field = if region.lod == 0 {
             self.get_height_field_one_region(
                 region.grid.clone(),
-                region.region_coords_x,
-                region.region_coords_y,
+                region.region_loc_x,
+                region.region_loc_y,
             )?
         } else {
             self.get_height_field_multi_region(
                 region.grid.clone(),
-                region.region_coords_x,
-                region.region_coords_y,               
-                (region.size_x, region.size_y),
+                region.region_loc_x,
+                region.region_loc_y,               
+                (region.region_size_x, region.region_size_y),
                 region.lod,
             )?
         };

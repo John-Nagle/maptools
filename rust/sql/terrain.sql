@@ -5,10 +5,10 @@
 
 CREATE TABLE IF NOT EXISTS raw_terrain_heights (
     grid VARCHAR(40) NOT NULL,
-    region_coords_x INT NOT NULL,
-    region_coords_y INT NOT NULL,
-    size_x INT NOT NULL,
-    size_y INT NOT NULL,
+    region_loc_x INT NOT NULL,
+    region_loc_y INT NOT NULL,
+    region_size_x INT NOT NULL,
+    region_size_y INT NOT NULL,
     name VARCHAR(100) NOT NULL,
     scale FLOAT NOT NULL,
     offset FLOAT NOT NULL,

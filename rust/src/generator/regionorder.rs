@@ -50,10 +50,10 @@ impl TileLods {
         log::debug!("Group bounds: {:?}", bounds);
         assert!(!regions.is_empty()); // This is checked in get_group_bounds
         //  Sort by X, Y. The input is usually almost in order, but not quite.
-        regions.sort_by_key(|v: &RegionData| (v.region_coords_x, v.region_coords_y));
+        regions.sort_by_key(|v: &RegionData| (v.region_loc_x, v.region_loc_y));
         //  Immutable after this point
         let regions = regions;
-        let base_region_size = (regions[0].size_x, regions[0].size_y);
+        let base_region_size = (regions[0].region_size_x, regions[0].region_size_y);
         let (max_lod, ll,ur) = get_group_scan_bounds(bounds, base_region_size).expect("Group scan bounds calc failed");
         //  ***CHECK FOR AT LEAST 2X2***
         //  ***MUST HAVE AS MANY COLUMNS AS ROWS*** add columns if necessary
@@ -133,7 +133,7 @@ impl Iterator for TileLods {
         if let Some(region) = self.regions.pop_front() {
             //  We have a new region to handle.
             //  Mark it in the current row.
-            let loc = (region.region_coords_x, region.region_coords_y);
+            let loc = (region.region_loc_x, region.region_loc_y);
             if loc.0 == self.cursors[0].recent_column_info.start.0 {
                 //  Column has not changed.
                 self.cursors[0].mark_lod_0(loc);
@@ -401,10 +401,10 @@ impl ColumnCursor {
         //  Build a new tile.
         RegionData {
             grid: self.grid.clone(),
-            region_coords_x: loc.0,
-            region_coords_y: loc.1,
-            size_x: size.0,
-            size_y: size.1,
+            region_loc_x: loc.0,
+            region_loc_y: loc.1,
+            region_size_x: size.0,
+            region_size_y: size.1,
             name,
             lod: self.lod,
         }
@@ -516,9 +516,9 @@ pub fn homogeneous_group_size(group: &Vec<RegionData>) -> Option<(u32, u32)> {
     //  Return size of region if group is homogeneous. It always is in SL. For OS, we don't try to do multi-region impostors.
     if !group.is_empty() && group
         .iter()
-        .find(|v| v.size_x != group[0].size_x || v.size_y != group[0].size_y)
+        .find(|v| v.region_size_x != group[0].region_size_x || v.region_size_y != group[0].region_size_y)
         .is_none() {
-            Some((group[0].size_x, group[0].size_y))
+            Some((group[0].region_size_x, group[0].region_size_y))
     } else {
         None
     }
@@ -534,7 +534,7 @@ pub fn get_group_bounds(group: &Vec<RegionData>) -> Result<((u32, u32), (u32, u3
     //  Error if group is not homogeneous. It always is in SL. For OS, we don't try to do multi-region impostors.
     if group
         .iter()
-        .find(|v| v.size_x != group[0].size_x || v.size_y != group[0].size_y)
+        .find(|v| v.region_size_x != group[0].region_size_x || v.region_size_y != group[0].region_size_y)
         .is_some()
     {
         return Err(anyhow!("Regions in a viz group are not all the same size"));
@@ -543,18 +543,18 @@ pub fn get_group_bounds(group: &Vec<RegionData>) -> Result<((u32, u32), (u32, u3
         (
             group
                 .iter()
-                .fold(u32::MAX, |acc, v| acc.min(v.region_coords_x)),
+                .fold(u32::MAX, |acc, v| acc.min(v.region_loc_x)),
             group
                 .iter()
-                .fold(u32::MAX, |acc, v| acc.min(v.region_coords_y)),
+                .fold(u32::MAX, |acc, v| acc.min(v.region_loc_y)),
         ),
         (
             group
                 .iter()
-                .fold(u32::MIN, |acc, v| acc.max(v.region_coords_x + v.size_x)),
+                .fold(u32::MIN, |acc, v| acc.max(v.region_loc_x + v.region_size_x)),
             group
                 .iter()
-                .fold(u32::MIN, |acc, v| acc.max(v.region_coords_y + v.size_y)),
+                .fold(u32::MIN, |acc, v| acc.max(v.region_loc_y + v.region_size_y)),
         ),
     ))
 }
@@ -662,7 +662,7 @@ fn test_region_order() {
         log::debug!("Next group, {} items", group.len());
         let mut prev_loc_opt = None;
         for item in &group {
-            let loc = (item.region_coords_x, item.region_coords_y);
+            let loc = (item.region_loc_x, item.region_loc_y);
             if let Some(prev_loc) = prev_loc_opt {
                 check_loc_sequence(prev_loc, loc);
             }
