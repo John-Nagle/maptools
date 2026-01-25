@@ -20,7 +20,7 @@ use log::LevelFilter;
 use common::Credentials;
 use common::init_fcgi;
 use common::{Handler, Request, Response};
-use common::{UploadedRegionInfo};
+use common::{RegionImpostorData};
 use common::u8_to_elev;
 use mysql::prelude::{Queryable};
 use mysql::{Pool};
@@ -56,13 +56,8 @@ fn logger() {
     log::warn!("Logging to {:?}", LOG_FILE_NAME); // where the log is going
 }
 
-/// Change status for region data
-#[derive(Debug)]
-enum ChangeStatus {
-    None, 
-    NoChange,
-    Changed 
-}
+/// Array of impostor data as uploaded. This is what comes in as JSON.
+pub type RegionImpostorDataArray = Vec<RegionImpostorData>;
 
 ///  Our handler
 struct ImpostorUploadHandler {
@@ -88,7 +83,7 @@ impl ImpostorUploadHandler {
     /// SQL insert for new item
     fn do_sql_insert(
         &mut self,
-        region_info: &UploadedRegionInfo,
+        region_info: &RegionImpostorDataArray,
         params: &HashMap<String, String>,
     ) -> Result<(), Error> {
 /*
@@ -125,7 +120,7 @@ impl ImpostorUploadHandler {
     /// SQL insert for new item. Replaces entire record
     fn do_sql_full_update(
         &mut self,
-        region_info: &UploadedRegionInfo,
+        region_info: &RegionImpostorData,
         params: &HashMap<String, String>,
     ) -> Result<(), Error> {
 /*
@@ -181,7 +176,7 @@ impl ImpostorUploadHandler {
     
     fn do_sql_confirmation_update(
         &mut self,
-        region_info: &UploadedRegionInfo,
+        region_info: &RegionImpostorData,
         params: &HashMap<String, String>,
     ) -> Result<(), Error> {
         const SQL_CONFIRMATION_UPDATE: &str = r"UPDATE raw_terrain_heights
@@ -204,7 +199,7 @@ impl ImpostorUploadHandler {
     /// Is this a duplicate?
     fn do_sql_unchanged_check(
         &mut self,
-        region_info: &UploadedRegionInfo,
+        region_info: &RegionImpostorData,
     ) -> Result<ChangeStatus, Error> {
         
         let samples = region_info.get_samples()?;
@@ -248,12 +243,11 @@ impl ImpostorUploadHandler {
         })
     }
 */  
-
     /// Parse a request
     fn parse_request(
         b: &[u8],
         _env: &HashMap<String, String>,
-    ) -> Result<UploadedRegionInfo, Error> {
+    ) -> Result<RegionImpostorDataArray, Error> {
         //  Should be UTF-8. Check.
         let s = core::str::from_utf8(b)?;
         if s.trim().is_empty() {
@@ -261,7 +255,9 @@ impl ImpostorUploadHandler {
         }
         log::info!("Uploaded JSON:\n{}", s);
         //  Should be valid JSON
-        Ok(UploadedRegionInfo::parse(s)?)
+        //////Ok(RegionImpostorDataArray::parse(s)?)
+        let parsed: RegionImpostorDataArray = serde_json::from_str(s)?;
+        Ok(parsed)
     }
 
     /// Handle request.
@@ -272,7 +268,7 @@ impl ImpostorUploadHandler {
     /// If no, replace old data entirely.
     fn process_request(
         &mut self,
-        region_info: UploadedRegionInfo,
+        region_info: RegionImpostorDataArray,
         params: &HashMap<String, String>,
     ) -> Result<(usize, String), Error> {
 /*
