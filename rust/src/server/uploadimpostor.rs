@@ -47,7 +47,7 @@ const UPLOAD_CREDS_FILE: &str = "upload_credentials.txt";
 fn logger() {
     //  Log file is openly visible as a web page.
     //  Only for debug tests.
-    const LOG_FILE_NAME: &str = "logs/updatelog.txt";
+    const LOG_FILE_NAME: &str = "logs/uploadimpostorlog.txt";
     let _ = simplelog::CombinedLogger::init(vec![simplelog::WriteLogger::new(
         LevelFilter::Debug,
         simplelog::Config::default(),

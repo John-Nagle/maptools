@@ -425,6 +425,13 @@ Complete, but correct?
    - Hash is 16 hex digits. Add to region_impostors as height_hash CHAR(16). Add to faces_json as "hash" for each texture item.
      - Viewer never uses these fields.
      - Plan ahead for more detailed models.
+     
+2026-01-22
+    Unified names region_loc, etc. between upload and download side.
+    Need to add versioning for upload, but put that as a parameter on the URL in future.
+    - In progress: more checking for duplicates in generate
+    - Next: recheck upload.
+    - Todo: download format with version info?
     
 
       
