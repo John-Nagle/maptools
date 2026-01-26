@@ -433,5 +433,44 @@ Complete, but correct?
     - Next: recheck upload.
     - Todo: download format with version info?
     
+2026-01-24
+    Design problem: vizgroup numbers need to be persistent.
+    - Do they need to be part of texture names? Probably, so uploadimpostor can work easily.
+    - Generateterrain needs to track this.
+    - Check impostor database and build correspondence between old vizgroup number and new one.
+      - New/old mapping. For each vizgroup, search impostor database for a matching object and map new vizgroup to stored vizgroup.
+        - Majority voting, so if permanent vizgroups need to change, the majority wins?
+        - A new region which joins two vizgroups means a big change to the impostor database.
+          - A change that doesn't involve uploading new impostors. 
+          - Argues against holding vizgroup data in terrain object names.
+          - Terrain generator may have to update existing entries.
+            - Not a big deal.
+          - What happens when vizgroups within a larger impostor set change.
+            - It's possible to have multiple multi-region impostors for same regions but different vizgroups. 
+              - region_impostors unique index now has a problem. 
+         - Picking new vizgroup values
+            - They're already sorted by size, so they probably won't change in ways that affect large numbers of impostors.
+            - Assume we have full impostor upload data in raw_terrain_heights. So vizgroup values are complete.
+            - We could just replace the old ones with the new ones and it would work, although viewers might be out of sync until they relog.
+              - Change as little as possible.
+              - New = old, unless we have to change.
+                - Old is found by looking up first region of a new vizgroup in region_impostors. 
+                  - Worst case we have to do a join to find matching single-region impostors.
+          - Orphaned multi-region impostors are a problem.
+
+2026-01-25
+    Vizgroup numbers
+    - New field in region_impostors: uniqueness_vizgroup, which is None for 1-region tiles, valid for others, and part of unique index.
+      - This prevents having a 1-region tile (LOD 0) in more than one vizgroup.
+    - After computing vizgroups, but before region order, generate table of vizgroup translations. Reads region_impostors but does not write it.
+    - Generate new items with new vizgroups. Vizgroup becomes another field in filename.
+    - Impostor upload in uploadimpostor sets vizgroup and uniqueness_vizgroup.
+    - Garbage collection.
+      - At end of uploadimpstors, do a garbage collection to delete entries in region_impostors which represent a tile of LOD>0 and 
+        for which no tile at LOD 0 has that vizgroup.
+        - Can this be done with one SQL statement?
+        
+       
+    
 
       

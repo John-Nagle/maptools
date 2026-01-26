@@ -368,12 +368,13 @@ impl TerrainGenerator {
     
     /// Encoded name for impostor asset file.
     /// The name contains all the info we need to generate the impostor.
-    /// Format: RS_x_y_sx_sy_sz_offset_lod_waterlevel_name
+    /// Format: RS_x_y_sx_sy_sz_offset_lod_waterlevel_vizgroup_hash_
     fn impostor_name(
         prefix: &str,
         region: &RegionData,
         height_field: &HeightField,
         lod: u8,
+        viz_group_id: usize,
         hash: u64,
     ) -> Result<String, Error> {
         let x = region.region_loc_x;
@@ -383,7 +384,7 @@ impl TerrainGenerator {
         let sy = region.region_size_y;
         let sz = scale;
         let water_level = height_field.water_level;
-        Ok(format!("{}_{}_{}_{}_{}_{:.2}_{:.2}_{}_{:.2}_0x{:016x}", prefix, x, y, sx, sy, sz, offset, lod, water_level, hash))
+        Ok(format!("{}_{}_{}_{}_{}_{:.2}_{:.2}_{}_{}_{:.2}_0x{:016x}", prefix, x, y, sx, sy, sz, offset, lod, viz_group_id, water_level, hash))
     }
     
     /// Get all the hash values for one tile.
@@ -430,6 +431,7 @@ impl TerrainGenerator {
         &mut self,
         region: &RegionData,
         height_field: &HeightField,
+        viz_group_id: usize,
     ) -> Result<(), Error> {
         let hash_info_opt = self. get_hashes_one_tile(&region.grid, region.region_loc_x, region.region_loc_y, region.lod)?;
         log::debug!("Hash info: {:?}", hash_info_opt);
@@ -437,11 +439,13 @@ impl TerrainGenerator {
             self.build_impostor_mesh(
                 region,
                 height_field,
+                viz_group_id,
             )
         } else {
             self.build_impostor_sculpt(
                 region,
                 height_field,
+                viz_group_id,
             )
         }
     }
@@ -451,6 +455,7 @@ impl TerrainGenerator {
         &mut self,
         region: &RegionData,
         height_field: &HeightField,
+        viz_group_id: usize,
     ) -> Result<(), Error> {
         const IMPOSTOR_SCULPT_PREFIX: &str = "RS";
         const IMPOSTOR_TERRAIN_PREFIX: &str = "RT0";
@@ -463,7 +468,7 @@ impl TerrainGenerator {
         terrain_sculpt.setelevs(elevs, scale as f64, offset as f64);
         terrain_sculpt.makeimage();
         let hash = terrain_sculpt.get_hash()?;
-        let sculpt_name = Self::impostor_name(IMPOSTOR_SCULPT_PREFIX, region, height_field, lod, hash)?;
+        let sculpt_name = Self::impostor_name(IMPOSTOR_SCULPT_PREFIX, region, height_field, lod, viz_group_id, hash)?;
         let sculpt_image = terrain_sculpt.image.unwrap();
         let mut sculpt_image_path = self.outdir.clone();
         sculpt_image_path.push(sculpt_name.to_owned() + ".png");
@@ -472,7 +477,7 @@ impl TerrainGenerator {
         let mut terrain_image = TerrainSculptTexture::new(region.region_loc_x, region.region_loc_y, lod, &region.name);
         terrain_image.makeimage(TERRAIN_SCULPT_TEXTURE_SIZE)?;
         let hash = terrain_image.get_hash()?;
-        let terrain_image_name = Self::impostor_name(IMPOSTOR_TERRAIN_PREFIX, region, height_field, lod, hash)?;
+        let terrain_image_name = Self::impostor_name(IMPOSTOR_TERRAIN_PREFIX, region, height_field, lod, viz_group_id, hash)?;
         
         let mut terrain_image_path = self.outdir.clone();
         terrain_image_path.push(terrain_image_name.to_owned() + ".png");
@@ -490,12 +495,13 @@ impl TerrainGenerator {
         &mut self,
         _region: &RegionData,
         _height_field: &HeightField,
+        _viz_group_id: usize,
     ) -> Result<(), Error> {
         todo!("glTF mesh generation is not implemented yet");
     }
     
     /// Build an impostor for LOD N.
-    fn build_impostor_for_lod(&mut self, region: &RegionData, _region_region_size_opt: Option<(u32, u32)>) -> Result<(), Error> {
+    fn build_impostor_for_lod(&mut self, region: &RegionData, _region_region_size_opt: Option<(u32, u32)>, viz_group_id: usize) -> Result<(), Error> {
         log::info!("Region \"{}\", LOD {} starting.", region.name, region.lod);
         let height_field = if region.lod == 0 {
             self.get_height_field_one_region(
@@ -515,24 +521,27 @@ impl TerrainGenerator {
         self.build_impostor(
             region,
             &height_field,
+            viz_group_id,
         )?;
         log::info!("Region \"{}\", LOD {} built.", region.name, region.lod);
         Ok(())
     }
     
     /// Process group, multi-LOD version
-    fn process_group(&mut self, group: Vec<RegionData>) -> Result<(), Error> {
-        log::info!("Group: {} entries.", group.len());
+    fn process_group(&mut self, group: Vec<RegionData>, initial_viz_group_id: usize) -> Result<(), Error> {
+        log::info!("Group #{}: {} entries.", initial_viz_group_id, group.len());
+        //  ***NEED TO ASSIGN PERSISTENT GROUP NUMBER***
+        let viz_group_id = initial_viz_group_id;    // ***TEMP*** Need real assignment algorithm.
         let region_size_opt = homogeneous_group_size(&group);
         if region_size_opt.is_some() && group.len() > 1 {
             //  Do the LOD thing.
             for region in TileLods::new(group) {
-                self.build_impostor_for_lod(&region, region_size_opt)?;
+                self.build_impostor_for_lod(&region, region_size_opt, viz_group_id)?;
             }
         } else {
             //  LOD 0 only.
             for region in group {
-                self.build_impostor_for_lod(&region, None)?;
+                self.build_impostor_for_lod(&region, None, viz_group_id)?;
             }
         }
         Ok(())
@@ -540,9 +549,10 @@ impl TerrainGenerator {
 
     /// Process one grid, with multiple visibilty groups
     pub fn process_grid(&mut self, mut completed_groups: CompletedGroups) -> Result<(), Error> {
+        //  Sort by length, biggest groups first.
         completed_groups.sort_by(|a, b| b.len().partial_cmp(&a.len()).unwrap());
-        for group in completed_groups {
-            self.process_group(group)?;
+        for (viz_group_id, group) in completed_groups.into_iter().enumerate() {
+            self.process_group(group, viz_group_id)?;
         }
         Ok(())
     }
