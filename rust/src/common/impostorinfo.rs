@@ -41,9 +41,9 @@ pub struct RegionImpostorData {
     pub scale: [f32;3],
     /// Impostor level of detail. 0=1 region, 1=4 regions, etc.
     pub impostor_lod: RegionImpostorLod,
-    /// Estate ID. You can only see objects with the same estate ID as your own.
+    /// Viz group ID. You can only see objects with the same viz group ID as your own.
     /// This indicates reachability without a teleport.
-    /// By convention, mainland is estate id 1.
+    /// Viz groups are generally in order of decreasing
     pub viz_group: u32,
     /// The object geometry, as a sculpt image.
     pub sculpt_uuid: Option<Uuid>,    
@@ -58,8 +58,8 @@ pub struct RegionImpostorData {
     pub elevation_offset: f32,
     /// Water height. Water is optional.
     pub water_height: Option<f32>,
-    /// Name - name of region, or 0,0 corner region for lower LODs
-    pub name: String,
+    /// Name - name of region, if available. Mostly for debug.
+    pub name: Option<String>,
     /// Grid -- name of associated grid
     pub grid: String,
     /// Faces (as JSON)

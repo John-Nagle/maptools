@@ -469,6 +469,9 @@ Complete, but correct?
       - At end of uploadimpstors, do a garbage collection to delete entries in region_impostors which represent a tile of LOD>0 and 
         for which no tile at LOD 0 has that vizgroup.
         - Can this be done with one SQL statement?
+    Region name was removed in favor of hash. But viewer uses names. 
+    - Embedding name in filename has potential length problem. Names are limited to 63 bytes.
+      - We can get the name from terrain_heights if we really need it.
         
        
     
