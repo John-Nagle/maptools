@@ -70,7 +70,7 @@ pub struct AssetUpload {
     /// Elevation offset 
     elevation_offset: f32,
     /// Scale
-    scale: f32,
+    scale: [f32;3],
     /// Water height
     water_height: f32,
     /// Impostor LOD. 0 is highest level of detail.
