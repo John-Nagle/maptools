@@ -488,7 +488,7 @@ Complete, but correct?
         - Maybe 50 meshes/sculpts, plus their textures.
         - Actual limit is about 10KB of filenames.
     - OK, suppose we have one big persistent table of textures. Then, when we see a sculpt of mesh, associate the textures and go.
-      - Table region_textures.
+      - Table tile_textures added.
             grid 
             region_loc_x region_loc_y 
             region_size_x region_size_y
