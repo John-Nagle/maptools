@@ -1,14 +1,8 @@
-//! Upload Second Life / Open Simulator object info to server
+//! Upload Second Life / Open Simulator asset info to server
 //! Part of the Animats impostor system
 //!
-//! Once a sculpt or mesh object and relevant textures have been created for a region,
-//! this service, run by a privileged user, updates the database to reflect that.
-//! The download service, downloadimpostor, downloads the same data. Downloading
-//! is not privileged.
-//! A Second Life/Open Simulator LSL script records terrain heights when visiting
-//! regions. It calls this FCGI responder to upload that data to a server.
-//! Later processing turns that into objects viewable in world via the
-//! region impostor system.
+//! At this point, the asset exists on the SL/OS asset store.
+//! A script running in an SL/OS viewer calls this service to tell it about new assets.
 //!
 //!     License: LGPL.
 //!     Animats
@@ -27,6 +21,7 @@ use mysql::{Pool};
 use mysql::{PooledConn, params};
 use std::collections::HashMap;
 use std::io::Write;
+use serde::Deserialize;
 mod auth;
 use auth::{Authorizer, AuthorizeType};
 
@@ -56,11 +51,40 @@ fn logger() {
     log::warn!("Logging to {:?}", LOG_FILE_NAME); // where the log is going
 }
 
+/// What the LSL tool uploads for each uploaded impostor asset.
+/// Intended for serde use.
+#[derive(Deserialize, Clone, Debug)]
+pub struct AssetUpload {
+    /// File name prefix. "RS", "RM", or RTn"
+    prefix: String,
+    /// Hash of asset content. Hex value.
+    region_hash: String,
+    /// Region location (meters)
+    region_loc: [u32;2],
+    /// Region size (meters)
+    region_size: [u32;2],
+    /// Grid name
+    grid: String,
+    /// UUID of asset
+    asset_uuid: String,
+    /// Elevation offset 
+    elevation_offset: f32,
+    /// Scale
+    scale: f32,
+    /// Water height
+    water_height: f32,
+    /// Impostor LOD. 0 is highest level of detail.
+    impostor_lod: u8,
+    /// Visibility group - only one viz group at a time is visible
+    viz_group: u32,
+}
+
 /// Array of impostor data as uploaded. This is what comes in as JSON.
-pub type RegionImpostorDataArray = Vec<RegionImpostorData>;
+pub type AssetUploadArray = Vec<AssetUpload>;
 
 ///  Our handler
-struct ImpostorUploadHandler {
+
+struct AssetUploadHandler {
     /// MySQL onnection pool. We only use one.
     #[allow(dead_code)] // needed to keep the pool alive, but never referenced.
     pool: Pool,
@@ -69,10 +93,7 @@ struct ImpostorUploadHandler {
     /// Owner of object at other end
     owner_name: Option<String>,
 }
-impl ImpostorUploadHandler {
-    /// Elevation error tolerance. Elevations are equal if within this tolerance.
-    /// LSL llGround is slightly noisy.
-    const ELEV_ERROR_TOLERANCE: f32 = 0.5;
+impl AssetUploadHandler {
 
     /// Usual new. Saves connection pool for use.
     pub fn new(pool: Pool) -> Result<Self, Error> {
@@ -83,7 +104,7 @@ impl ImpostorUploadHandler {
     /// SQL insert for new item
     fn do_sql_insert(
         &mut self,
-        region_info: &RegionImpostorDataArray,
+        region_info: &AssetUploadArray,
         params: &HashMap<String, String>,
     ) -> Result<(), Error> {
 /*
@@ -247,7 +268,7 @@ impl ImpostorUploadHandler {
     fn parse_request(
         b: &[u8],
         _env: &HashMap<String, String>,
-    ) -> Result<RegionImpostorDataArray, Error> {
+    ) -> Result<AssetUploadArray, Error> {
         //  Should be UTF-8. Check.
         let s = core::str::from_utf8(b)?;
         if s.trim().is_empty() {
@@ -256,7 +277,7 @@ impl ImpostorUploadHandler {
         log::info!("Uploaded JSON:\n{}", s);
         //  Should be valid JSON
         //////Ok(RegionImpostorDataArray::parse(s)?)
-        let parsed: RegionImpostorDataArray = serde_json::from_str(s)?;
+        let parsed: AssetUploadArray = serde_json::from_str(s)?;
         Ok(parsed)
     }
 
@@ -268,7 +289,7 @@ impl ImpostorUploadHandler {
     /// If no, replace old data entirely.
     fn process_request(
         &mut self,
-        region_info: RegionImpostorDataArray,
+        asset_info: AssetUploadArray,
         params: &HashMap<String, String>,
     ) -> Result<(usize, String), Error> {
 /*
@@ -298,7 +319,7 @@ impl ImpostorUploadHandler {
     }
 }
 //  Our "handler"
-impl Handler for ImpostorUploadHandler {
+impl Handler for AssetUploadHandler {
     fn handler(
         &mut self,
         out: &mut dyn Write,
@@ -395,9 +416,9 @@ pub fn run_responder() -> Result<(), Error> {
     //////log::info!("Opts: {:?}", opts);
     let pool = Pool::new(opts)?;
     log::info!("Connected to database.");
-    let mut terrain_upload_handler = ImpostorUploadHandler::new(pool)?;
+    let mut asset_upload_handler = AssetUploadHandler::new(pool)?;
     //  Run the FCGI server.
-    common::run(&mut instream, &mut outio, &mut terrain_upload_handler)
+    common::run(&mut instream, &mut outio, &mut asset_upload_handler)
 }
 
 /// Main program
