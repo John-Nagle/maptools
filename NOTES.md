@@ -471,7 +471,38 @@ Complete, but correct?
         - Can this be done with one SQL statement?
     Region name was removed in favor of hash. But viewer uses names. 
     - Embedding name in filename has potential length problem. Names are limited to 63 bytes.
-      - We can get the name from terrain_heights if we really need it.
+      - We can get the name from terrain_heights if we really need it. Null for now.
+    Need base texture hash for each face. 
+    - Problem. How do we get that from LSL? Upload does not know this.
+      - We don't have face info at SL viewer upload time. Rethink.
+        - Have to read in all the geometry and texture entries, then assemble them into the region_impostors table.
+          - Just read them into temporary tables and do a join. Let SQL do the work.
+
+2026-01-26
+    Next design problem - need to do uploads in batches.
+    - What's the limit on how many textures a prim can store as content?
+    - Generator needs to generate lots of folders.
+      - Limit on how much is number of records we can send in one HTTP request to uploadimpostors.
+    - Each folder must contain all the textures needed for any object in it.
+      - So the terrain generator must generate many small folders.
+        - Maybe 50 meshes/sculpts, plus their textures.
+        - Actual limit is about 10KB of filenames.
+    - OK, suppose we have one big persistent table of textures. Then, when we see a sculpt of mesh, associate the textures and go.
+      - Table region_textures.
+            grid 
+            region_loc_x region_loc_y 
+            region_size_x region_size_y
+            texture_index (always 0 for sculpts)
+            lod
+            viz_group
+            uuid
+            hash
+            timestamp
+
+      - Table cleanup/garbage collection?
+        - Not essential for now. Unique on x, y, size_x, size_y, lod, viz_group, new replaces old. Defunct regions remain.
+      - Too many manual uploads?
+        - Workflow: upload one folder, put in prim. Run script in prim. Repeat 500 times.
         
        
     
