@@ -254,11 +254,11 @@ impl AssetUploadHandler {
     }
     
     /// Hash strings are hex strings. 
-    /// We want the hash without any prefix, as 16 chars.
+    /// We want the hash without any prefix, as 8 chars.
     fn fix_hash_string(hash_str: &str) -> Result<String, Error> {
         let without_prefix = hash_str.trim_start_matches("0x");
-        let z = u64::from_str_radix(without_prefix, 16)?;
-        Ok(format!("{:16x}", z))
+        let z = u32::from_str_radix(without_prefix, 16)?;
+        Ok(format!("{:08x}", z))
     }
     
     //  Parse and check UUID
