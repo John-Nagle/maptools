@@ -255,7 +255,9 @@ impl AssetUploadHandler {
     /// Hash strings are hex strings. 
     /// We want the hash without any prefix, as 16 chars.
     fn fix_hash_string(hash_str: &str) -> Result<String, Error> {
-        todo!();
+        let without_prefix = hash_str.trim_start_matches("0x");
+        let z = u64::from_str_radix(without_prefix, 16)?;
+        Ok(format!("{:16x}", z))
     }
     
     //  Parse and check UUID
@@ -279,7 +281,7 @@ impl AssetUploadHandler {
     creation_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     */
     fn update_terrain_tile(&mut self, asset_upload: &AssetUpload) -> Result<(), Error> {
-        let SQL_UPDATE_TILE = r"UPDATE tile_textures
+        const SQL_UPDATE_TILE: &str = r"UPDATE tile_textures
             SET grid = :grid, region_coords_x = :region_coords_x,region_coords_y = :region_coords_y,
                 region_size_x = :region_size_x, region_size_y = :region_size_y, impostor_lod = :impostor_lod,
                 viz_group = :viz_group, texture_index = :texture_index, texture_hash = :texture_hash, 
@@ -320,7 +322,6 @@ impl AssetUploadHandler {
         }
         log::info!("Uploaded JSON:\n{}", s);
         //  Should be valid JSON
-        //////Ok(RegionImpostorDataArray::parse(s)?)
         let parsed: AssetUploadArray = serde_json::from_str(s)?;
         Ok(parsed)
     }
@@ -336,30 +337,24 @@ impl AssetUploadHandler {
         asset_info: AssetUploadArray,
         params: &HashMap<String, String>,
     ) -> Result<(usize, String), Error> {
-/*
-        let change_status = self.do_sql_unchanged_check(&region_info)?;
-        log::warn!("Changed status for region {}: {:?}", region_info.name, change_status);
-        match change_status {
-            ChangeStatus::None => {
-                //  New region, add region
-                log::info!("Region \"{}\") is new.", region_info.name);
-                self.do_sql_insert(&region_info, params)?; 
-                Ok((201, "Added region".to_string()))    
-            }
-            ChangeStatus::NoChange  => {
-                //  Existing region, same values as last time
-                log::info!("Region \"{}\") is unchanged.", region_info.name);
-                self.do_sql_confirmation_update(&region_info, params)?; 
-                Ok((204, "No change to region".to_string()))
-            }
-            ChangeStatus::Changed => {
-                log::info!("Region \"{}\") changed", region_info.name);
-                self.do_sql_full_update(&region_info, params)?; 
-                Ok((200, "Change to region".to_string()))
+        //  We have an array of assets.
+        //  
+        for asset_upload in &asset_info {
+            match &asset_upload.prefix[0..2] {
+                "RS" => {
+                    //  Sculpt
+                    log::debug!("Sculpts not implemented yet");
+                }
+                "RT" => {
+                    //  Texture
+                    self.update_terrain_tile(asset_upload)?;
+                }
+                _ => { 
+                    return Err(anyhow!("Invalid asset upload prefix: {}", asset_upload.prefix));
+                }
             }
         }
-*/
-        Ok((200, "Implementation unfinished".to_string()))   // ***TEMP***
+        Ok((200, "Asset upload successful".to_string()))
     }
 }
 //  Our "handler"
