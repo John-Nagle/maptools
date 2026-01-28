@@ -68,5 +68,5 @@ CREATE TABLE IF NOT EXISTS tile_textures (
     texture_uuid CHAR(36) NOT NULL,  
     texture_hash CHAR(16) NOT NULL,
     creation_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE INDEX (grid, region_loc_x, region_loc_y, impostor_lod, vizgroup, texture_index)
+    UNIQUE INDEX (grid, region_loc_x, region_loc_y, impostor_lod, viz_group, texture_index)
 )

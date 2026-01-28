@@ -281,7 +281,8 @@ impl AssetUploadHandler {
     creation_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     */
     fn update_terrain_tile(&mut self, asset_upload: &AssetUpload) -> Result<(), Error> {
-        const SQL_UPDATE_TILE: &str = r"UPDATE tile_textures
+/*
+        const OLD_SQL_UPDATE_TILE: &str = r"UPDATE tile_textures
             SET grid = :grid, region_coords_x = :region_coords_x,region_coords_y = :region_coords_y,
                 region_size_x = :region_size_x, region_size_y = :region_size_y, impostor_lod = :impostor_lod,
                 viz_group = :viz_group, texture_index = :texture_index, texture_hash = :texture_hash, 
@@ -292,6 +293,19 @@ impl AssetUploadHandler {
                 AND region_size_x = :region_size_x AND region_size_y = :region_size_y
                 AND viz_group = :viz_group AND 
                 AND impostor_lod = :impostor_lod AND texture_index = :texture_index";
+*/
+            //  Insert tile, or update hash and uuid if exists. 
+            const SQL_UPDATE_TILE: &str = r"INSERT INTO tile_textures
+                (grid, region_coords_x, region_coords_y, region_size_x, region_size_y,
+                impostor_lod, viz_group, texture_index, texture_hash, texture_uuid,
+                creation_time) 
+            VALUES 
+                (:grid, :region_coords_x, :region_coords_y, :region_size_x, :region_size_y,
+                :impostor_lod, :viz_group, :texture_index, :texture_hash, :texture_uuid,
+                NOW()) 
+            ON DUPLICATE KEY UPDATE
+                texture_hash = :texture_hash, texture_uuid = :texture_uuid, creation_time = NOW()";
+        //  UNIQUE INDEX (grid, region_loc_x, region_loc_y, impostor_lod, viz_group, texture_index)
         let values = params! {
             "grid" => asset_upload.grid.to_lowercase(),
             "region_loc_x" => asset_upload.region_loc[0],
