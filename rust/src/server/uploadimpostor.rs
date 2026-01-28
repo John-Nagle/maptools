@@ -47,7 +47,8 @@ fn logger() {
     let _ = simplelog::CombinedLogger::init(vec![simplelog::WriteLogger::new(
         LevelFilter::Debug,
         simplelog::Config::default(),
-        std::fs::File::create(LOG_FILE_NAME).expect("Unable to create log file"),
+        ////std::fs::File::create(LOG_FILE_NAME).expect("Unable to create log file"),
+        std::fs::OpenOptions::new().create(true).append(true).open(LOG_FILE_NAME).expect("Unable to create log file"),
     )]);
     log::warn!("Logging to {:?}", LOG_FILE_NAME); // where the log is going
 }
@@ -296,11 +297,11 @@ impl AssetUploadHandler {
 */
             //  Insert tile, or update hash and uuid if exists. 
             const SQL_UPDATE_TILE: &str = r"INSERT INTO tile_textures
-                (grid, region_coords_x, region_coords_y, region_size_x, region_size_y,
+                (grid, region_loc_x, region_loc_y, region_size_x, region_size_y,
                 impostor_lod, viz_group, texture_index, texture_hash, texture_uuid,
                 creation_time) 
             VALUES 
-                (:grid, :region_coords_x, :region_coords_y, :region_size_x, :region_size_y,
+                (:grid, :region_loc_x, :region_loc_y, :region_size_x, :region_size_y,
                 :impostor_lod, :viz_group, :texture_index, :texture_hash, :texture_uuid,
                 NOW()) 
             ON DUPLICATE KEY UPDATE
