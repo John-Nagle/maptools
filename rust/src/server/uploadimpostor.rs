@@ -22,6 +22,7 @@ use mysql::{PooledConn, params};
 use std::collections::HashMap;
 use std::io::Write;
 use serde::Deserialize;
+use uuid::Uuid;
 mod auth;
 use auth::{Authorizer, AuthorizeType};
 
@@ -174,26 +175,6 @@ impl AssetUploadHandler {
         Ok(())
     }
 /*    
-    /// Compare elevations within tolerance.
-    /// LSL llGround is not totally repeatable.  We have to allow some error.
-    fn check_elev_err_within_tolerance(elevs0: &[u8], elevs1: &[u8], scale: f32, offset: f32, tolerance: f32) -> bool {
-        let elev_err = |a: u8, b: u8| (u8_to_elev(a, scale, offset) - u8_to_elev(b, scale, offset)).abs();
-        let max_err_item_opt = elevs0.iter().zip(elevs1).max_by(|(a0, b0), (a1, b1)| {
-            let aerr = elev_err(**a0, **b0);
-            let berr = elev_err(**a1, **b1);
-            aerr.total_cmp(&berr)
-        });
-        if let Some(max_err_item) = max_err_item_opt {
-            let max_err = elev_err(*max_err_item.0, *max_err_item.1);
-            if max_err > tolerance {
-                log::warn!("Elevations differ by {:5}", max_err);
-            }
-            max_err < tolerance
-        } else {
-            // Not equal
-            false 
-        }
-    }
     
     fn do_sql_confirmation_update(
         &mut self,
@@ -263,7 +244,70 @@ impl AssetUploadHandler {
             }
         })
     }
-*/  
+*/
+
+    /// Fix up some fields with strange formatting
+    /// Texture ID prefix will be "XXn", where the first two characters indicate the type of texture.
+    fn get_texture_index(prefix: &str) -> Result<u8, Error> {
+        Ok(prefix[2..].parse()?)
+    }
+    
+    /// Hash strings are hex strings. 
+    /// We want the hash without any prefix, as 16 chars.
+    fn fix_hash_string(hash_str: &str) -> Result<String, Error> {
+        todo!();
+    }
+    
+    //  Parse and check UUID
+    fn fix_uuid_string(uuid_str: &str) -> Result<String, Error> {
+        let uuid = Uuid::parse_str(uuid_str)?;
+        Ok(uuid.to_string())
+    }
+
+    /// Update terrain tile. A new terrain tile has been added, and needs to be added to the database.
+    /*
+        name VARCHAR(100) NOT NULL,
+    region_loc_x INT NOT NULL,
+    region_loc_y INT NOT NULL,
+    region_size_x INT NOT NULL,
+    region_size_y INT NOT NULL,
+    impostor_lod TINYINT NOT NULL,
+    viz_group INT NOT NULL,
+    texture_index SMALLINT NOT NULL,
+    texture_uuid CHAR(36) NOT NULL,  
+    texture_hash CHAR(16) NOT NULL,
+    creation_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    */
+    fn update_terrain_tile(&mut self, asset_upload: &AssetUpload) -> Result<(), Error> {
+        let SQL_UPDATE_TILE = r"UPDATE tile_textures
+            SET grid = :grid, region_coords_x = :region_coords_x,region_coords_y = :region_coords_y,
+                region_size_x = :region_size_x, region_size_y = :region_size_y, impostor_lod = :impostor_lod,
+                viz_group = :viz_group, texture_index = :texture_index, texture_hash = :texture_hash, 
+                texture_uuid = :texture_uuid, 
+                creation_time = NOW()            
+            WHERE grid = :grid 
+                AND region_coords_x = :region_coords_x AND region_coords_y = :region_coords_y
+                AND region_size_x = :region_size_x AND region_size_y = :region_size_y
+                AND viz_group = :viz_group AND 
+                AND impostor_lod = :impostor_lod AND texture_index = :texture_index";
+        let values = params! {
+            "grid" => asset_upload.grid.to_lowercase(),
+            "region_loc_x" => asset_upload.region_loc[0],
+            "region_loc_y" => asset_upload.region_loc[1],
+            "region_size_x" => asset_upload.region_size[0],
+            "region_size_y" => asset_upload.region_size[1],
+            "impostor_lod" => asset_upload.impostor_lod,
+            "viz_group" => asset_upload.viz_group,
+            "texture_index" => Self::get_texture_index(&asset_upload.prefix)?,
+            "texture_uuid" => Self::fix_uuid_string(&asset_upload.asset_uuid)?,
+            "texture_hash" => Self::fix_hash_string(&asset_upload.region_hash)?,
+        };
+        log::debug!("SQL terrain tile update: {:?}", values);
+        self.conn.exec_drop(SQL_UPDATE_TILE, values)?;
+        log::debug!("SQL terrain tile update succeeded.");
+        Ok(())
+    }
+    
     /// Parse a request
     fn parse_request(
         b: &[u8],

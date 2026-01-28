@@ -58,7 +58,6 @@ CREATE TABLE IF NOT EXISTS region_impostors (
 
 CREATE TABLE IF NOT EXISTS tile_textures (
     grid VARCHAR(40) NOT NULL,
-    name VARCHAR(100) NOT NULL,
     region_loc_x INT NOT NULL,
     region_loc_y INT NOT NULL,
     region_size_x INT NOT NULL,
