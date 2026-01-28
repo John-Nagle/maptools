@@ -17,7 +17,7 @@ fn calc_rgbimage_hash(img: &RgbImage) -> u32 {
     img.hash(&mut hasher);
     let hash: u64 = hasher.finish();
     //  We only want a 32-bit hash, because we have a length problem.
-    (((hash >> 32) & 0xffff) ^ (hash & 0xffff)) as u32
+    (((hash >> 32) & 0xffffffff) ^ (hash & 0xffffffff)) as u32
 }
 
 const SCULPTDIM: usize = 64; // Sculpt textures are always 64x64
