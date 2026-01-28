@@ -12,10 +12,12 @@ use anyhow::{anyhow, Error};
 use std::io::{Cursor};
 
 /// Calculate hash for duplicate check.
-fn calc_rgbimage_hash(img: &RgbImage) -> u64 {
+fn calc_rgbimage_hash(img: &RgbImage) -> u32 {
     let mut hasher = DefaultHasher::new();
     img.hash(&mut hasher);
-    hasher.finish()
+    let hash: u64 = hasher.finish();
+    //  We only want a 32-bit hash, because we have a length problem.
+    (((hash >> 32) & 0xffff) ^ (hash & 0xffff)) as u32
 }
 
 const SCULPTDIM: usize = 64; // Sculpt textures are always 64x64
@@ -69,7 +71,7 @@ impl TerrainSculpt {
     }
     
     /// Get uniqueness hash
-    pub fn get_hash(&self) -> Result<u64, Error> {
+    pub fn get_hash(&self) -> Result<u32, Error> {
         Ok(calc_rgbimage_hash(&self.image.as_ref().unwrap()))
     }
 
@@ -163,7 +165,7 @@ impl TerrainSculptTexture {
     }
     
     /// Get uniqueness hash
-    pub fn get_hash(&self) -> Result<u64, Error> {
+    pub fn get_hash(&self) -> Result<u32, Error> {
         Ok(calc_rgbimage_hash(&self.image.as_ref().unwrap()))
     }
     

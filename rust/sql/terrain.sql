@@ -42,9 +42,9 @@ CREATE TABLE IF NOT EXISTS region_impostors (
     viz_group INT NOT NULL,
     uniqueness_viz_group INT DEFAULT NULL,
     mesh_uuid CHAR(36) DEFAULT NULL,
-    mesh_hash CHAR(16) DEFAULT NULL,
+    mesh_hash CHAR(8) DEFAULT NULL,
     sculpt_uuid CHAR(36) DEFAULT NULL,
-    sculpt_hash CHAR(16) DEFAULT NULL,
+    sculpt_hash CHAR(8) DEFAULT NULL,
     water_height FLOAT NOT NULL,
     creator VARCHAR(63) NOT NULL,
     creation_time TIMESTAMP NOT NULL,
@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS tile_textures (
     viz_group INT NOT NULL,
     texture_index SMALLINT NOT NULL,
     texture_uuid CHAR(36) NOT NULL,  
-    texture_hash CHAR(16) NOT NULL,
+    texture_hash CHAR(8) NOT NULL,
     creation_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE INDEX (grid, region_loc_x, region_loc_y, impostor_lod, viz_group, texture_index)
 )

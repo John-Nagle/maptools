@@ -375,7 +375,7 @@ impl TerrainGenerator {
         height_field: &HeightField,
         lod: u8,
         viz_group_id: usize,
-        hash: u64,
+        hash: u32,
     ) -> Result<String, Error> {
         let x = region.region_loc_x;
         let y = region.region_loc_y;
@@ -384,7 +384,13 @@ impl TerrainGenerator {
         let sy = region.region_size_y;
         let sz = scale;
         let water_level = height_field.water_level;
-        Ok(format!("{}_{}_{}_{}_{}_{:.2}_{:.2}_{}_{}_{:.2}_0x{:016x}", prefix, x, y, sx, sy, sz, offset, lod, viz_group_id, water_level, hash))
+        //////Ok(format!("{}_{}_{}_{}_{}_{:.2}_{:.2}_{}_{}_{:.2}_0x{:016x}", prefix, x, y, sx, sy, sz, offset, lod, viz_group_id, water_level, hash))
+        let s = format!("{}_{}_{}_{}_{}_{:.2}_{:.2}_{}_{}_{:.2}_{:08x}", prefix, x, y, sx, sy, sz, offset, lod, viz_group_id, water_level, hash);
+        if s.len() > 63 {
+            Err(anyhow!("Generated filename is too long: {}", s))
+        } else {
+            Ok(s)
+        }
     }
     
     /// Get all the hash values for one tile.

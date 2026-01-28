@@ -504,6 +504,11 @@ Complete, but correct?
       - Too many manual uploads?
         - Workflow: upload one folder, put in prim. Run script in prim. Repeat 500 times.
         
+2026-01-26
+    tile uploader is running for textures, but some hash values are not 16 characters.
+    - Lead zero problem.
+    - Name length limitation in SL: 63 chars. But description is same as name, but limited to 127 chars.
+        
        
     
 
