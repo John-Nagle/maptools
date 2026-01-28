@@ -338,7 +338,7 @@ impl AssetUploadHandler {
         params: &HashMap<String, String>,
     ) -> Result<(usize, String), Error> {
         //  We have an array of assets.
-        //  
+        log::info!("Processing {} assets.", asset_info.len());
         for asset_upload in &asset_info {
             match &asset_upload.prefix[0..2] {
                 "RS" => {
