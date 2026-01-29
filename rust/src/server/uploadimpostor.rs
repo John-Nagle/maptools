@@ -325,13 +325,47 @@ impl AssetUploadHandler {
         Ok(())
     }
     
+    //  Look up region name.
+    //  Returns name of region if exact match. Otherwise searches for
+    //  some name in a larger area containing the region of interest.
+    fn look_up_region_name(&mut self, grid: &str, viz_group: u32, loc: [u32;2], size: [u32;2]) -> Result<Option<String>, Error> {
+        //  Look up some name in the rectangle of interest.
+        //  For LOD 0, this gets the region of interest.
+        //  For lower LODs, the corner might be a nameless water region, so we pick some region in the rectangle.
+        const SQL_GET_NAME: &str = r"SELECT name, region_loc_x, region_loc_y 
+            WHERE region_loc_x >= :region_loc_x AND region_loc_y >= region_loc_y
+            AND region_loc_x <= :region_loc_x + :region_size_x
+            AND region_loc_y <= :region_loc_y + :region-size_y
+            AND viz_group = :viz_group
+            ORDER BY region_loc_x, region_loc_y LIMIT 1";
+        let params = params! {
+            "grid" => grid.to_lowercase().clone(), 
+            "region_loc_x" => loc[0],
+            "region_loc_y" => loc[1],
+            "region_size_x" => size[0],
+            "region_size_y" => size[1],
+            "viz_group" => viz_group,
+            };
+        let names = self.conn.exec_map(
+            SQL_GET_NAME,
+            params,
+            |(name, region_loc_x, region_loc_y) : (String, u32, u32)| {
+            name
+            })?;
+        if names.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(names[0].clone()))
+        }
+    }
+    
     /// Update a sculpt tile.
     fn update_sculpt_tile(&mut self, asset_upload: &AssetUpload) -> Result<(), Error> {
         //  Most of the info we need is in asset_upload, but we also need:
         //  - name
         //  - face texture data.
         log::debug!("Sculpts not implemented yet");
-        //  Get face texture data.
+        //  Get face texture data. One row for each face.
         const SQL_GET_TEXTURES: &str = r"SELECT texture_index, texture_uuid CHAR(36) 
             FROM tile_textures 
             WHERE grid = :grid, region_loc_x = :region_loc_x, region_loc_y = :region_loc_y,
@@ -352,8 +386,11 @@ impl AssetUploadHandler {
             |(texture_index, texture_uuid) : (u32, String)| {
            (texture_index, texture_uuid)
             },
-        )?;
-        log::debug!("Textures for sculpt {}: {:?}", asset_upload.asset_uuid, texture_tuples);
+        )?;        
+        let name_opt = self.look_up_region_name(&asset_upload.grid.to_lowercase(), asset_upload.viz_group, asset_upload.region_loc, asset_upload.region_size, )?;
+ 
+        log::debug!("Textures for sculpt {:?}: {:?}", name_opt, texture_tuples);
+        //  ***MORE***
         Ok(())
     }
     
