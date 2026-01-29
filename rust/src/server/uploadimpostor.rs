@@ -319,12 +319,12 @@ impl AssetUploadHandler {
     }
 
     /// Update terrain tile. A new terrain tile has been added, and needs to be added to the database.
-    fn update_terrain_tile(&mut self, asset_upload: &AssetUpload) -> Result<(), Error> {
+    fn update_texture_tile(&mut self, asset_upload: &AssetUpload) -> Result<(), Error> {
             //  Insert tile, or update hash and uuid if exists. 
         const SQL_UPDATE_TILE: &str = r"INSERT INTO tile_assets
                 (grid, region_loc_x, region_loc_y, region_size_x, region_size_y,
                 impostor_lod, viz_group, texture_index, asset_hash, asset_uuid,
-                asset_name
+                asset_name,
                 creation_time) 
             VALUES 
                 (:grid, :region_loc_x, :region_loc_y, :region_size_x, :region_size_y,
@@ -344,8 +344,8 @@ impl AssetUploadHandler {
             "impostor_lod" => asset_upload.impostor_lod,
             "viz_group" => asset_upload.viz_group,
             "texture_index" => Self::get_texture_index(&asset_upload.prefix)?,
-            "texture_uuid" => Self::fix_uuid_string(&asset_upload.asset_uuid)?,
-            "texture_hash" => Self::fix_hash_string(&asset_upload.asset_hash)?,
+            "asset_uuid" => Self::fix_uuid_string(&asset_upload.asset_uuid)?,
+            "asset_hash" => Self::fix_hash_string(&asset_upload.asset_hash)?,
         };
         log::debug!("SQL terrain tile update: {:?}", values);
         self.conn.exec_drop(SQL_UPDATE_TILE, values)?;
@@ -527,7 +527,7 @@ impl AssetUploadHandler {
                 }
                 "RT" => {
                     //  Texture
-                    self.update_terrain_tile(asset_upload)?;
+                    self.update_texture_tile(asset_upload)?;
                 }
                 _ => { 
                     return Err(anyhow!("Invalid asset upload prefix: {}", asset_upload.prefix));
