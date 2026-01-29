@@ -53,6 +53,45 @@ fn logger() {
     log::warn!("Logging to {:?}", LOG_FILE_NAME); // where the log is going
 }
 
+/// Asset type
+#[derive(Deserialize, Clone, Debug)]
+pub enum TileAssetType {
+    /// Base color of tile
+    BaseTexture, 
+    /// Emissive texture of tile
+    EmissiveTexture,
+    /// Geometry as a sculpt texture
+    SculptTexture,
+    /// Mesh (future)
+    Mesh
+}
+
+impl TileAssetType {
+    /// From string. Valid values are RS, RM, RTn, and REn.
+    pub fn new_from_string(prefix: &str) -> Result<(Self, Option<u8>), Error> {
+        if prefix.len() < 2 {
+            Err(anyhow!("Too short tile asset name prefix: {}", prefix))
+        } else {
+            match &prefix[0..2] {
+                "RS" => Ok((Self::SculptTexture, None)),
+                "RM" => Ok((Self::Mesh, None)),
+                "RT" => Ok((Self::BaseTexture, Some(Self::get_texture_index(prefix)?))),
+                "RE" => Ok((Self::EmissiveTexture, Some(Self::get_texture_index(prefix)?))),
+                _ => Err(anyhow!("Invalid tile asset name prefix: {}", prefix))
+            }
+        }
+    }
+    
+    /// Get one digit, with checking
+    fn get_texture_index(prefix: &str) -> Result<u8, Error> {
+        if prefix.len() < 3 {
+            Err(anyhow!("Too short tile asset name prefix: {}", prefix))
+        } else {
+            Ok(prefix[2..3].parse()?)
+        }
+    }
+}
+
 /// What the LSL tool uploads for each uploaded impostor asset.
 /// Intended for serde use.
 #[derive(Deserialize, Clone, Debug)]
@@ -387,6 +426,8 @@ impl AssetUploadHandler {
             },
         )?;        
         let name_opt = self.look_up_region_name(&asset_upload.grid.to_lowercase(), asset_upload.region_loc, asset_upload.region_size, )?;
+        //  Build the textures as  JSON
+        
         log::debug!("Textures for sculpt {:?}: {:?}", name_opt, texture_tuples);
         //  We have all the info now. Update the region_impostor table.
         //  Insert tile, or update hash and uuid if exists. 
@@ -417,7 +458,7 @@ impl AssetUploadHandler {
     INDEX(grid, viz_group),
     INDEX(name)
     
-    Delete hashes and creator. This is a product, not input data.
+    Delete hashes and creator fields from SQL table. This is a product, not input data.
 */
         const SQL_IMPOSTOR: &str = r"INSERT INTO region_impostors
                 (grid, name, region_loc_x, region_loc_y, region_size_x, region_size_y, uniqueness_viz_group,

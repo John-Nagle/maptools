@@ -512,6 +512,21 @@ Complete, but correct?
 2026-01-28
    Changed hash to 8 chars. Now it fits and works.
    Next, upload sculpt info and generate region_impostors database.
+   - Forgot about emissive textures. Add support for that.
+     - New record, RE, for emissive textures.
+     - Add enum to tile_textures.
+     - Emissive doesn't do anything yet, but put it in anyway.
+     
+ 2026-01-29
+    Rename tile_textures to tile_assets
+    Add enum for sculpt, mesh, base texture, emissive_texture.
+    Put sculpt textures in tile_assets file.
+    Add asset name string to tile_assets table.
+    Unduplication of assets and vizgroup renaming works off tile_assets file.
+    Move parsing of filename to server side.
+    
+    Close to getting useful output.
+     
         
        
     
