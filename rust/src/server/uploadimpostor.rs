@@ -388,6 +388,72 @@ impl AssetUploadHandler {
         )?;        
         let name_opt = self.look_up_region_name(&asset_upload.grid.to_lowercase(), asset_upload.region_loc, asset_upload.region_size, )?;
         log::debug!("Textures for sculpt {:?}: {:?}", name_opt, texture_tuples);
+        //  We have all the info now. Update the region_impostor table.
+        //  Insert tile, or update hash and uuid if exists. 
+        /*
+        CREATE TABLE IF NOT EXISTS region_impostors (
+    grid VARCHAR(40) NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    region_loc_x INT NOT NULL,
+    region_loc_y INT NOT NULL,
+    region_size_x INT NOT NULL,
+    region_size_y INT NOT NULL,
+    scale_x INT NOT NULL,
+    scale_y INT NOT NULL,
+    scale_z FLOAT NOT NULL,
+    elevation_offset FLOAT NOT NULL,
+    impostor_lod TINYINT NOT NULL,
+    viz_group INT NOT NULL,
+    uniqueness_viz_group INT DEFAULT NULL,
+    mesh_uuid CHAR(36) DEFAULT NULL,
+    mesh_hash CHAR(8) DEFAULT NULL,
+    sculpt_uuid CHAR(36) DEFAULT NULL,
+    sculpt_hash CHAR(8) DEFAULT NULL,
+    water_height FLOAT NOT NULL,
+    creator VARCHAR(63) NOT NULL,
+    creation_time TIMESTAMP NOT NULL,
+    faces_json JSON NOT NULL,
+    UNIQUE INDEX (grid, region_loc_x, region_loc_y, impostor_lod, uniqueness_vizgroup),
+    INDEX(grid, viz_group),
+    INDEX(name)
+    
+    Delete hashes and creator. This is a product, not input data.
+*/
+        const SQL_IMPOSTOR: &str = r"INSERT INTO region_impostors
+                (grid, name, region_loc_x, region_loc_y, region_size_x, region_size_y, uniqueness_viz_group,
+                scale_x, scale_y, scale_z, 
+                elevation_offiset, impostor_lod, viz_group, 
+                sculpt_uuid,
+                water_height, creation_time, faces_json) 
+            VALUES 
+                (:grid, :name, :region_loc_x, :region_loc_y, :region_size_x, :region_size_y, :uniqueness_viz_group,
+                :scale_x, :scale_y, :scale_z,
+                :elevation_offset, :impostor_lod, :viz_group, 
+                :sculpt_uuid, 
+                :water_height, NOW(), faces_json)
+            ON DUPLICATE KEY UPDATE
+                scale_x = :scale_x, scale_y = :scale_y, scale_z = :scale_z,
+                elevation_offset = :elevation_offset, impostor_lod := impostor_lod, viz_group = :viz_group,
+                sculpt_uuid = :sculpt_uuid,
+                water_height = :water_height, creation_time = NOW(), faces_json = :faces_json";
+               
+        let faces_json = "".to_string();    // ***TEMP*** 
+        let insert_params = params! {
+                "grid" => asset_upload.grid.to_lowercase().clone(), 
+                "region_loc_x" => asset_upload.region_loc[0],
+                "region_loc_y" => asset_upload.region_loc[1],
+                "region_size_x" => asset_upload.region_size[0],
+                "region_size_y" => asset_upload.region_size[1],
+                "scale_x" => asset_upload.scale[0], // ***CONVERT TO INT***
+                "scale_y" => asset_upload.scale[1], // ***CONVERT TO INT***
+                "scale_z" => asset_upload.scale[2],
+                "impostor_lod" => asset_upload.impostor_lod,
+                "uniqueness_viz_group" => asset_upload.viz_group, // ***NOT SURE ABOUT THIS***
+                "viz_group" => asset_upload.viz_group,
+                "elevation_offset" => asset_upload.elevation_offset,
+                "water_height" => asset_upload.water_height,
+                "faces_json" => faces_json,
+            };
         //  ***MORE***
         Ok(())
     }
