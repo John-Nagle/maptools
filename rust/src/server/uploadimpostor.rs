@@ -15,13 +15,12 @@ use common::Credentials;
 use common::init_fcgi;
 use common::{Handler, Request, Response};
 use common::{RegionImpostorData};
-use common::u8_to_elev;
 use mysql::prelude::{Queryable};
 use mysql::{Pool};
 use mysql::{PooledConn, params};
 use std::collections::HashMap;
 use std::io::Write;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 mod auth;
 use auth::{Authorizer, AuthorizeType};
@@ -54,7 +53,7 @@ fn logger() {
 }
 
 /// Asset type
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Deserialize, Serialize)]
 pub enum TileAssetType {
     /// Base color of tile
     BaseTexture, 
@@ -67,8 +66,8 @@ pub enum TileAssetType {
 }
 
 impl TileAssetType {
-    /// From string. Valid values are RS, RM, RTn, and REn.
-    pub fn new_from_string(prefix: &str) -> Result<(Self, Option<u8>), Error> {
+    /// From filename prefix string. Valid prefix values are RS, RM, RTn, and REn.
+    pub fn new_from_prefix(prefix: &str) -> Result<(Self, Option<u8>), Error> {
         if prefix.len() < 2 {
             Err(anyhow!("Too short tile asset name prefix: {}", prefix))
         } else {
@@ -79,6 +78,17 @@ impl TileAssetType {
                 "RE" => Ok((Self::EmissiveTexture, Some(Self::get_texture_index(prefix)?))),
                 _ => Err(anyhow!("Invalid tile asset name prefix: {}", prefix))
             }
+        }
+    }
+    
+    /// From string, which ought to be a macro.
+    pub fn new_from_string(s: &str) -> Result<Self, Error> {
+        match s {
+            "SculptTexture" => Ok(Self::SculptTexture),
+            "Mesh" => Ok(Self::Mesh),
+            "BaseTexture" => Ok(Self::BaseTexture),
+            "EmissiveTexture" => Ok(Self::EmissiveTexture),
+            _ => Err(anyhow!("Invalid TileAssetType: {}", s))
         }
     }
     
@@ -404,12 +414,13 @@ impl AssetUploadHandler {
         //  - face texture data.
         log::debug!("Update sculpt tile: {:?}", asset_upload);
         //  Get face texture data. One row for each face.
-        const SQL_GET_TEXTURES: &str = r"SELECT texture_index, texture_uuid
-            FROM tile_textures 
+        const SQL_GET_TEXTURES: &str = r#"SELECT texture_index, asset_uuid, asset_type
+            FROM tile_assets
             WHERE grid = :grid AND region_loc_x = :region_loc_x AND region_loc_y = :region_loc_y
                 AND region_size_x = :region_size_x AND region_size_y = :region_size_y
                 AND viz_group = :viz_group AND impostor_lod = :impostor_lod
-            ORDER BY texture_index";
+                AND (asset_type = "BaseTexture" OR asset_type = "EmissiveTexture")
+            ORDER BY texture_index"#;
         let texture_tuples = self.conn.exec_map(
             SQL_GET_TEXTURES,
             params! {
@@ -421,12 +432,13 @@ impl AssetUploadHandler {
                 "impostor_lod" => asset_upload.impostor_lod,
                 "viz_group" => asset_upload.viz_group,
             },
-            |(texture_index, texture_uuid) : (u32, String)| {
-           (texture_index, texture_uuid)
+            |(texture_index, texture_uuid, asset_type) : (Option<u8>, String, String)| {
+           (texture_index, texture_uuid, asset_type)
             },
         )?;        
         let name_opt = self.look_up_region_name(&asset_upload.grid.to_lowercase(), asset_upload.region_loc, asset_upload.region_size, )?;
-        //  Build the textures as  JSON
+        //  Build the textures as  JSON. Format is an array of JSON structs.
+        //  ***MORE***
         
         log::debug!("Textures for sculpt {:?}: {:?}", name_opt, texture_tuples);
         //  We have all the info now. Update the region_impostor table.
