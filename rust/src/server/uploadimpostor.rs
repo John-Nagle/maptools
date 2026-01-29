@@ -328,15 +328,15 @@ impl AssetUploadHandler {
     //  Look up region name.
     //  Returns name of region if exact match. Otherwise searches for
     //  some name in a larger area containing the region of interest.
-    fn look_up_region_name(&mut self, grid: &str, viz_group: u32, loc: [u32;2], size: [u32;2]) -> Result<Option<String>, Error> {
+    fn look_up_region_name(&mut self, grid: &str, loc: [u32;2], size: [u32;2]) -> Result<Option<String>, Error> {
         //  Look up some name in the rectangle of interest.
         //  For LOD 0, this gets the region of interest.
         //  For lower LODs, the corner might be a nameless water region, so we pick some region in the rectangle.
-        const SQL_GET_NAME: &str = r"SELECT name, region_loc_x, region_loc_y 
-            WHERE region_loc_x >= :region_loc_x AND region_loc_y >= region_loc_y
+        const SQL_GET_NAME: &str = r"SELECT name, region_loc_x, region_loc_y
+            FROM raw_terrain_heights
+            WHERE region_loc_x >= :region_loc_x AND region_loc_y >= :region_loc_y
             AND region_loc_x <= :region_loc_x + :region_size_x
-            AND region_loc_y <= :region_loc_y + :region-size_y
-            AND viz_group = :viz_group
+            AND region_loc_y <= :region_loc_y + :region_size_y
             ORDER BY region_loc_x, region_loc_y LIMIT 1";
         let params = params! {
             "grid" => grid.to_lowercase().clone(), 
@@ -344,7 +344,6 @@ impl AssetUploadHandler {
             "region_loc_y" => loc[1],
             "region_size_x" => size[0],
             "region_size_y" => size[1],
-            "viz_group" => viz_group,
             };
         let names = self.conn.exec_map(
             SQL_GET_NAME,
@@ -364,13 +363,13 @@ impl AssetUploadHandler {
         //  Most of the info we need is in asset_upload, but we also need:
         //  - name
         //  - face texture data.
-        log::debug!("Sculpts not implemented yet");
+        log::debug!("Update sculpt tile: {:?}", asset_upload);
         //  Get face texture data. One row for each face.
-        const SQL_GET_TEXTURES: &str = r"SELECT texture_index, texture_uuid CHAR(36) 
+        const SQL_GET_TEXTURES: &str = r"SELECT texture_index, texture_uuid
             FROM tile_textures 
-            WHERE grid = :grid, region_loc_x = :region_loc_x, region_loc_y = :region_loc_y,
-                region_size_x = :region_size_x, region_size_y = :region_size_y,
-                viz_group = :viz_group, impostor_lod = :impostor_lod
+            WHERE grid = :grid AND region_loc_x = :region_loc_x AND region_loc_y = :region_loc_y
+                AND region_size_x = :region_size_x AND region_size_y = :region_size_y
+                AND viz_group = :viz_group AND impostor_lod = :impostor_lod
             ORDER BY texture_index";
         let texture_tuples = self.conn.exec_map(
             SQL_GET_TEXTURES,
@@ -387,8 +386,7 @@ impl AssetUploadHandler {
            (texture_index, texture_uuid)
             },
         )?;        
-        let name_opt = self.look_up_region_name(&asset_upload.grid.to_lowercase(), asset_upload.viz_group, asset_upload.region_loc, asset_upload.region_size, )?;
- 
+        let name_opt = self.look_up_region_name(&asset_upload.grid.to_lowercase(), asset_upload.region_loc, asset_upload.region_size, )?;
         log::debug!("Textures for sculpt {:?}: {:?}", name_opt, texture_tuples);
         //  ***MORE***
         Ok(())
