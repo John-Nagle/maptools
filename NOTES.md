@@ -526,7 +526,7 @@ Complete, but correct?
     Move parsing of filename to server side.
     
     Close to getting useful output.
-     
+    But sql and database now out of sync. LSL uploader out of sync. 
         
        
     

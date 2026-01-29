@@ -106,10 +106,12 @@ impl TileAssetType {
 /// Intended for serde use.
 #[derive(Deserialize, Clone, Debug)]
 pub struct AssetUpload {
+    /// Asset name - the name used in SL/OS
+    asset_name: String,
     /// File name prefix. "RS", "RM", or RTn"
     prefix: String,
     /// Hash of asset content. Hex value.
-    region_hash: String,
+    asset_hash: String,
     /// Region location (meters)
     region_loc: [u32;2],
     /// Region size (meters)
@@ -317,47 +319,24 @@ impl AssetUploadHandler {
     }
 
     /// Update terrain tile. A new terrain tile has been added, and needs to be added to the database.
-    /*
-        name VARCHAR(100) NOT NULL,
-    region_loc_x INT NOT NULL,
-    region_loc_y INT NOT NULL,
-    region_size_x INT NOT NULL,
-    region_size_y INT NOT NULL,
-    impostor_lod TINYINT NOT NULL,
-    viz_group INT NOT NULL,
-    texture_index SMALLINT NOT NULL,
-    texture_uuid CHAR(36) NOT NULL,  
-    texture_hash CHAR(16) NOT NULL,
-    creation_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    */
     fn update_terrain_tile(&mut self, asset_upload: &AssetUpload) -> Result<(), Error> {
-/*
-        const OLD_SQL_UPDATE_TILE: &str = r"UPDATE tile_textures
-            SET grid = :grid, region_coords_x = :region_coords_x,region_coords_y = :region_coords_y,
-                region_size_x = :region_size_x, region_size_y = :region_size_y, impostor_lod = :impostor_lod,
-                viz_group = :viz_group, texture_index = :texture_index, texture_hash = :texture_hash, 
-                texture_uuid = :texture_uuid, 
-                creation_time = NOW()            
-            WHERE grid = :grid 
-                AND region_coords_x = :region_coords_x AND region_coords_y = :region_coords_y
-                AND region_size_x = :region_size_x AND region_size_y = :region_size_y
-                AND viz_group = :viz_group AND 
-                AND impostor_lod = :impostor_lod AND texture_index = :texture_index";
-*/
             //  Insert tile, or update hash and uuid if exists. 
-            const SQL_UPDATE_TILE: &str = r"INSERT INTO tile_textures
+        const SQL_UPDATE_TILE: &str = r"INSERT INTO tile_assets
                 (grid, region_loc_x, region_loc_y, region_size_x, region_size_y,
-                impostor_lod, viz_group, texture_index, texture_hash, texture_uuid,
+                impostor_lod, viz_group, texture_index, asset_hash, asset_uuid,
+                asset_name
                 creation_time) 
             VALUES 
                 (:grid, :region_loc_x, :region_loc_y, :region_size_x, :region_size_y,
-                :impostor_lod, :viz_group, :texture_index, :texture_hash, :texture_uuid,
+                :impostor_lod, :viz_group, :texture_index, :asset_hash, :asset_uuid,
+                :asset_name,
                 NOW()) 
             ON DUPLICATE KEY UPDATE
-                texture_hash = :texture_hash, texture_uuid = :texture_uuid, creation_time = NOW()";
+                asset_hash = :asset_hash, asset_uuid = :asset_uuid, creation_time = NOW()";
         //  UNIQUE INDEX (grid, region_loc_x, region_loc_y, impostor_lod, viz_group, texture_index)
         let values = params! {
             "grid" => asset_upload.grid.to_lowercase(),
+            "asset_name" => asset_upload.asset_name.clone(),
             "region_loc_x" => asset_upload.region_loc[0],
             "region_loc_y" => asset_upload.region_loc[1],
             "region_size_x" => asset_upload.region_size[0],
@@ -366,7 +345,7 @@ impl AssetUploadHandler {
             "viz_group" => asset_upload.viz_group,
             "texture_index" => Self::get_texture_index(&asset_upload.prefix)?,
             "texture_uuid" => Self::fix_uuid_string(&asset_upload.asset_uuid)?,
-            "texture_hash" => Self::fix_hash_string(&asset_upload.region_hash)?,
+            "texture_hash" => Self::fix_hash_string(&asset_upload.asset_hash)?,
         };
         log::debug!("SQL terrain tile update: {:?}", values);
         self.conn.exec_drop(SQL_UPDATE_TILE, values)?;
