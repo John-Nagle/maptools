@@ -325,6 +325,38 @@ impl AssetUploadHandler {
         Ok(())
     }
     
+    /// Update a sculpt tile.
+    fn update_sculpt_tile(&mut self, asset_upload: &AssetUpload) -> Result<(), Error> {
+        //  Most of the info we need is in asset_upload, but we also need:
+        //  - name
+        //  - face texture data.
+        log::debug!("Sculpts not implemented yet");
+        //  Get face texture data.
+        const SQL_GET_TEXTURES: &str = r"SELECT texture_index, texture_uuid CHAR(36) 
+            FROM tile_textures 
+            WHERE grid = :grid, region_loc_x = :region_loc_x, region_loc_y = :region_loc_y,
+                region_size_x = :region_size_x, region_size_y = :region_size_y,
+                viz_group = :viz_group, impostor_lod = :impostor_lod
+            ORDER BY texture_index";
+        let texture_tuples = self.conn.exec_map(
+            SQL_GET_TEXTURES,
+            params! {
+                "grid" => asset_upload.grid.to_lowercase().clone(), 
+                "region_loc_x" => asset_upload.region_loc[0],
+                "region_loc_y" => asset_upload.region_loc[1],
+                "region_size_x" => asset_upload.region_size[0],
+                "region_size_y" => asset_upload.region_size[1],
+                "impostor_lod" => asset_upload.impostor_lod,
+                "viz_group" => asset_upload.viz_group,
+            },
+            |(texture_index, texture_uuid) : (u32, String)| {
+           (texture_index, texture_uuid)
+            },
+        )?;
+        log::debug!("Textures for sculpt {}: {:?}", asset_upload.asset_uuid, texture_tuples);
+        Ok(())
+    }
+    
     /// Parse a request
     fn parse_request(
         b: &[u8],
@@ -358,7 +390,7 @@ impl AssetUploadHandler {
             match &asset_upload.prefix[0..2] {
                 "RS" => {
                     //  Sculpt
-                    log::debug!("Sculpts not implemented yet");
+                    self.update_sculpt_tile(asset_upload)?;
                 }
                 "RT" => {
                     //  Texture

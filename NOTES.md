@@ -504,10 +504,14 @@ Complete, but correct?
       - Too many manual uploads?
         - Workflow: upload one folder, put in prim. Run script in prim. Repeat 500 times.
         
-2026-01-26
+2026-01-27
     tile uploader is running for textures, but some hash values are not 16 characters.
     - Lead zero problem.
     - Name length limitation in SL: 63 chars. But description is same as name, but limited to 127 chars.
+    
+2026-01-28
+   Changed hash to 8 chars. Now it fits and works.
+   Next, upload sculpt info and generate region_impostors database.
         
        
     
