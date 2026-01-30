@@ -158,7 +158,7 @@ impl AssetUpload {
     
     /// Construct from input JSON.
     fn new_from_asset_upload_short(upload_short: &AssetUploadShort) -> Result<Self, Error> {
-        Self::new_from_asset_name(&upload_short.asset_name, &upload_short.asset_uuid, &upload_short.grid)
+        Self::new_from_asset_name(&upload_short.asset_name, &upload_short.grid, &upload_short.asset_uuid)
     }
     
     ///  Parse and check UUID
