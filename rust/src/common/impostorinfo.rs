@@ -19,6 +19,7 @@
 //! 
 //! This is very close to the JSON sent to the viewer.
 //
+use anyhow::{anyhow, Error};
 use uuid::Uuid;
 use serde;
 use serde::{Deserialize, Serialize};
@@ -85,7 +86,46 @@ pub struct RegionImpostorFaceData {
 }
 
 impl RegionImpostorFaceData {
-
+    /// Make array from array of tuples
+    pub fn new_array_from_tuples(tuples: &Vec<(usize, String, String, String)>) -> Result<Vec<RegionImpostorFaceData>, Error> {
+        const MAX_TEXTURES: usize = 8;
+        let mut base_textures: [Option<(String, String)>;MAX_TEXTURES] = Default::default();
+        let mut emissive_textures: [Option<(String, String)>;MAX_TEXTURES] = Default::default();
+        for (texture_index, texture_uuid, texture_hash, asset_type) in tuples {
+            let arr = match asset_type.as_str() {
+                "BaseTexture" => &mut base_textures,
+                "EmissiveTexture" => &mut emissive_textures,
+                _ => { return Err(anyhow!("Invalid asset type for face data: {}", asset_type)); }
+            };
+            if *texture_index >= MAX_TEXTURES {
+                return Err(anyhow!("Out of range texture index {} asset type for face data: {}", texture_index, asset_type));
+            }
+            if arr[*texture_index].is_some() {
+                return Err(anyhow!("Duplicate texture index {} asset type for face data: {}", texture_index, asset_type)); 
+            }
+            arr[*texture_index] = Some((texture_uuid.to_string(), texture_hash.to_string()));
+        }
+        //  Now we have arrays of tuples. Convert to a vec of structs, stopping at the last non-empty.
+        let mut face_data = Vec::new();
+        let cnt = MAX_TEXTURES; // ***TEMP***
+/*   NEEDS WORK
+        for n in 0..cnt {
+            //  Stop at first empty slot. Sparse texture usage not supported yet. ***FIX*** ***CREATE JSON HERE***
+            if base_textures[n].is_none() {
+                break;
+            }
+            let item = RegionImpostorFaceData {
+                base_texture_uuid: base_textures[n].unwrap().0,
+                base_texture_hash: base_textures[n].unwrap().1,
+                emissive_texture_uuid: emissive_textures[n].0,
+                emissive_texture_hash: emissive_textures[n].1,
+            };
+            face_data.push(item);
+        }
+*/
+        todo!();
+        Ok(face_data)
+    }    
 }
 
 /// What's returned to a caller via a REST request

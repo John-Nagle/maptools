@@ -307,7 +307,7 @@ impl AssetUploadHandler {
         //  - face texture data.
         log::debug!("Update sculpt tile: {:?}", asset_upload);
         //  Get face texture data. One row for each face.
-        const SQL_GET_TEXTURES: &str = r#"SELECT texture_index, asset_uuid, asset_type
+        const SQL_GET_TEXTURES: &str = r#"SELECT texture_index, asset_uuid, asset_hash, asset_type
             FROM tile_assets
             WHERE grid = :grid AND region_loc_x = :region_loc_x AND region_loc_y = :region_loc_y
                 AND region_size_x = :region_size_x AND region_size_y = :region_size_y
@@ -325,8 +325,8 @@ impl AssetUploadHandler {
                 "impostor_lod" => asset_upload.impostor_lod,
                 "viz_group" => asset_upload.viz_group,
             },
-            |(texture_index, texture_uuid, asset_type) : (Option<u8>, String, String)| {
-           (texture_index, texture_uuid, asset_type)
+            |(texture_index, texture_uuid,texture_hash, asset_type) : (Option<u8>, String, String)| {
+           (texture_index, texture_uuid, texture_hash, asset_type)
             },
         )?;        
         let name_opt = self.look_up_region_name(&asset_upload.grid.to_lowercase(), asset_upload.region_loc, asset_upload.region_size, )?;
