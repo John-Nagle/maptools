@@ -56,9 +56,9 @@ fn logger() {
 #[derive(Clone, Debug, PartialEq, PartialOrd, Deserialize, Serialize)]
 pub enum TileAssetType {
     /// Base color of tile
-    BaseTexture, 
+    BaseTexture(u8), 
     /// Emissive texture of tile
-    EmissiveTexture,
+    EmissiveTexture(u8),
     /// Geometry as a sculpt texture
     SculptTexture,
     /// Mesh (future)
@@ -67,28 +67,17 @@ pub enum TileAssetType {
 
 impl TileAssetType {
     /// From filename prefix string. Valid prefix values are RS, RM, RTn, and REn.
-    pub fn new_from_prefix(prefix: &str) -> Result<(Self, Option<u8>), Error> {
+    pub fn new_from_prefix(prefix: &str) -> Result<Self, Error> {
         if prefix.len() < 2 {
             Err(anyhow!("Too short tile asset name prefix: {}", prefix))
         } else {
             match &prefix[0..2] {
-                "RS" => Ok((Self::SculptTexture, None)),
-                "RM" => Ok((Self::Mesh, None)),
-                "RT" => Ok((Self::BaseTexture, Some(Self::get_texture_index(prefix)?))),
-                "RE" => Ok((Self::EmissiveTexture, Some(Self::get_texture_index(prefix)?))),
+                "RS" => Ok(Self::SculptTexture),
+                "RM" => Ok(Self::Mesh),
+                "RT" => Ok(Self::BaseTexture(Self::get_texture_index(prefix)?)),
+                "RE" => Ok(Self::EmissiveTexture(Self::get_texture_index(prefix)?)),
                 _ => Err(anyhow!("Invalid tile asset name prefix: {}", prefix))
             }
-        }
-    }
-    
-    /// From string, which ought to be a macro.
-    pub fn new_from_string(s: &str) -> Result<Self, Error> {
-        match s {
-            "SculptTexture" => Ok(Self::SculptTexture),
-            "Mesh" => Ok(Self::Mesh),
-            "BaseTexture" => Ok(Self::BaseTexture),
-            "EmissiveTexture" => Ok(Self::EmissiveTexture),
-            _ => Err(anyhow!("Invalid TileAssetType: {}", s))
         }
     }
     
@@ -109,7 +98,6 @@ pub struct AssetUpload {
     /// Asset name - the name used in SL/OS
     asset_name: String,
     /// File name prefix. "RS", "RM", or RTn"
-    prefix: String,
     /// Hash of asset content. Hex value.
     asset_hash: String,
     /// Region location (meters)
@@ -130,6 +118,8 @@ pub struct AssetUpload {
     impostor_lod: u8,
     /// Visibility group - only one viz group at a time is visible
     viz_group: u32,
+    /// Tile assset type - derived from prefix
+    tile_asset_type: TileAssetType,
 }
 
 impl AssetUpload {
@@ -143,16 +133,16 @@ impl AssetUpload {
         Ok(Self {
             grid: grid.to_string(),
             asset_name: asset_name.to_string(),
-            prefix: fields[0].to_string(),
             region_loc: [fields[1].parse()?, fields[2].parse()?],
-            region_size: [fields[3].parse()?, fields[3].parse()?],
-            scale: [fields[3].parse()?, fields[3].parse()?, fields[4].parse()?],
+            region_size: [fields[3].parse()?, fields[4].parse()?],
+            scale: [fields[3].parse()?, fields[4].parse()?, fields[5].parse()?],
             elevation_offset: fields[6].parse()?,
             impostor_lod: fields[7].parse()?,
             viz_group: fields[8].parse()?,
             water_height: fields[9].parse()?,
             asset_hash: fields[10].to_string(),
             asset_uuid: Self::fix_uuid_string(asset_uuid)?,
+            tile_asset_type: TileAssetType::new_from_prefix(fields[0])?,
         })
     }
     
@@ -193,6 +183,7 @@ impl AssetUpload {
 pub struct AssetUploadShort {
     /// Asset name - the name used in SL/OS.
     /// This encodes all the other fields.
+    /// It's the only way we can attach metadata to SL/OS content.
     asset_name: String,
     /// UUID of asset
     asset_uuid: String,
@@ -221,78 +212,6 @@ impl AssetUploadHandler {
         let conn = pool.get_conn()?;
         Ok(Self { pool, conn, owner_name: None  })
     }
-/*
-    /// SQL insert for new item
-    fn do_sql_insert(
-        &mut self,
-        region_info: &AssetUploadArray,
-        params: &HashMap<String, String>,
-    ) -> Result<(), Error> {
-    
-        const SQL_INSERT: &str = r"INSERT INTO raw_terrain_heights (grid, region_coords_x, region_coords_y, samples_x, samples_y, size_x, size_y, name, scale, offset, elevs,  water_level, creator) 
-            VALUES
-            (:grid, :region_coords_x, :region_coords_y, :samples_x, :samples_y, :size_x, :size_y, :name, :scale, :offset, :elevs, :water_level, :creator)";
-        let creator = &self.owner_name
-            .as_ref()
-            .ok_or_else(|| anyhow!("No owner name from auth"))?;    // should fail upstream, not here.
-        let samples = region_info.get_samples()?;
-        let values = params! {
-        //////"table" => RAW_TERRAIN_HEIGHTS,
-        "grid" => region_info.grid.clone(),
-        "region_coords_x" => region_info.region_coords[0],
-        "region_coords_y" => region_info.region_coords[1],
-        "size_x" => region_info.get_size()[0],
-        "size_y" => region_info.get_size()[1],
-        "name" => region_info.name.clone(),
-        "scale" => region_info.scale,
-        "offset" => region_info.offset,	
-        "elevs" => region_info.get_elevs_as_blob()?,
-        "samples_x" => samples[0],
-        "samples_y" => samples[1],
-        "water_level" => region_info.water_lev,
-        "creator" => creator };
-        log::debug!("SQL insert: {:?}", values);
-        self.conn.exec_drop(SQL_INSERT, values)?;
-        log::debug!("SQL insert succeeded.");
-        Ok(())
-    }
-    
-    /// SQL insert for new item. Replaces entire record
-    fn do_sql_full_update(
-        &mut self,
-        region_info: &RegionImpostorData,
-        params: &HashMap<String, String>,
-    ) -> Result<(), Error> {
-
-        const SQL_FULL_UPDATE: &str = r"UPDATE raw_terrain_heights 
-            SET samples_x = :samples_x, samples_y = :samples_y, scale = :scale, offset = :offset, elevs = :elevs, water_level = :water_level, creator = :creator,
-                size_x = :size_x, size_y = :size_y, name = :name, confirmation_time = NOW(), confirmer = NULL
-            WHERE LOWER(grid) = :grid AND region_coords_x = :region_coords_x AND region_coords_y = :region_coords_y";           
-        let creator = &self.owner_name
-            .as_ref()
-            .ok_or_else(|| anyhow!("No owner name from auth"))?;    // should fail upstream, not here.
-        let samples = region_info.get_samples()?;
-        let values = params! {
-        "grid" => region_info.grid.clone(),
-        "region_coords_x" => region_info.region_coords[0],
-        "region_coords_y" => region_info.region_coords[1],
-        "size_x" => region_info.get_size()[0],
-        "size_y" => region_info.get_size()[1],
-        "name" => region_info.name.clone(),
-        "scale" => region_info.scale,
-        "offset" => region_info.offset,	
-        "elevs" => region_info.get_elevs_as_blob()?,
-        "samples_x" => samples[0],
-        "samples_y" => samples[1],
-        "water_level" => region_info.water_lev,
-        "creator" => creator };
-        log::debug!("SQL update: {:?}", values);
-        self.conn.exec_drop(SQL_FULL_UPDATE, values)?;
-        log::debug!("SQL update succeeded.");
-        Ok(())
-    }
-*/
-
 
     /// Fix up some fields with strange formatting
     /// Texture ID prefix will be "XXn", where the first two characters indicate the type of texture.
@@ -308,14 +227,13 @@ impl AssetUploadHandler {
         Ok(format!("{:08x}", z))
     }
     
-    //  Parse and check UUID
-    fn fix_uuid_string(uuid_str: &str) -> Result<String, Error> {
-        let uuid = Uuid::parse_str(uuid_str)?;
-        Ok(uuid.to_string())
+    /// Update terrain tile. A new terrain tile has been added, and needs to be added to the database.
+    fn update_mesh_tile(&mut self, asset_upload: &AssetUpload) -> Result<(), Error> {
+        Err(anyhow!("Mesh tiles unimplemented"))
     }
 
     /// Update terrain tile. A new terrain tile has been added, and needs to be added to the database.
-    fn update_texture_tile(&mut self, asset_upload: &AssetUpload) -> Result<(), Error> {
+    fn update_texture_tile(&mut self, asset_upload: &AssetUpload, texture_index: u8) -> Result<(), Error> {
             //  Insert tile, or update hash and uuid if exists. 
         const SQL_UPDATE_TILE: &str = r"INSERT INTO tile_assets
                 (grid, region_loc_x, region_loc_y, region_size_x, region_size_y,
@@ -339,9 +257,9 @@ impl AssetUploadHandler {
             "region_size_y" => asset_upload.region_size[1],
             "impostor_lod" => asset_upload.impostor_lod,
             "viz_group" => asset_upload.viz_group,
-            "texture_index" => Self::get_texture_index(&asset_upload.prefix)?,
-            "asset_uuid" => Self::fix_uuid_string(&asset_upload.asset_uuid)?,
-            "asset_hash" => Self::fix_hash_string(&asset_upload.asset_hash)?,
+            "texture_index" => texture_index,
+            "asset_uuid" => asset_upload.asset_uuid.clone(),
+            "asset_hash" => asset_upload.asset_hash.clone(),
         };
         log::debug!("SQL terrain tile update: {:?}", values);
         self.conn.exec_drop(SQL_UPDATE_TILE, values)?;
@@ -517,17 +435,25 @@ impl AssetUploadHandler {
         log::info!("Processing {} assets.", asset_info_short.len());
         for asset_upload_short in &asset_info_short {
             let asset_upload = AssetUpload::new_from_asset_upload_short(asset_upload_short)?;
-            match &asset_upload.prefix[0..2] {
-                "RS" => {
+            match &asset_upload.tile_asset_type {
+                TileAssetType::SculptTexture => {
                     //  Sculpt
                     self.update_sculpt_tile(&asset_upload)?;
                 }
-                "RT" => {
+                TileAssetType::Mesh => {
                     //  Texture
-                    self.update_texture_tile(&asset_upload)?;
+                    self.update_mesh_tile(&asset_upload)?;
+                }
+                TileAssetType::BaseTexture(ix) => {
+                    //  Texture
+                    self.update_texture_tile(&asset_upload, *ix)?;
+                }
+                TileAssetType::EmissiveTexture(ix) => {
+                    //  Texture
+                    self.update_texture_tile(&asset_upload, *ix)?;
                 }
                 _ => { 
-                    return Err(anyhow!("Invalid asset upload prefix: {}", asset_upload.prefix));
+                    return Err(anyhow!("Invalid asset type: {:?}", asset_upload_short));
                 }
             }
         }
