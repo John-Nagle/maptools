@@ -132,8 +132,76 @@ pub struct AssetUpload {
     viz_group: u32,
 }
 
+impl AssetUpload {
+    pub fn new_from_asset_name(asset_name: &str, grid: &str, asset_uuid: &str) -> Result<Self, Error> {
+        //  Extract 11 fields from asset name
+        const FIELD_COUNT: usize = 11;
+        let fields: Vec<&str> = asset_name.split('_').collect();
+        if fields.len() != FIELD_COUNT {
+            return Err(anyhow!("Asset name did not contain {} fields: {}", FIELD_COUNT, asset_name));
+        }
+        Ok(Self {
+            grid: grid.to_string(),
+            asset_name: asset_name.to_string(),
+            prefix: fields[0].to_string(),
+            region_loc: [fields[1].parse()?, fields[2].parse()?],
+            region_size: [fields[3].parse()?, fields[3].parse()?],
+            scale: [fields[3].parse()?, fields[3].parse()?, fields[4].parse()?],
+            elevation_offset: fields[6].parse()?,
+            impostor_lod: fields[7].parse()?,
+            viz_group: fields[8].parse()?,
+            water_height: fields[9].parse()?,
+            asset_hash: fields[10].to_string(),
+            asset_uuid: Self::fix_uuid_string(asset_uuid)?,
+        })
+    }
+    
+    /// Construct from input JSON.
+    fn new_from_asset_upload_short(upload_short: &AssetUploadShort) -> Result<Self, Error> {
+        Self::new_from_asset_name(&upload_short.asset_name, &upload_short.asset_uuid, &upload_short.grid)
+    }
+    
+    ///  Parse and check UUID
+    fn fix_uuid_string(uuid_str: &str) -> Result<String, Error> {
+        let uuid = Uuid::parse_str(uuid_str)?;
+        Ok(uuid.to_string())
+    }
+/*           
+    string prefix = llList2String(fields,0);
+    integer x = (integer) llList2String(fields, 1);
+    integer y = (integer) llList2String(fields, 2);
+    integer sx = (integer) llList2String(fields, 3);
+    integer sy = (integer) llList2String(fields, 4);
+    float sz = (float) llList2String(fields, 5);
+    float elevation_offset = (float) llList2String(fields, 6);
+    integer lod = (integer)llList2String(fields, 7);
+    integer viz_group = (integer)llList2String(fields, 8);
+    float water_height = (float) llList2String(fields, 9);
+    string region_hash = llList2String(fields, 10);
+    //  Assemble data
+    string region_loc = llList2Json(JSON_ARRAY, [x, y]);
+    string scale = llList2Json(JSON_ARRAY, [sx, sy, sz]);
+    string region_size = llList2Json(JSON_ARRAY, [sx, sy]);
+    }
+*/
+}
+
+/// Short version of asset upload.
+/// For serde use.
+/// This is what the client sends us as JSON.
+#[derive(Deserialize, Clone, Debug)]
+pub struct AssetUploadShort {
+    /// Asset name - the name used in SL/OS.
+    /// This encodes all the other fields.
+    asset_name: String,
+    /// UUID of asset
+    asset_uuid: String,
+    /// Grid name
+    grid: String,
+}
+
 /// Array of impostor data as uploaded. This is what comes in as JSON.
-pub type AssetUploadArray = Vec<AssetUpload>;
+pub type AssetUploadArrayShort = Vec<AssetUploadShort>;
 
 ///  Our handler
 
@@ -153,14 +221,13 @@ impl AssetUploadHandler {
         let conn = pool.get_conn()?;
         Ok(Self { pool, conn, owner_name: None  })
     }
-
+/*
     /// SQL insert for new item
     fn do_sql_insert(
         &mut self,
         region_info: &AssetUploadArray,
         params: &HashMap<String, String>,
     ) -> Result<(), Error> {
-/*
     
         const SQL_INSERT: &str = r"INSERT INTO raw_terrain_heights (grid, region_coords_x, region_coords_y, samples_x, samples_y, size_x, size_y, name, scale, offset, elevs,  water_level, creator) 
             VALUES
@@ -187,7 +254,6 @@ impl AssetUploadHandler {
         log::debug!("SQL insert: {:?}", values);
         self.conn.exec_drop(SQL_INSERT, values)?;
         log::debug!("SQL insert succeeded.");
-*/
         Ok(())
     }
     
@@ -197,7 +263,7 @@ impl AssetUploadHandler {
         region_info: &RegionImpostorData,
         params: &HashMap<String, String>,
     ) -> Result<(), Error> {
-/*
+
         const SQL_FULL_UPDATE: &str = r"UPDATE raw_terrain_heights 
             SET samples_x = :samples_x, samples_y = :samples_y, scale = :scale, offset = :offset, elevs = :elevs, water_level = :water_level, creator = :creator,
                 size_x = :size_x, size_y = :size_y, name = :name, confirmation_time = NOW(), confirmer = NULL
@@ -223,80 +289,10 @@ impl AssetUploadHandler {
         log::debug!("SQL update: {:?}", values);
         self.conn.exec_drop(SQL_FULL_UPDATE, values)?;
         log::debug!("SQL update succeeded.");
-*/
         Ok(())
     }
-/*    
-    
-    fn do_sql_confirmation_update(
-        &mut self,
-        region_info: &RegionImpostorData,
-        params: &HashMap<String, String>,
-    ) -> Result<(), Error> {
-        const SQL_CONFIRMATION_UPDATE: &str = r"UPDATE raw_terrain_heights
-            SET confirmation_time = NOW(), confirmer = :confirmer
-            WHERE LOWER(grid) = :grid AND region_coords_x = :region_coords_x AND region_coords_y = :region_coords_y";           
-        let confirmer = &self.owner_name
-            .as_ref()
-            .ok_or_else(|| anyhow!("No owner name from auth"))?;    // should fail upstream, not here.
-        let values = params! {
-        "grid" => region_info.grid.clone(),
-        "region_coords_x" => region_info.region_coords[0],
-        "region_coords_y" => region_info.region_coords[1],
-        "confirmer" => confirmer };
-        log::debug!("SQL confirmation update: {:?}", values);
-        self.conn.exec_drop(SQL_CONFIRMATION_UPDATE, values)?;
-        log::debug!("SQL confirmation update succeeded.");
-        Ok(())
-    }
-    
-    /// Is this a duplicate?
-    fn do_sql_unchanged_check(
-        &mut self,
-        region_info: &RegionImpostorData,
-    ) -> Result<ChangeStatus, Error> {
-        
-        let samples = region_info.get_samples()?;
-        let grid = &region_info.grid;
-        let region_coords_x = region_info.region_coords[0];
-        let region_coords_y = region_info.region_coords[1];
-        let new_elevs= region_info.get_elevs_as_blob()?;
-        const SQL_SELECT: &str = r"SELECT size_x, size_y, samples_x, samples_y, scale, offset, elevs, name, water_level
-            FROM raw_terrain_heights
-            WHERE LOWER(grid) = :grid AND region_coords_x = :region_coords_x AND region_coords_y = :region_coords_y";
-        let is_sames = self.conn.exec_map(
-            SQL_SELECT,
-            params! { grid, region_coords_x, region_coords_y },
-            |(size_x, size_y, samples_x, samples_y, scale, offset, elevs, name, water_level) : (u32, u32, u32, u32, f32, f32, Vec<u8>, String, f32)| {
-                //  Is the stored data identical to what we just read from the region?
-                log::trace!("Elevs:\n{:?} vs\n{:?}", elevs, new_elevs); // ***TEMP***
-                let is_same = 
-                    size_x == region_info.get_size()[0] && 
-                    size_y == region_info.get_size()[1] &&
-                    samples_x == samples[0] && 
-                    samples_y == samples[1] &&
-                    (scale - region_info.scale).abs() < Self::ELEV_ERROR_TOLERANCE  &&
-                    (offset - region_info.offset).abs() < Self::ELEV_ERROR_TOLERANCE &&
-                    Self::check_elev_err_within_tolerance(&elevs, &new_elevs, scale, offset, Self::ELEV_ERROR_TOLERANCE) &&
-                    name == region_info.name &&
-                    water_level == region_info.water_lev;                    
-                is_same
-            },
-        )?;
-        //  Changed?
-        Ok(if is_sames.is_empty() {
-            ChangeStatus::None
-        } else {
-            //  Must be 1, because of SELECT on unique key.
-            assert!(is_sames.len() == 1);
-            if is_sames[0] {
-                ChangeStatus::NoChange
-            } else {
-                ChangeStatus::Changed
-            }
-        })
-    }
 */
+
 
     /// Fix up some fields with strange formatting
     /// Texture ID prefix will be "XXn", where the first two characters indicate the type of texture.
@@ -494,7 +490,7 @@ impl AssetUploadHandler {
     fn parse_request(
         b: &[u8],
         _env: &HashMap<String, String>,
-    ) -> Result<AssetUploadArray, Error> {
+    ) -> Result<AssetUploadArrayShort, Error> {
         //  Should be UTF-8. Check.
         let s = core::str::from_utf8(b)?;
         if s.trim().is_empty() {
@@ -502,7 +498,7 @@ impl AssetUploadHandler {
         }
         log::info!("Uploaded JSON:\n{}", s);
         //  Should be valid JSON
-        let parsed: AssetUploadArray = serde_json::from_str(s)?;
+        let parsed: AssetUploadArrayShort = serde_json::from_str(s)?;
         Ok(parsed)
     }
 
@@ -514,20 +510,21 @@ impl AssetUploadHandler {
     /// If no, replace old data entirely.
     fn process_request(
         &mut self,
-        asset_info: AssetUploadArray,
+        asset_info_short: AssetUploadArrayShort,
         params: &HashMap<String, String>,
     ) -> Result<(usize, String), Error> {
         //  We have an array of assets.
-        log::info!("Processing {} assets.", asset_info.len());
-        for asset_upload in &asset_info {
+        log::info!("Processing {} assets.", asset_info_short.len());
+        for asset_upload_short in &asset_info_short {
+            let asset_upload = AssetUpload::new_from_asset_upload_short(asset_upload_short)?;
             match &asset_upload.prefix[0..2] {
                 "RS" => {
                     //  Sculpt
-                    self.update_sculpt_tile(asset_upload)?;
+                    self.update_sculpt_tile(&asset_upload)?;
                 }
                 "RT" => {
                     //  Texture
-                    self.update_texture_tile(asset_upload)?;
+                    self.update_texture_tile(&asset_upload)?;
                 }
                 _ => { 
                     return Err(anyhow!("Invalid asset upload prefix: {}", asset_upload.prefix));
