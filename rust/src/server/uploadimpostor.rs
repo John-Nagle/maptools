@@ -215,17 +215,19 @@ impl AssetUploadHandler {
     }
 
     /// Update terrain tile. A new terrain tile has been added, and needs to be added to the database.
-    fn update_texture_tile(&mut self, asset_upload: &AssetUpload, texture_index: u8) -> Result<(), Error> {
-            //  Insert tile, or update hash and uuid if exists. 
+    fn update_texture_tile(&mut self, asset_upload: &AssetUpload, texture_index: u8, asset_type: &str) -> Result<(), Error> {
+        //  Only insert textures here, not sculpts or meshes.
+        assert!(asset_type == "BaseTexture" || asset_type == "EmissiveTexture");
+        //  Insert tile, or update hash and uuid if exists. 
         const SQL_UPDATE_TILE: &str = r"INSERT INTO tile_assets
                 (grid, region_loc_x, region_loc_y, region_size_x, region_size_y,
                 impostor_lod, viz_group, texture_index, asset_hash, asset_uuid,
-                asset_name,
+                asset_name, asset_type,
                 creation_time) 
             VALUES 
                 (:grid, :region_loc_x, :region_loc_y, :region_size_x, :region_size_y,
                 :impostor_lod, :viz_group, :texture_index, :asset_hash, :asset_uuid,
-                :asset_name,
+                :asset_name, :asset_type,
                 NOW()) 
             ON DUPLICATE KEY UPDATE
                 asset_hash = :asset_hash, asset_uuid = :asset_uuid, creation_time = NOW()";
@@ -233,6 +235,7 @@ impl AssetUploadHandler {
         let values = params! {
             "grid" => asset_upload.grid.to_lowercase(),
             "asset_name" => asset_upload.asset_name.clone(),
+            "asset_type" => asset_type,
             "region_loc_x" => asset_upload.region_loc[0],
             "region_loc_y" => asset_upload.region_loc[1],
             "region_size_x" => asset_upload.region_size[0],
@@ -296,8 +299,7 @@ impl AssetUploadHandler {
                 AND viz_group = :viz_group AND impostor_lod = :impostor_lod
                 AND (asset_type = "BaseTexture" OR asset_type = "EmissiveTexture")
             ORDER BY texture_index"#;
-        let texture_tuples = self.conn.exec_map(
-            SQL_GET_TEXTURES,
+        let texture_query_params = 
             params! {
                 "grid" => asset_upload.grid.to_lowercase().clone(), 
                 "region_loc_x" => asset_upload.region_loc[0],
@@ -306,14 +308,18 @@ impl AssetUploadHandler {
                 "region_size_y" => asset_upload.region_size[1],
                 "impostor_lod" => asset_upload.impostor_lod,
                 "viz_group" => asset_upload.viz_group,
-            },
+            };
+        let name_opt = self.look_up_region_name(&asset_upload.grid.to_lowercase(), asset_upload.region_loc, asset_upload.region_size, )?;
+        log::debug!("Textures for sculpt {:?}, query params: {:?}", name_opt, texture_query_params);
+        let texture_tuples = self.conn.exec_map(
+            SQL_GET_TEXTURES,
+            texture_query_params,
             |(texture_index, texture_uuid,texture_hash, asset_type) : (usize, String, String, String)| {
            (texture_index, texture_uuid, texture_hash, asset_type)
             },
         )?;        
-        let name_opt = self.look_up_region_name(&asset_upload.grid.to_lowercase(), asset_upload.region_loc, asset_upload.region_size, )?;
         //  Build the textures as  JSON. Format is an array of JSON structs.        
-        log::debug!("Textures for sculpt {:?}: {:?}", name_opt, texture_tuples);
+        log::debug!("Textures for sculpt {:?}  {:?}", name_opt, texture_tuples);
         let faces_json = RegionImpostorFaceData::json_from_tuples(&texture_tuples)?;
         //  We have all the info now. Update the region_impostor table.
         //  Insert tile, or update hash and uuid if exists. 
@@ -397,11 +403,11 @@ impl AssetUploadHandler {
                 }
                 TileAssetType::BaseTexture(ix) => {
                     //  Texture
-                    self.update_texture_tile(&asset_upload, *ix)?;
+                    self.update_texture_tile(&asset_upload, *ix, "BaseTexture")?;
                 }
                 TileAssetType::EmissiveTexture(ix) => {
                     //  Texture
-                    self.update_texture_tile(&asset_upload, *ix)?;
+                    self.update_texture_tile(&asset_upload, *ix, "EmissiveTexture")?;
                 }
             }
         }
