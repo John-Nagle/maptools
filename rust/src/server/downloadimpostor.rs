@@ -5,15 +5,15 @@
 //! 
 //! Requests:
 //!
-//!     https://animatsinfo/actions/downloadimpostor.fcgi?grid=NAME,x=NNN,y=NNN
+//!     https://animats.info/actions/downloadimpostor.fcgi?grid=NAME,x=NNN,y=NNN
 //!
 //! Returns info for one region, if available.
 //!
-//!     https://animatsinfo/actions/downloadimpostor.fcgi?grid=NAME, viz_group=NNN
+//!     https://animats.info/actions/downloadimpostor.fcgi?grid=NAME, viz_group=NNN
 //!
 //! Returns info for one visibility group, if available.
 //!
-//!     https://animatsinfo/actions/downloadimpostor.fcgi?grid=NAME
+//!     https://animats.info/actions/downloadimpostor.fcgi?grid=NAME
 //!
 //! Returns info for an entire grid. Mostly for test purposes.
 //!
