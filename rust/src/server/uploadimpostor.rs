@@ -337,7 +337,7 @@ impl AssetUploadHandler {
                 :scale_x, :scale_y, :scale_z,
                 :elevation_offset, :impostor_lod, :viz_group, 
                 :sculpt_uuid, 
-                :water_height, NOW(), faces_json)
+                :water_height, NOW(), :faces_json)
             ON DUPLICATE KEY UPDATE
                 scale_x = :scale_x, scale_y = :scale_y, scale_z = :scale_z,
                 elevation_offset = :elevation_offset, impostor_lod := impostor_lod, viz_group = :viz_group,

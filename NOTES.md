@@ -541,6 +541,13 @@ Complete, but correct?
           - Add an "original vizgroup" field, default NULL, for tracking.
         - How does garbage collection work?
        - Efficient find first free vizgroup number with SQL?
+     
+    Generated region impostor database for the first time.
+    TODO:
+    - Do we need hash values? Probably not, remove from table after checking.
+    - Pass creator info through to region_impostors table.
+    - faces_json not getting set.
+    - Optimization stuff.
         
        
     
