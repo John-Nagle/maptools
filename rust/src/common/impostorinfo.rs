@@ -121,7 +121,7 @@ impl RegionImpostorFaceData {
             let mut vals = serde_json::Map::new();
             let mut inserter = |k: &str, v: &str| { vals.insert(k.to_string(), serde_json::Value::String(v.to_string())) };
             //  Not putting the hashes in the JSON because the viewer does not need them.
-            if let Some(v) = &emissive_textures[n] {
+            if let Some(v) = &base_textures[n] {
                 inserter("base_texture_uuid", v);
             }
             if let Some(v) = &emissive_textures[n] {
