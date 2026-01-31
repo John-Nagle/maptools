@@ -527,6 +527,20 @@ Complete, but correct?
     
     Close to getting useful output.
     But sql and database now out of sync. LSL uploader out of sync. 
+    
+ 2026-01-30
+    Back in sync.
+    Optimizations to put in:
+    - When generating tiles, check if exact duplicate on filename, including hash.
+      If so, no need to generate again.
+    - Vizgroup numbering
+      - Generated numbers from the current pass are always used.
+      - If a generated tile matches on everything but vizgroup,
+        - Do not generate a new tile.
+        - Generator adds a new entry for it in tile_asset with new visgroup number but old filename.
+          - Add an "original vizgroup" field, default NULL, for tracking.
+        - How does garbage collection work?
+       - Efficient find first free vizgroup number with SQL?
         
        
     

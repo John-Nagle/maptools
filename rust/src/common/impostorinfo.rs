@@ -23,6 +23,7 @@ use anyhow::{anyhow, Error};
 use uuid::Uuid;
 use serde;
 use serde::{Deserialize, Serialize};
+use std::collections::{HashMap};
 /// The data stored in the database for a region impostor.
 ///
 /// This is very similar to the version inside Sharpview at
@@ -86,11 +87,14 @@ pub struct RegionImpostorFaceData {
 }
 
 impl RegionImpostorFaceData {
-    /// Make array from array of tuples
-    pub fn new_array_from_tuples(tuples: &Vec<(usize, String, String, String)>) -> Result<Vec<RegionImpostorFaceData>, Error> {
+    /// Make JSON from array of tuples.
+    /// Tuples are in order but may be sparse.
+    /// JSON must be an array in texture index order but rows can be empty.
+    /// This requires excessive wrangling.
+    pub fn json_from_tuples(tuples: &Vec<(usize, String, String, String)>) -> Result<serde_json::Value, Error> {
         const MAX_TEXTURES: usize = 8;
-        let mut base_textures: [Option<(String, String)>;MAX_TEXTURES] = Default::default();
-        let mut emissive_textures: [Option<(String, String)>;MAX_TEXTURES] = Default::default();
+        let mut base_textures: [Option<String>;MAX_TEXTURES] = Default::default();
+        let mut emissive_textures: [Option<String>;MAX_TEXTURES] = Default::default();
         for (texture_index, texture_uuid, texture_hash, asset_type) in tuples {
             let arr = match asset_type.as_str() {
                 "BaseTexture" => &mut base_textures,
@@ -103,28 +107,31 @@ impl RegionImpostorFaceData {
             if arr[*texture_index].is_some() {
                 return Err(anyhow!("Duplicate texture index {} asset type for face data: {}", texture_index, asset_type)); 
             }
-            arr[*texture_index] = Some((texture_uuid.to_string(), texture_hash.to_string()));
+            arr[*texture_index] = Some(texture_uuid.to_string());
         }
         //  Now we have arrays of tuples. Convert to a vec of structs, stopping at the last non-empty.
         let mut face_data = Vec::new();
-        let cnt = MAX_TEXTURES; // ***TEMP***
-/*   NEEDS WORK
+        let cnt = MAX_TEXTURES; // Cover all the slots
         for n in 0..cnt {
-            //  Stop at first empty slot. Sparse texture usage not supported yet. ***FIX*** ***CREATE JSON HERE***
+            //  Stop at first empty slot. 
+            //  Sparse texture usage not supported.
             if base_textures[n].is_none() {
                 break;
             }
-            let item = RegionImpostorFaceData {
-                base_texture_uuid: base_textures[n].unwrap().0,
-                base_texture_hash: base_textures[n].unwrap().1,
-                emissive_texture_uuid: emissive_textures[n].0,
-                emissive_texture_hash: emissive_textures[n].1,
-            };
-            face_data.push(item);
+            let mut vals = serde_json::Map::new();
+            let mut inserter = |k: &str, v: &str| { vals.insert(k.to_string(), serde_json::Value::String(v.to_string())) };
+            //  Not putting the hashes in the JSON because the viewer does not need them.
+            if let Some(v) = &emissive_textures[n] {
+                inserter("base_texture_uuid", v);
+            }
+            if let Some(v) = &emissive_textures[n] {
+                inserter("emissive_texture_uuid", v);
+            }
+            face_data.push(serde_json::Value::Object(vals));
         }
-*/
-        todo!();
-        Ok(face_data)
+        let face_json = serde_json::Value::Array(face_data);
+        log::debug!("Face JSON: {:?}", face_json);
+        Ok(face_json)
     }    
 }
 

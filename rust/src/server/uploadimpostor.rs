@@ -14,7 +14,7 @@ use log::LevelFilter;
 use common::Credentials;
 use common::init_fcgi;
 use common::{Handler, Request, Response};
-use common::{RegionImpostorData};
+use common::{RegionImpostorFaceData};
 use mysql::prelude::{Queryable};
 use mysql::{Pool};
 use mysql::{PooledConn, params};
@@ -156,24 +156,6 @@ impl AssetUpload {
         let uuid = Uuid::parse_str(uuid_str)?;
         Ok(uuid.to_string())
     }
-/*           
-    string prefix = llList2String(fields,0);
-    integer x = (integer) llList2String(fields, 1);
-    integer y = (integer) llList2String(fields, 2);
-    integer sx = (integer) llList2String(fields, 3);
-    integer sy = (integer) llList2String(fields, 4);
-    float sz = (float) llList2String(fields, 5);
-    float elevation_offset = (float) llList2String(fields, 6);
-    integer lod = (integer)llList2String(fields, 7);
-    integer viz_group = (integer)llList2String(fields, 8);
-    float water_height = (float) llList2String(fields, 9);
-    string region_hash = llList2String(fields, 10);
-    //  Assemble data
-    string region_loc = llList2Json(JSON_ARRAY, [x, y]);
-    string scale = llList2Json(JSON_ARRAY, [sx, sy, sz]);
-    string region_size = llList2Json(JSON_ARRAY, [sx, sy]);
-    }
-*/
 }
 
 /// Short version of asset upload.
@@ -325,46 +307,16 @@ impl AssetUploadHandler {
                 "impostor_lod" => asset_upload.impostor_lod,
                 "viz_group" => asset_upload.viz_group,
             },
-            |(texture_index, texture_uuid,texture_hash, asset_type) : (Option<u8>, String, String)| {
+            |(texture_index, texture_uuid,texture_hash, asset_type) : (usize, String, String, String)| {
            (texture_index, texture_uuid, texture_hash, asset_type)
             },
         )?;        
         let name_opt = self.look_up_region_name(&asset_upload.grid.to_lowercase(), asset_upload.region_loc, asset_upload.region_size, )?;
-        //  Build the textures as  JSON. Format is an array of JSON structs.
-        //  ***MORE***
-        
+        //  Build the textures as  JSON. Format is an array of JSON structs.        
         log::debug!("Textures for sculpt {:?}: {:?}", name_opt, texture_tuples);
+        let faces_json = RegionImpostorFaceData::json_from_tuples(&texture_tuples)?;
         //  We have all the info now. Update the region_impostor table.
         //  Insert tile, or update hash and uuid if exists. 
-        /*
-        CREATE TABLE IF NOT EXISTS region_impostors (
-    grid VARCHAR(40) NOT NULL,
-    name VARCHAR(100) NOT NULL,
-    region_loc_x INT NOT NULL,
-    region_loc_y INT NOT NULL,
-    region_size_x INT NOT NULL,
-    region_size_y INT NOT NULL,
-    scale_x INT NOT NULL,
-    scale_y INT NOT NULL,
-    scale_z FLOAT NOT NULL,
-    elevation_offset FLOAT NOT NULL,
-    impostor_lod TINYINT NOT NULL,
-    viz_group INT NOT NULL,
-    uniqueness_viz_group INT DEFAULT NULL,
-    mesh_uuid CHAR(36) DEFAULT NULL,
-    mesh_hash CHAR(8) DEFAULT NULL,
-    sculpt_uuid CHAR(36) DEFAULT NULL,
-    sculpt_hash CHAR(8) DEFAULT NULL,
-    water_height FLOAT NOT NULL,
-    creator VARCHAR(63) NOT NULL,
-    creation_time TIMESTAMP NOT NULL,
-    faces_json JSON NOT NULL,
-    UNIQUE INDEX (grid, region_loc_x, region_loc_y, impostor_lod, uniqueness_vizgroup),
-    INDEX(grid, viz_group),
-    INDEX(name)
-    
-    Delete hashes and creator fields from SQL table. This is a product, not input data.
-*/
         const SQL_IMPOSTOR: &str = r"INSERT INTO region_impostors
                 (grid, name, region_loc_x, region_loc_y, region_size_x, region_size_y, uniqueness_viz_group,
                 scale_x, scale_y, scale_z, 
@@ -383,7 +335,6 @@ impl AssetUploadHandler {
                 sculpt_uuid = :sculpt_uuid,
                 water_height = :water_height, creation_time = NOW(), faces_json = :faces_json";
                
-        let faces_json = "".to_string();    // ***TEMP*** 
         let insert_params = params! {
                 "grid" => asset_upload.grid.to_lowercase().clone(), 
                 "region_loc_x" => asset_upload.region_loc[0],
@@ -398,7 +349,7 @@ impl AssetUploadHandler {
                 "viz_group" => asset_upload.viz_group,
                 "elevation_offset" => asset_upload.elevation_offset,
                 "water_height" => asset_upload.water_height,
-                "faces_json" => faces_json,
+                "faces_json" => faces_json.to_string(),
             };
         //  ***MORE***
         Ok(())
@@ -451,9 +402,6 @@ impl AssetUploadHandler {
                 TileAssetType::EmissiveTexture(ix) => {
                     //  Texture
                     self.update_texture_tile(&asset_upload, *ix)?;
-                }
-                _ => { 
-                    return Err(anyhow!("Invalid asset type: {:?}", asset_upload_short));
                 }
             }
         }
