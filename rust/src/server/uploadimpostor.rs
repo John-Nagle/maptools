@@ -232,7 +232,7 @@ impl AssetUploadHandler {
             ON DUPLICATE KEY UPDATE
                 asset_hash = :asset_hash, asset_uuid = :asset_uuid, creation_time = NOW()";
         //  UNIQUE INDEX (grid, region_loc_x, region_loc_y, impostor_lod, viz_group, texture_index)
-        let values = params! {
+        let params = params! {
             "grid" => asset_upload.grid.to_lowercase(),
             "asset_name" => asset_upload.asset_name.clone(),
             "asset_type" => asset_type,
@@ -246,8 +246,8 @@ impl AssetUploadHandler {
             "asset_uuid" => asset_upload.asset_uuid.clone(),
             "asset_hash" => asset_upload.asset_hash.clone(),
         };
-        log::debug!("SQL terrain tile update: {:?}", values);
-        self.conn.exec_drop(SQL_UPDATE_TILE, values)?;
+        log::debug!("SQL terrain tile update: {:?}", params);
+        self.conn.exec_drop(SQL_UPDATE_TILE, params)?;
         log::debug!("SQL terrain tile update succeeded.");
         Ok(())
     }
@@ -286,6 +286,7 @@ impl AssetUploadHandler {
     }
     
     /// Update a sculpt tile.
+    /// ***NEED TO UPLOAD TO tile_asset table***
     fn update_sculpt_tile(&mut self, asset_upload: &AssetUpload) -> Result<(), Error> {
         //  Most of the info we need is in asset_upload, but we also need:
         //  - name
@@ -310,7 +311,9 @@ impl AssetUploadHandler {
                 "viz_group" => asset_upload.viz_group,
             };
         let name_opt = self.look_up_region_name(&asset_upload.grid.to_lowercase(), asset_upload.region_loc, asset_upload.region_size, )?;
-        log::debug!("Textures for sculpt {:?}, query params: {:?}", name_opt, texture_query_params);
+        //  Name is only for debug and documentation
+        let name = if let Some(name) = name_opt { name } else { "(UNKNOWN)".to_string() };
+        log::debug!("Textures for sculpt {:?}, query params: {:?}", name, texture_query_params);
         let texture_tuples = self.conn.exec_map(
             SQL_GET_TEXTURES,
             texture_query_params,
@@ -319,14 +322,14 @@ impl AssetUploadHandler {
             },
         )?;        
         //  Build the textures as  JSON. Format is an array of JSON structs.        
-        log::debug!("Textures for sculpt {:?}  {:?}", name_opt, texture_tuples);
+        log::debug!("Textures for sculpt {:?}  {:?}", name, texture_tuples);
         let faces_json = RegionImpostorFaceData::json_from_tuples(&texture_tuples)?;
         //  We have all the info now. Update the region_impostor table.
         //  Insert tile, or update hash and uuid if exists. 
         const SQL_IMPOSTOR: &str = r"INSERT INTO region_impostors
                 (grid, name, region_loc_x, region_loc_y, region_size_x, region_size_y, uniqueness_viz_group,
                 scale_x, scale_y, scale_z, 
-                elevation_offiset, impostor_lod, viz_group, 
+                elevation_offset, impostor_lod, viz_group, 
                 sculpt_uuid,
                 water_height, creation_time, faces_json) 
             VALUES 
@@ -342,7 +345,9 @@ impl AssetUploadHandler {
                 water_height = :water_height, creation_time = NOW(), faces_json = :faces_json";
                
         let insert_params = params! {
-                "grid" => asset_upload.grid.to_lowercase().clone(), 
+                "grid" => asset_upload.grid.to_lowercase().clone(),
+                "name" => name,
+                "sculpt_uuid" => asset_upload.asset_uuid.clone(),
                 "region_loc_x" => asset_upload.region_loc[0],
                 "region_loc_y" => asset_upload.region_loc[1],
                 "region_size_x" => asset_upload.region_size[0],
@@ -357,7 +362,9 @@ impl AssetUploadHandler {
                 "water_height" => asset_upload.water_height,
                 "faces_json" => faces_json.to_string(),
             };
-        //  ***MORE***
+        //  Finally insert into the impostor table
+        log::debug!("Inserting impostor into region_impostors, params: {:?}", insert_params);
+        self.conn.exec_drop(SQL_IMPOSTOR, insert_params)?;
         Ok(())
     }
     
