@@ -365,9 +365,7 @@ impl AssetUploadHandler {
         //  Name is only for debug and documentation
         let name = if let Some(name) = name_opt { name } else { "(UNKNOWN)".to_string() };
         //  Valid sculpt tile.  Update tile assets.
-        log::debug!("Inserting {} into tile_assets.", name);
-        self.update_tile(asset_upload, None, "SculptTexture")?;
-        log::debug!("Inserting {} into region_impostors.", name);        
+        self.update_tile(asset_upload, None, "SculptTexture")?;        
         let mesh_uuid = Some(asset_upload.asset_uuid.clone());
         let sculpt_uuid = None;
         self.update_impostor_info(asset_upload, &name, mesh_uuid, sculpt_uuid, faces_json)
@@ -384,52 +382,7 @@ impl AssetUploadHandler {
         //  Name is only for debug and documentation
         let name = if let Some(name) = name_opt { name } else { "(UNKNOWN)".to_string() };
         //  Valid sculpt tile.  Update tile assets.
-        log::debug!("Inserting {} into tile_assets.", name);
-        self.update_tile(asset_upload, None, "SculptTexture")?;
-        log::debug!("Inserting {} into region_impostors.", name);
-/*
-        //  We have all the info now. Update the region_impostor table.
-        //  Insert tile, or update hash and uuid if exists. 
-        const SQL_IMPOSTOR: &str = r"INSERT INTO region_impostors
-                (grid, name, region_loc_x, region_loc_y, region_size_x, region_size_y, uniqueness_viz_group,
-                scale_x, scale_y, scale_z, 
-                elevation_offset, impostor_lod, viz_group, 
-                sculpt_uuid,
-                water_height, creation_time, faces_json) 
-            VALUES 
-                (:grid, :name, :region_loc_x, :region_loc_y, :region_size_x, :region_size_y, :uniqueness_viz_group,
-                :scale_x, :scale_y, :scale_z,
-                :elevation_offset, :impostor_lod, :viz_group, 
-                :sculpt_uuid, 
-                :water_height, NOW(), :faces_json)
-            ON DUPLICATE KEY UPDATE
-                scale_x = :scale_x, scale_y = :scale_y, scale_z = :scale_z,
-                elevation_offset = :elevation_offset, impostor_lod := impostor_lod, viz_group = :viz_group,
-                sculpt_uuid = :sculpt_uuid,
-                water_height = :water_height, creation_time = NOW(), faces_json = :faces_json";
-               
-        let insert_params = params! {
-                "grid" => asset_upload.grid.to_lowercase().clone(),
-                "name" => name,
-                "sculpt_uuid" => asset_upload.asset_uuid.clone(),
-                "region_loc_x" => asset_upload.region_loc[0],
-                "region_loc_y" => asset_upload.region_loc[1],
-                "region_size_x" => asset_upload.region_size[0],
-                "region_size_y" => asset_upload.region_size[1],
-                "scale_x" => asset_upload.scale[0], // ***CONVERT TO INT***
-                "scale_y" => asset_upload.scale[1], // ***CONVERT TO INT***
-                "scale_z" => asset_upload.scale[2],
-                "impostor_lod" => asset_upload.impostor_lod,
-                "uniqueness_viz_group" => asset_upload.viz_group, // ***NOT SURE ABOUT THIS***
-                "viz_group" => asset_upload.viz_group,
-                "elevation_offset" => asset_upload.elevation_offset,
-                "water_height" => asset_upload.water_height,
-                "faces_json" => faces_json.to_string(),
-            };
-        //  Finally insert into the impostor table
-        log::debug!("Inserting impostor into region_impostors, params: {:?}", insert_params);
-        self.conn.exec_drop(SQL_IMPOSTOR, insert_params)?;
-*/        
+        self.update_tile(asset_upload, None, "SculptTexture")?;       
         let sculpt_uuid = Some(asset_upload.asset_uuid.clone());
         let mesh_uuid = None;
         self.update_impostor_info(asset_upload, &name, mesh_uuid, sculpt_uuid, faces_json)
