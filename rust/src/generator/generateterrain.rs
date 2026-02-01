@@ -32,6 +32,7 @@ use vizgroup::{CompletedGroups, RegionData, VizGroups};
 use sculptmaker::{TerrainSculpt, TerrainSculptTexture};
 use regionorder::{TileLods, homogeneous_group_size};
 use ureq::{Agent};
+use std::fmt::{Display};
 
 
 /// MySQL Credentials for uploading.
@@ -211,6 +212,31 @@ impl HeightFieldCache {
     }
 }
 
+/// Statistics for terrain generator
+struct TerrainGeneratorStats {
+    /// Generated, must upload to SL/OS.
+    assets_generated: usize,
+    /// Reused, nothing to upload to SL/OS
+    assets_reused: usize,
+}
+
+impl TerrainGeneratorStats {
+    /// Usual new
+    fn new() -> Self {
+        Self {
+            assets_generated: 0,
+            assets_reused: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for TerrainGeneratorStats {
+    // Implement `fmt::Display` for the struct
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        writeln!(f, "Assets generated: {}\nAssets reused:   {}", self.assets_generated, self.assets_reused)
+    }
+}
+
 /// The terrain object generator
 struct TerrainGenerator {
     /// SQL connection
@@ -228,6 +254,8 @@ struct TerrainGenerator {
     generate_mesh: bool,
     /// The height field cache
     height_field_cache: HeightFieldCache,
+    /// Statistics
+    stats: TerrainGeneratorStats,
 }
 
 impl TerrainGenerator {
@@ -252,6 +280,7 @@ impl TerrainGenerator {
             corners_touch_connects,
             generate_mesh,
             height_field_cache: HeightFieldCache::new(),
+            stats: TerrainGeneratorStats::new(),
         }
     }
 
@@ -455,6 +484,34 @@ impl TerrainGenerator {
             )
         }
     }
+    
+    /// Does asset already exist and is logged in the tile asset table?
+    /// If it does, we don't have to generate and upload it again.
+    /// Huge optimization.
+    /// But fails if the viz group changes.
+    /// That has to be handled elsewhere.
+    fn asset_already_exists(&mut self, grid: &str, asset_name: &str) -> Result<bool, Error> {
+        const SQL_CHECK_ASSET_EXISTS: &str = r"SELECT asset_name FROM tile_assets 
+            WHERE grid= :grid AND asset_name = :asset_name";
+        let params = params! {
+            "grid" => grid.to_lowercase().clone(), 
+            "asset_name" => asset_name,
+            };
+        let asset_names = self.conn.exec_map(
+            SQL_CHECK_ASSET_EXISTS,
+            params,
+            |(name) : (String)| {
+                name
+            })?;
+        if asset_names.is_empty() {
+            Ok(false)
+        } else {
+            //  Database enforces these constraints.
+            assert_eq!(asset_names.len(), 1);
+            assert_eq!(asset_names[0], asset_name);
+            Ok(true)
+        }
+    }
 
     /// Build the impostor as a sculpt.
     pub fn build_impostor_sculpt(
@@ -466,33 +523,44 @@ impl TerrainGenerator {
         const IMPOSTOR_SCULPT_PREFIX: &str = "RS";
         const IMPOSTOR_TERRAIN_PREFIX: &str = "RT0";
         let lod = region.lod;
+        let grid = &region.grid;
         log::info!("Generating sculpt for \"{}\": {}", region.name, height_field);
         // TerrainSculpt was translated from Python with an LLM. NEEDS WORK
-        let sculpt_impostor_name = region.name.clone(); // ***TEMP***
-        let mut terrain_sculpt = TerrainSculpt::new(&sculpt_impostor_name);
+        //  Do sculpt
+        let mut terrain_sculpt = TerrainSculpt::new(&region.name);
         let (scale, offset, elevs) = height_field.into_sculpt_array()?;
         terrain_sculpt.setelevs(elevs, scale as f64, offset as f64);
         terrain_sculpt.makeimage();
         let hash = terrain_sculpt.get_hash()?;
         let sculpt_name = Self::impostor_name(IMPOSTOR_SCULPT_PREFIX, region, height_field, lod, viz_group_id, hash)?;
-        let sculpt_image = terrain_sculpt.image.unwrap();
-        let mut sculpt_image_path = self.outdir.clone();
-        sculpt_image_path.push(sculpt_name.to_owned() + ".png");
-        
-        log::info!("Generating texture for  \"{}\"", sculpt_image_path.display());
+        if self.asset_already_exists(grid, &sculpt_name)? {
+            log::info!("Sculpt image asset already exists: {}", sculpt_name);
+            self.stats.assets_reused += 1;
+        } else {
+            let sculpt_image = terrain_sculpt.image.unwrap();
+            let mut sculpt_image_path = self.outdir.clone();
+            sculpt_image_path.push(sculpt_name.to_owned() + ".png");
+            sculpt_image.save(&sculpt_image_path)?;
+            log::info!("Sculpt image file saved: \"{}\"", sculpt_image_path.display());  
+            self.stats.assets_generated += 1;  
+        }
+        //  Do texture
+        log::info!("Generating texture image for  \"{}\"", &region.name);
         let mut terrain_image = TerrainSculptTexture::new(region.region_loc_x, region.region_loc_y, lod, &region.name);
         terrain_image.makeimage(TERRAIN_SCULPT_TEXTURE_SIZE)?;
         let hash = terrain_image.get_hash()?;
         let terrain_image_name = Self::impostor_name(IMPOSTOR_TERRAIN_PREFIX, region, height_field, lod, viz_group_id, hash)?;
-        
-        let mut terrain_image_path = self.outdir.clone();
-        terrain_image_path.push(terrain_image_name.to_owned() + ".png");
-        let terrain_image = terrain_image.image.unwrap();
-        //  Did both sculpt and its one texture. Now OK to write files
-        sculpt_image.save(sculpt_image_path)?;
-        log::info!("Sculpt image saved: \"{}\"", terrain_image_path.display());    
-        terrain_image.save(&terrain_image_path)?;
-        log::info!("Sculpt terrain image saved: \"{}\"", terrain_image_path.display());        
+        if self.asset_already_exists(grid, &terrain_image_name)? {
+            log::info!("Terrain image asset already exists: {}", terrain_image_name);
+            self.stats.assets_reused += 1;
+        } else {
+            let mut terrain_image_path = self.outdir.clone();
+            terrain_image_path.push(terrain_image_name.to_owned() + ".png");
+            let terrain_image = terrain_image.image.unwrap();
+            terrain_image.save(&terrain_image_path)?;
+            log::info!("Terrain image file saved: \"{}\"", terrain_image_path.display());
+            self.stats.assets_generated += 1;      
+        }
         Ok(())
     }
 
@@ -582,6 +650,8 @@ fn run(pool: Pool, outdir: PathBuf, grid: String, url_prefix_opt: Option<String>
     }
     let grid_entry = grids.pop().unwrap(); // get the one grid
     terrain_generator.process_grid(grid_entry)?;
+    println!("Statistics:\n{}", terrain_generator.stats);
+    log::info!("Statistics:\n{}", terrain_generator.stats);
     Ok(())
 }
 

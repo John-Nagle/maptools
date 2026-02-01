@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS region_impostors (
 
 --- Region textures. Used to hold texture information which needs to be matched to geometry.
 
-CREATE TABLE IF NOT EXISTS tile_asset (
+CREATE TABLE IF NOT EXISTS tile_assets (
     grid VARCHAR(40) NOT NULL,
     region_loc_x INT NOT NULL,
     region_loc_y INT NOT NULL,
@@ -71,5 +71,5 @@ CREATE TABLE IF NOT EXISTS tile_asset (
     asset_hash CHAR(8) NOT NULL,
     creation_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE INDEX (grid, region_loc_x, region_loc_y, impostor_lod, viz_group, texture_index),
-    UNIQUE INDEX (file_name)
+    UNIQUE INDEX (grid, asset_name)
 )

@@ -548,6 +548,9 @@ Complete, but correct?
     - Pass creator info through to region_impostors table.
     - faces_json not getting set.
     - Optimization stuff.
+    
+  2026-01-31
+    Add grid to tile_assets table index as UNIQUE INDEX (grid, asset_name)
         
        
     
