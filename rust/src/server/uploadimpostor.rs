@@ -272,18 +272,8 @@ impl AssetUploadHandler {
         }
     }
     
-    /// Update terrain tile. A new terrain tile has been added, and needs to be added to the database.
-    fn update_mesh_tile(&mut self, _asset_upload: &AssetUpload) -> Result<(), Error> {
-        Err(anyhow!("Mesh tiles unimplemented"))
-    }
-
-    /// Update a sculpt tile.
-    /// ***NEED TO UPLOAD TO tile_asset table***
-    fn update_sculpt_tile(&mut self, asset_upload: &AssetUpload) -> Result<(), Error> {
-        //  Most of the info we need is in asset_upload, but we also need:
-        //  - name
-        //  - face texture data.
-        log::debug!("Update sculpt tile: {:?}", asset_upload);
+    //  Get face information, which is texture UUIDs.
+    fn get_faces_json(&mut self, asset_upload: &AssetUpload) -> Result<serde_json::Value, Error> {
         //  Get face texture data. One row for each face.
         const SQL_GET_TEXTURES: &str = r#"SELECT texture_index, asset_uuid, asset_hash, asset_type
             FROM tile_assets
@@ -302,10 +292,7 @@ impl AssetUploadHandler {
                 "impostor_lod" => asset_upload.impostor_lod,
                 "viz_group" => asset_upload.viz_group,
             };
-        let name_opt = self.look_up_region_name(&asset_upload.grid.to_lowercase(), asset_upload.region_loc, asset_upload.region_size, )?;
-        //  Name is only for debug and documentation
-        let name = if let Some(name) = name_opt { name } else { "(UNKNOWN)".to_string() };
-        log::debug!("Textures for sculpt {:?}, query params: {:?}", name, texture_query_params);
+        log::debug!("Textures for sculpt/mesh {:?}, query params: {:?}", asset_upload.asset_name, texture_query_params);
         let texture_tuples = self.conn.exec_map(
             SQL_GET_TEXTURES,
             texture_query_params,
@@ -314,12 +301,93 @@ impl AssetUploadHandler {
             },
         )?;        
         //  Build the textures as  JSON. Format is an array of JSON structs.        
-        log::debug!("Textures for sculpt {:?}  {:?}", name, texture_tuples);
-        let faces_json = RegionImpostorFaceData::json_from_tuples(&texture_tuples)?;
+        log::debug!("Textures for sculpt/mesh {:?}  {:?}", asset_upload.asset_name, texture_tuples);
+        RegionImpostorFaceData::json_from_tuples(&texture_tuples)
+    }
+    
+    /// Update impostor info in region_impostors table.
+    fn update_impostor_info(&mut self, asset_upload: &AssetUpload, name: &str, mesh_uuid: Option<String>, sculpt_uuid: Option<String>, faces_json: serde_json::Value) -> Result<(), Error> {
+
+        log::debug!("Inserting {} into region_impostors.", name);
+        //  We have all the info now. Update the region_impostor table.
+        //  Insert tile, or update hash and uuid if exists. 
+        const SQL_IMPOSTOR: &str = r"INSERT INTO region_impostors
+                (grid, name, region_loc_x, region_loc_y, region_size_x, region_size_y, uniqueness_viz_group,
+                scale_x, scale_y, scale_z, 
+                elevation_offset, impostor_lod, viz_group, 
+                mesh_uuid, sculpt_uuid,
+                water_height, creation_time, faces_json) 
+            VALUES 
+                (:grid, :name, :region_loc_x, :region_loc_y, :region_size_x, :region_size_y, :uniqueness_viz_group,
+                :scale_x, :scale_y, :scale_z,
+                :elevation_offset, :impostor_lod, :viz_group, 
+                :mesh_uuid, :sculpt_uuid, 
+                :water_height, NOW(), :faces_json)
+            ON DUPLICATE KEY UPDATE
+                scale_x = :scale_x, scale_y = :scale_y, scale_z = :scale_z,
+                elevation_offset = :elevation_offset, impostor_lod := impostor_lod, viz_group = :viz_group,
+                mesh_uuid = :mesh_uuid,
+                sculpt_uuid = :sculpt_uuid,
+                water_height = :water_height, creation_time = NOW(), faces_json = :faces_json";
+               
+        let insert_params = params! {
+                "grid" => asset_upload.grid.to_lowercase().clone(),
+                "name" => name,
+                "mesh_uuid" => mesh_uuid,
+                "sculpt_uuid" => sculpt_uuid,
+                "region_loc_x" => asset_upload.region_loc[0],
+                "region_loc_y" => asset_upload.region_loc[1],
+                "region_size_x" => asset_upload.region_size[0],
+                "region_size_y" => asset_upload.region_size[1],
+                "scale_x" => asset_upload.scale[0], // ***CONVERT TO INT***
+                "scale_y" => asset_upload.scale[1], // ***CONVERT TO INT***
+                "scale_z" => asset_upload.scale[2],
+                "impostor_lod" => asset_upload.impostor_lod,
+                "uniqueness_viz_group" => asset_upload.viz_group, // ***NOT SURE ABOUT THIS***
+                "viz_group" => asset_upload.viz_group,
+                "elevation_offset" => asset_upload.elevation_offset,
+                "water_height" => asset_upload.water_height,
+                "faces_json" => faces_json.to_string(),
+            };
+        //  Finally insert into the impostor table
+        log::debug!("Inserting impostor into region_impostors, params: {:?}", insert_params);
+        Ok(self.conn.exec_drop(SQL_IMPOSTOR, insert_params)?)
+    }
+    
+    /// Update terrain tile. A new terrain tile has been added, and needs to be added to the database.
+    fn update_mesh_tile(&mut self, asset_upload: &AssetUpload) -> Result<(), Error> {
+        //  Most of the info we need is in asset_upload, but we also need:
+        //  - name
+        //  - face texture data.
+        log::debug!("Update mesh tile: {:?}", asset_upload);
+        let faces_json = self.get_faces_json(asset_upload)?;
+        let name_opt = self.look_up_region_name(&asset_upload.grid.to_lowercase(), asset_upload.region_loc, asset_upload.region_size, )?;
+        //  Name is only for debug and documentation
+        let name = if let Some(name) = name_opt { name } else { "(UNKNOWN)".to_string() };
+        //  Valid sculpt tile.  Update tile assets.
+        log::debug!("Inserting {} into tile_assets.", name);
+        self.update_tile(asset_upload, None, "SculptTexture")?;
+        log::debug!("Inserting {} into region_impostors.", name);        
+        let mesh_uuid = Some(asset_upload.asset_uuid.clone());
+        let sculpt_uuid = None;
+        self.update_impostor_info(asset_upload, &name, mesh_uuid, sculpt_uuid, faces_json)
+    }
+
+    /// Update a sculpt tile.
+    fn update_sculpt_tile(&mut self, asset_upload: &AssetUpload) -> Result<(), Error> {
+        //  Most of the info we need is in asset_upload, but we also need:
+        //  - name
+        //  - face texture data.
+        log::debug!("Update sculpt tile: {:?}", asset_upload);
+        let faces_json = self.get_faces_json(asset_upload)?;
+        let name_opt = self.look_up_region_name(&asset_upload.grid.to_lowercase(), asset_upload.region_loc, asset_upload.region_size, )?;
+        //  Name is only for debug and documentation
+        let name = if let Some(name) = name_opt { name } else { "(UNKNOWN)".to_string() };
         //  Valid sculpt tile.  Update tile assets.
         log::debug!("Inserting {} into tile_assets.", name);
         self.update_tile(asset_upload, None, "SculptTexture")?;
         log::debug!("Inserting {} into region_impostors.", name);
+/*
         //  We have all the info now. Update the region_impostor table.
         //  Insert tile, or update hash and uuid if exists. 
         const SQL_IMPOSTOR: &str = r"INSERT INTO region_impostors
@@ -361,7 +429,10 @@ impl AssetUploadHandler {
         //  Finally insert into the impostor table
         log::debug!("Inserting impostor into region_impostors, params: {:?}", insert_params);
         self.conn.exec_drop(SQL_IMPOSTOR, insert_params)?;
-        Ok(())
+*/        
+        let sculpt_uuid = Some(asset_upload.asset_uuid.clone());
+        let mesh_uuid = None;
+        self.update_impostor_info(asset_upload, &name, mesh_uuid, sculpt_uuid, faces_json)
     }
     
     /// Parse a request
