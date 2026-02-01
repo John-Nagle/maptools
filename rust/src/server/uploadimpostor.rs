@@ -195,25 +195,6 @@ impl AssetUploadHandler {
         Ok(Self { pool, conn, owner_name: None  })
     }
 
-    /// Fix up some fields with strange formatting
-    /// Texture ID prefix will be "XXn", where the first two characters indicate the type of texture.
-    fn get_texture_index(prefix: &str) -> Result<u8, Error> {
-        Ok(prefix[2..].parse()?)
-    }
-    
-    /// Hash strings are hex strings. 
-    /// We want the hash without any prefix, as 8 chars.
-    fn fix_hash_string(hash_str: &str) -> Result<String, Error> {
-        let without_prefix = hash_str.trim_start_matches("0x");
-        let z = u32::from_str_radix(without_prefix, 16)?;
-        Ok(format!("{:08x}", z))
-    }
-    
-    /// Update terrain tile. A new terrain tile has been added, and needs to be added to the database.
-    fn update_mesh_tile(&mut self, asset_upload: &AssetUpload) -> Result<(), Error> {
-        Err(anyhow!("Mesh tiles unimplemented"))
-    }
-
     /// Update terrain tile. A new terrain tile has been added, and needs to be added to the database.
     fn update_texture_tile(&mut self, asset_upload: &AssetUpload, texture_index: u8, asset_type: &str) -> Result<(), Error> {
         //  Only insert textures here, not sculpts or meshes.
@@ -275,7 +256,7 @@ impl AssetUploadHandler {
         let names = self.conn.exec_map(
             SQL_GET_NAME,
             params,
-            |(name, region_loc_x, region_loc_y) : (String, u32, u32)| {
+            |(name, _region_loc_x, _region_loc_y) : (String, u32, u32)| {
             name
             })?;
         if names.is_empty() {
@@ -285,6 +266,11 @@ impl AssetUploadHandler {
         }
     }
     
+    /// Update terrain tile. A new terrain tile has been added, and needs to be added to the database.
+    fn update_mesh_tile(&mut self, _asset_upload: &AssetUpload) -> Result<(), Error> {
+        Err(anyhow!("Mesh tiles unimplemented"))
+    }
+
     /// Update a sculpt tile.
     /// ***NEED TO UPLOAD TO tile_asset table***
     fn update_sculpt_tile(&mut self, asset_upload: &AssetUpload) -> Result<(), Error> {
@@ -393,7 +379,7 @@ impl AssetUploadHandler {
     fn process_request(
         &mut self,
         asset_info_short: AssetUploadArrayShort,
-        params: &HashMap<String, String>,
+        _params: &HashMap<String, String>,
     ) -> Result<(usize, String), Error> {
         //  We have an array of assets.
         log::info!("Processing {} assets.", asset_info_short.len());

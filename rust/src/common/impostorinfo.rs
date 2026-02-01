@@ -23,7 +23,6 @@ use anyhow::{anyhow, Error};
 use uuid::Uuid;
 use serde;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap};
 /// The data stored in the database for a region impostor.
 ///
 /// This is very similar to the version inside Sharpview at
@@ -95,7 +94,7 @@ impl RegionImpostorFaceData {
         const MAX_TEXTURES: usize = 8;
         let mut base_textures: [Option<String>;MAX_TEXTURES] = Default::default();
         let mut emissive_textures: [Option<String>;MAX_TEXTURES] = Default::default();
-        for (texture_index, texture_uuid, texture_hash, asset_type) in tuples {
+        for (texture_index, texture_uuid, _texture_hash, asset_type) in tuples {
             let arr = match asset_type.as_str() {
                 "BaseTexture" => &mut base_textures,
                 "EmissiveTexture" => &mut emissive_textures,
