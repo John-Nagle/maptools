@@ -550,7 +550,8 @@ Complete, but correct?
     - Optimization stuff.
     
   2026-01-31
-    Add grid to tile_assets table index as UNIQUE INDEX (grid, asset_name)
+    Add grid to tile_assets table index as UNIQUE INDEX (grid, asset_name) [DONE]
+    Need to add sculpts to tile_assets table so unduplication will find them.
         
        
     

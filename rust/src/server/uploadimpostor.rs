@@ -196,9 +196,10 @@ impl AssetUploadHandler {
     }
 
     /// Update terrain tile. A new terrain tile has been added, and needs to be added to the database.
-    fn update_texture_tile(&mut self, asset_upload: &AssetUpload, texture_index: u8, asset_type: &str) -> Result<(), Error> {
-        //  Only insert textures here, not sculpts or meshes.
-        assert!(asset_type == "BaseTexture" || asset_type == "EmissiveTexture");
+    fn update_tile(&mut self, asset_upload: &AssetUpload, texture_index: Option<u8>, asset_type: &str) -> Result<(), Error> {
+        //  Allowed types. Must match exactly.
+        assert!(asset_type == "BaseTexture" || asset_type == "EmissiveTexture" || asset_type == "SculptTexture" || asset_type == "Mesh");
+        assert!(if asset_type == "BaseTexture" || asset_type == "EmissiveTexture" { texture_index.is_some() } else { true });
         //  Insert tile, or update hash and uuid if exists. 
         const SQL_UPDATE_TILE: &str = r"INSERT INTO tile_assets
                 (grid, region_loc_x, region_loc_y, region_size_x, region_size_y,
@@ -231,6 +232,11 @@ impl AssetUploadHandler {
         self.conn.exec_drop(SQL_UPDATE_TILE, params)?;
         log::debug!("SQL terrain tile update succeeded.");
         Ok(())
+    }
+    
+    /// Update a tile. A new tile has been added, and needs to be added to the database.
+    fn update_texture_tile(&mut self, asset_upload: &AssetUpload, texture_index: u8, asset_type: &str) -> Result<(), Error> {
+        self.update_tile(asset_upload, Some(texture_index), asset_type)
     }
     
     //  Look up region name.
@@ -310,6 +316,10 @@ impl AssetUploadHandler {
         //  Build the textures as  JSON. Format is an array of JSON structs.        
         log::debug!("Textures for sculpt {:?}  {:?}", name, texture_tuples);
         let faces_json = RegionImpostorFaceData::json_from_tuples(&texture_tuples)?;
+        //  Valid sculpt tile.  Update tile assets.
+        log::debug!("Inserting {} into tile_assets.", name);
+        self.update_tile(asset_upload, None, "SculptTexture")?;
+        log::debug!("Inserting {} into region_impostors.", name);
         //  We have all the info now. Update the region_impostor table.
         //  Insert tile, or update hash and uuid if exists. 
         const SQL_IMPOSTOR: &str = r"INSERT INTO region_impostors
