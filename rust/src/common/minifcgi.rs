@@ -63,7 +63,7 @@ pub trait Handler {
 
 /// Type of transaction. Only Responder is implemented.
 #[derive(Debug, FromPrimitive, ToPrimitive, Clone, PartialEq)]
-enum FcgiRole {
+enum _FcgiRole {
     /// Respond and execute commands
     Responder = 1,
     /// Authorization (unimplemented)

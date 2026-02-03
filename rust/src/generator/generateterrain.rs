@@ -32,8 +32,6 @@ use vizgroup::{CompletedGroups, RegionData, VizGroups};
 use sculptmaker::{TerrainSculpt, TerrainSculptTexture};
 use regionorder::{TileLods, homogeneous_group_size};
 use ureq::{Agent};
-use std::fmt::{Display};
-
 
 /// MySQL Credentials for uploading.
 /// This filename will be searched for in parent directories,
@@ -145,7 +143,7 @@ impl TileHashes {
             return Ok(true)
         };
         let url = url_prefix.to_string() + &uuid.to_string();
-        let mut resp = terrain_generator.agent.head(&url)
+        let resp = terrain_generator.agent.head(&url)
             .header("Content-Type", "any") // 
             .call();
         log::debug!("Test UUID valid. {} -> {:?}", url, resp);
