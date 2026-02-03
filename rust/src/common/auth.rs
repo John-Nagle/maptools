@@ -7,9 +7,9 @@
 //! Later processing turns that into objects viewable in world via the
 //! region impostor system.
 //!
-//!     License: LGPL.
-//!     Animats
-//!     August, 2025.
+//! License: LGPL.
+//! Animats
+//! August, 2025.
 //
 use anyhow::{Error, anyhow};
 use std::collections::HashMap;

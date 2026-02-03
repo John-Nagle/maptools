@@ -22,8 +22,7 @@ use std::collections::HashMap;
 use std::io::Write;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-mod auth;
-use auth::{Authorizer, AuthorizeType};
+use common::{Authorizer, AuthorizeType};
 
 /// MySQL Credentials for uploading.
 /// This filename will be searched for in parent directories,

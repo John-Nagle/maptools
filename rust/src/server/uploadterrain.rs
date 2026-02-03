@@ -23,9 +23,7 @@ use mysql::{Pool};
 use mysql::{PooledConn, params};
 use std::collections::HashMap;
 use std::io::Write;
-mod auth;
-use auth::{Authorizer, AuthorizeType};
-
+use common::{Authorizer, AuthorizeType};
 /// MySQL Credentials for uploading.
 /// This filename will be searched for in parent directories,
 /// so it can be placed above the web root, where the web server can't see it.
