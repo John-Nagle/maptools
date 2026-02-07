@@ -18,6 +18,7 @@
 mod sculptmaker;
 mod regionorder;
 mod vizgroup;
+mod initialimpostors;
 use anyhow::{anyhow, Error};
 use common::{HeightField, RegionImpostorFaceData};
 use envie::Envie;
