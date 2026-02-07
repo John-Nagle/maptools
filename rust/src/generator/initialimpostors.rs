@@ -15,6 +15,9 @@
 //
 use anyhow::{Error, anyhow};
 use mysql::{PooledConn};
+use uuid::{Uuid};
+use crate::{RegionData};
+use common::{RegionImpostorData, RegionImpostorFaceData};
 //////use mysql::prelude::{Queryable};
 
 /// The initial impostors.
@@ -33,8 +36,13 @@ impl InitialImpostors {
         })
     }
     
-    /// Add one tile (sculpt or mesh) to the table. UUIDs may be null.
-    pub fn add_tile(&mut self) -> Result<(), Error> {
+    /// Add one impostor (sculpt or mesh) to the table. UUIDs may be null.
+    pub fn add_impostor(&mut self, region_impostor_data: RegionImpostorData) -> Result<(), Error> {
         todo!();
     }
+}
+
+//  ***NEED MESH OR SCULPT TYPE?***
+pub fn assemble_region_impostor_data(region: &RegionData, viz_group: u32, asset_hash: &str, asset_uuid: Option<Uuid>, face_data: &[RegionImpostorFaceData], terrain_hash: &str, terrain_uuid: Option<Uuid>) -> RegionImpostorData {
+    todo!();
 }
