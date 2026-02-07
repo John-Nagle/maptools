@@ -517,7 +517,7 @@ Complete, but correct?
      - Add enum to tile_textures.
      - Emissive doesn't do anything yet, but put it in anyway.
      
- 2026-01-29
+2026-01-29
     Rename tile_textures to tile_assets
     Add enum for sculpt, mesh, base texture, emissive_texture.
     Put sculpt textures in tile_assets file.
@@ -528,7 +528,7 @@ Complete, but correct?
     Close to getting useful output.
     But sql and database now out of sync. LSL uploader out of sync. 
     
- 2026-01-30
+2026-01-30
     Back in sync.
     Optimizations to put in:
     - When generating tiles, check if exact duplicate on filename, including hash.
@@ -549,10 +549,39 @@ Complete, but correct?
     - faces_json not getting set.
     - Optimization stuff.
     
-  2026-01-31
+2026-01-31
     Add grid to tile_assets table index as UNIQUE INDEX (grid, asset_name) [DONE]
     Need to add sculpts to tile_assets table so unduplication will find them.
         
+2026-02-05
+    Much confusion about avoiding re-upload of the same content when viz_group changes.
+    Architecture is wrong.
+    Need to:
+    - Run generateterrain to generate upload list.
+    - Upload all files generated to asset server.
+    - Tell servers about uploaded files.
+    - Only when all files have been uploaded, generate new region_impostors table.
+    
+    To do this, must:
+    - Keep table of viz_group info from generateterrain. 
+      - What's in that table?
+        - It's a new version of the region_impostors table. Starts empty.
+        - Many UUIDs are not filled in yet. 
+          - Missing UUIDs are inserted as uploadimpostors runs.
+          - When inserting UUIDs, try to find an existing tile_asset
+            which matches on x,y,sx,sy,grid,hash but not vizgroup.
+          - If no find, have to generate a new tile.
+        - Use the viz groups from the generateterrain run.    
+       - When all UUIDs are filled in, it becomes the new region_impostors table.     
+    - How to know when all uploads are complete.
+      - If all UUIDs are filled in, we're ready to replace the entire region_impostors table.
+        - Atomic SQL operation.
+        - Do we need a generation number or timestamp so that viewer can tell if table changed?
+     - Workflow
+       - Replacement happens automatically when all UUIDs are filled in.
+       - Replacement is done by uploadimpostors.
+       - Need error list.
+   Think on this overnight. May have missed something.
        
     
 
