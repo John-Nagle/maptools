@@ -50,18 +50,21 @@ pub enum TileType {
     Mesh
 }
 
-/// Format conversion
+/// Format conversion.
+//  There's too much conversion between similar formats in this program.
+//  Some of that is from having to put coordinates into SQL columns.
+//  SQL has neither tuples nor arrays.
 pub fn assemble_region_impostor_data(tile_type: TileType, region: &RegionData, height_field: HeightField, viz_group: u32, asset_hash: &str, asset_uuid_opt: Option<Uuid>, face_data: &[RegionImpostorFaceData], terrain_hash: &str, terrain_uuid: Option<Uuid>) -> RegionImpostorData {
     let (sculpt_hash, sculpt_uuid, mesh_hash, mesh_uuid) = match tile_type {
         TileType::Sculpt => (Some(asset_hash), asset_uuid_opt, None, None),
         TileType::Mesh => (None, None, Some(asset_hash), asset_uuid_opt)
     };
-    let scale = [0.0, 0.0, 0.0];    // ***TEMP***
-    let offset = 0.0;   // ***TEMP***
+    //  This is valid but inefficient.
+    let (scale, offset) = height_field.get_scale_offset().expect("Height field invalid, should be caught by caller.");
     RegionImpostorData {
         region_loc: [region.region_loc_x, region.region_loc_y],
         region_size: [region.region_size_x, region.region_size_y],     
-        scale: scale,
+        scale: [region.region_size_x as f32, region.region_size_y as f32, scale],
         impostor_lod: region.lod,
         viz_group,
         sculpt_uuid,   
