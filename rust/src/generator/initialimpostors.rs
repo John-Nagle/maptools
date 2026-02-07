@@ -17,7 +17,7 @@ use anyhow::{Error, anyhow};
 use mysql::{PooledConn};
 use uuid::{Uuid};
 use crate::{RegionData};
-use common::{RegionImpostorData, RegionImpostorFaceData};
+use common::{RegionImpostorData, RegionImpostorFaceData, HeightField};
 //////use mysql::prelude::{Queryable};
 
 /// The initial impostors.
@@ -42,7 +42,36 @@ impl InitialImpostors {
     }
 }
 
-//  ***NEED MESH OR SCULPT TYPE?***
-pub fn assemble_region_impostor_data(region: &RegionData, viz_group: u32, asset_hash: &str, asset_uuid: Option<Uuid>, face_data: &[RegionImpostorFaceData], terrain_hash: &str, terrain_uuid: Option<Uuid>) -> RegionImpostorData {
-    todo!();
+/// Type of tile
+pub enum TileType {
+    /// As a sculpt
+    Sculpt,
+    /// As a mesh
+    Mesh
+}
+
+/// Format conversion
+pub fn assemble_region_impostor_data(tile_type: TileType, region: &RegionData, height_field: HeightField, viz_group: u32, asset_hash: &str, asset_uuid_opt: Option<Uuid>, face_data: &[RegionImpostorFaceData], terrain_hash: &str, terrain_uuid: Option<Uuid>) -> RegionImpostorData {
+    let (sculpt_hash, sculpt_uuid, mesh_hash, mesh_uuid) = match tile_type {
+        TileType::Sculpt => (Some(asset_hash), asset_uuid_opt, None, None),
+        TileType::Mesh => (None, None, Some(asset_hash), asset_uuid_opt)
+    };
+    let scale = [0.0, 0.0, 0.0];    // ***TEMP***
+    let offset = 0.0;   // ***TEMP***
+    RegionImpostorData {
+        region_loc: [region.region_loc_x, region.region_loc_y],
+        region_size: [region.region_size_x, region.region_size_y],     
+        scale: scale,
+        impostor_lod: region.lod,
+        viz_group,
+        sculpt_uuid,   
+        sculpt_hash: sculpt_hash.map(|s| s.to_string()),
+        mesh_uuid,
+        mesh_hash: mesh_hash.map(|s| s.to_string()),
+        elevation_offset: offset,
+        water_height: Some(height_field.water_level),
+        name: Some(region.name.clone()),
+        grid: region.grid.clone(),
+        faces: face_data.into(),
+    }
 }

@@ -75,7 +75,7 @@ impl RegionImpostorData {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct RegionImpostorFaceData {
     /// Base texture for old non-material objects.
-    pub base_texture_uuid: Uuid,
+    pub base_texture_uuid: Option<Uuid>,
     /// Emissive texture, to show what's lit at night.
     /// For now, this is future expansion.
     pub emissive_texture_uuid: Option<Uuid>,
