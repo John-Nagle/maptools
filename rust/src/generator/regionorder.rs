@@ -22,7 +22,7 @@
 //
 use anyhow::{anyhow, Error};
 use std::collections::VecDeque;
-use crate::vizgroup::{RegionData};
+use common::{RegionData};
 
 /// Maximum LOD. It never gets this big, because there would have to be a viz group 2^LOD across for that to happen.
 const MAX_LOD: u8 = 16;

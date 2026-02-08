@@ -23,6 +23,36 @@ use anyhow::{anyhow, Error};
 use uuid::Uuid;
 use serde;
 use serde::{Deserialize, Serialize};
+
+/// RegionData - info about one region relevant to vizgroup computation.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RegionData {
+    /// Which grid
+    pub grid: String,
+    /// Which LOD - zero for all data obtained from the world.
+    pub lod: u8,
+    /// X
+    pub region_loc_x: u32,
+    /// Y
+    pub region_loc_y: u32,
+    /// X size
+    pub region_size_x: u32,
+    /// Y size
+    pub region_size_y: u32,
+    /// Region name
+    pub name: String,
+}   
+
+impl std::fmt::Display for RegionData {
+    /// Just name and location, no size.
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "\"{}\" ({}, {})",
+            self.name, self.region_loc_x, self.region_loc_y
+        )
+    }
+}
 /// The data stored in the database for a region impostor.
 ///
 /// This is very similar to the version inside Sharpview at

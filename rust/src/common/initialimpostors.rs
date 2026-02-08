@@ -9,16 +9,16 @@
 //! Part of the Animats impostor system
 //!
 //!
-//!     License: LGPL.
-//!     Animats
-//!     February, 2026.
+//! License: LGPL.
+//! Animats
+//! February, 2026.
 //
 use anyhow::{Error, anyhow};
 use mysql::{PooledConn, params};
 use mysql::prelude::Queryable;
 use uuid::{Uuid};
 use crate::{RegionData};
-use common::{RegionImpostorData, RegionImpostorFaceData, HeightField};
+use crate::{RegionImpostorData, RegionImpostorFaceData, HeightField};
 //////use mysql::prelude::{Queryable};
 
 /// The initial impostors.
