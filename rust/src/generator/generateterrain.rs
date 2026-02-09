@@ -513,7 +513,7 @@ impl TerrainGenerator {
     
     /// Get asset UUID from tile_assets if already available.
     /// Vizgroup and index are not considered.
-    fn get_asset_uuid(&mut self, grid: &str, region_loc: [u32;2], region_size: [u32;2], asset_type: &str, asset_hash: &str) -> Result<Option<Uuid>, Error> {
+    fn get_asset_uuid(&mut self, grid: &str, region_loc: [u32;2], region_size: [u32;2], asset_type: &str, asset_hash: u32) -> Result<Option<Uuid>, Error> {
         const SQL_GET_ASSET_UUID: &str = r"SELECT asset_uuid FROM tile_assets 
             WHERE grid= :grid AND region_loc_x = :region_loc_x AND region_loc_y = :region_loc_y 
             AND region_size_x = :region_size_x AND region_size_y = :region_size_y
@@ -525,7 +525,7 @@ impl TerrainGenerator {
             "region_size_x" => region_size[0],
             "region_size_y" => region_size[1],
             "asset_type" => asset_type,
-            "asset_hash" => asset_hash,
+            "asset_hash" => format!("{:08x}",asset_hash),
             };
          let asset_uuids = self.conn.exec_map(
             SQL_GET_ASSET_UUID,
@@ -564,7 +564,8 @@ impl TerrainGenerator {
         terrain_sculpt.makeimage();
         let hash = terrain_sculpt.get_hash()?;
         let sculpt_name = Self::impostor_name(IMPOSTOR_SCULPT_PREFIX, region, height_field, lod, viz_group_id, hash)?;
-        if let Some (uuid) = self.asset_already_exists(grid, &sculpt_name)? {
+        let sculpt_uuid_opt = self.get_asset_uuid(grid, [region.region_loc_x, region.region_loc_y], [region.region_size_x, region.region_size_y], "SculptTexture", hash)?;
+        if let Some (uuid) = sculpt_uuid_opt {
             log::info!("Sculpt image asset already exists: {} UUID: {:?}", sculpt_name, uuid);
             self.stats.assets_reused += 1;
         } else {
@@ -581,7 +582,9 @@ impl TerrainGenerator {
         terrain_image.makeimage(TERRAIN_SCULPT_TEXTURE_SIZE)?;
         let hash = terrain_image.get_hash()?;
         let terrain_image_name = Self::impostor_name(IMPOSTOR_TERRAIN_PREFIX, region, height_field, lod, viz_group_id, hash)?;
-        if let Some(uuid) = self.asset_already_exists(grid, &terrain_image_name)? {
+        //  For sculpts, there's only one texture, the base texture, and only one face. Meshes are more complicated.
+        let terrain_uuid_opt = self.get_asset_uuid(grid, [region.region_loc_x, region.region_loc_y], [region.region_size_x, region.region_size_y], "BaseTexture", hash)?;
+        if let Some(uuid) = terrain_uuid_opt {
             log::info!("Terrain image asset already exists: {} UUID: {:?}", terrain_image_name, uuid);
             self.stats.assets_reused += 1;
         } else {
