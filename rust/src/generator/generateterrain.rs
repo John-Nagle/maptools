@@ -489,26 +489,25 @@ impl TerrainGenerator {
     /// Huge optimization.
     /// But fails if the viz group changes.
     /// That has to be handled elsewhere.
-    fn asset_already_exists(&mut self, grid: &str, asset_name: &str) -> Result<bool, Error> {
-        const SQL_CHECK_ASSET_EXISTS: &str = r"SELECT asset_name FROM tile_assets 
+    fn asset_already_exists(&mut self, grid: &str, asset_name: &str) -> Result<Option<Uuid>, Error> {
+        const SQL_CHECK_ASSET_EXISTS: &str = r"SELECT asset_uuid FROM tile_assets 
             WHERE grid= :grid AND asset_name = :asset_name";
         let params = params! {
             "grid" => grid.to_lowercase().clone(), 
             "asset_name" => asset_name,
             };
-        let asset_names = self.conn.exec_map(
+        let asset_uuids = self.conn.exec_map(
             SQL_CHECK_ASSET_EXISTS,
             params,
-            |(name) : (String)| {
-                name
+            |(uuid,) : (String,)| {
+                uuid
             })?;
-        if asset_names.is_empty() {
-            Ok(false)
+        if asset_uuids.is_empty() {
+            Ok(None)
         } else {
             //  Database enforces these constraints.
-            assert_eq!(asset_names.len(), 1);
-            assert_eq!(asset_names[0], asset_name);
-            Ok(true)
+            assert_eq!(asset_uuids.len(), 1);
+            Ok(Some(Uuid::parse_str(&asset_uuids[0])?))
         }
     }
     
@@ -565,8 +564,8 @@ impl TerrainGenerator {
         terrain_sculpt.makeimage();
         let hash = terrain_sculpt.get_hash()?;
         let sculpt_name = Self::impostor_name(IMPOSTOR_SCULPT_PREFIX, region, height_field, lod, viz_group_id, hash)?;
-        if self.asset_already_exists(grid, &sculpt_name)? {
-            log::info!("Sculpt image asset already exists: {}", sculpt_name);
+        if let Some (uuid) = self.asset_already_exists(grid, &sculpt_name)? {
+            log::info!("Sculpt image asset already exists: {} UUID: {:?}", sculpt_name, uuid);
             self.stats.assets_reused += 1;
         } else {
             let sculpt_image = terrain_sculpt.image.unwrap();
@@ -582,8 +581,8 @@ impl TerrainGenerator {
         terrain_image.makeimage(TERRAIN_SCULPT_TEXTURE_SIZE)?;
         let hash = terrain_image.get_hash()?;
         let terrain_image_name = Self::impostor_name(IMPOSTOR_TERRAIN_PREFIX, region, height_field, lod, viz_group_id, hash)?;
-        if self.asset_already_exists(grid, &terrain_image_name)? {
-            log::info!("Terrain image asset already exists: {}", terrain_image_name);
+        if let Some(uuid) = self.asset_already_exists(grid, &terrain_image_name)? {
+            log::info!("Terrain image asset already exists: {} UUID: {:?}", terrain_image_name, uuid);
             self.stats.assets_reused += 1;
         } else {
             let mut terrain_image_path = self.outdir.clone();
