@@ -32,6 +32,7 @@ use vizgroup::{CompletedGroups, VizGroups};
 use sculptmaker::{TerrainSculpt, TerrainSculptTexture};
 use regionorder::{TileLods, homogeneous_group_size};
 use ureq::{Agent};
+use uuid::{Uuid};
 
 /// MySQL Credentials for uploading.
 /// This filename will be searched for in parent directories,
@@ -509,6 +510,39 @@ impl TerrainGenerator {
             assert_eq!(asset_names[0], asset_name);
             Ok(true)
         }
+    }
+    
+    /// Get asset UUID from tile_assets if already available.
+    /// Vizgroup and index are not considered.
+    fn get_asset_uuid(&mut self, grid: &str, region_loc: [u32;2], region_size: [u32;2], asset_type: &str, asset_hash: &str) -> Result<Option<Uuid>, Error> {
+        const SQL_GET_ASSET_UUID: &str = r"SELECT asset_uuid FROM tile_assets 
+            WHERE grid= :grid AND region_loc_x = :region_loc_x AND region_loc_y = :region_loc_y 
+            AND region_size_x = :region_size_x AND region_size_y = :region_size_y
+            AND asset_type = :asset_type AND asset_hash = :asset_hash";
+        let params = params! {
+            "grid" => grid.to_lowercase().clone(), 
+            "region_loc_x" => region_loc[0],
+            "region_loc_y" => region_loc[1],
+            "region_size_x" => region_size[0],
+            "region_size_y" => region_size[1],
+            "asset_type" => asset_type,
+            "asset_hash" => asset_hash,
+            };
+         let asset_uuids = self.conn.exec_map(
+            SQL_GET_ASSET_UUID,
+            params,
+            |(uuid) : (String)| {
+                uuid
+            })?;
+        if asset_uuids.is_empty() {
+            return Ok(None);
+        }
+        //  Found something
+        if asset_uuids.len() > 1 {
+            //  This is possible when viz_group numbers change, but is not fatal.
+            log::warn!("Duplicate hashes for grid {} looking up {} asset at {:?} size {:?}", grid, asset_type, region_loc, region_size);
+        }
+        Ok(Some(Uuid::parse_str(&asset_uuids[0])?))
     }
 
     /// Build the impostor as a sculpt.

@@ -82,6 +82,34 @@ impl InitialImpostors {
         log::debug!("Inserting impostor into initial_impostors, params: {:?}", insert_params);
         Ok(self.conn.exec_drop(SQL_IMPOSTOR, insert_params)?)
     }
+    
+    /// Truncate the table. This table is re-created on each run of generateterrain.
+    /// ***DOES THIS NEED TO BE ONLY FOR ONE GRID???***
+    pub fn clear_grid(&mut self, grid: &str) -> Result<(), Error> {
+        const SQL_DELETE: &str = r"DELETE FROM initial_impostors WHERE LOWERCASE(grid) = :grid;";
+        let delete_params = params! {
+            "grid" => grid.to_lowercase()
+        };
+        Ok(self.conn.exec_drop(SQL_DELETE, delete_params)?)
+    }
+    
+    /// Find missing UUIDs. When there are none, we're done.
+    pub fn find_missing_uuids(&mut self, grid: &str) -> Result<(), Error> {
+        const SQL_SELECT_MISSING_TILE: &str = "grid, region_loc_x, region_loc_y, name, region_size_x, region_size_y,
+            mesh_hash, mesh_uuid, sculpt_hash, sculpt_uuid
+            WHERE (grid = :grid) AND ((mesh_hash IS NOT NULL AND mesh_uuid IS NULL) OR (sculpt_hash IS NOT NULL AND sculpt_uuid IS NULL))
+            LIMIT 20";
+            
+        const SQL_SELECT_MISSING_TEXTURE: &str = "grid, region_loc_x, region_loc_y, name, region_size_x, region_size_y,
+            mesh_hash, mesh_uuid, sculpt_hash, sculpt_uuid
+            WHERE (grid = :grid) AND (mesh_hash IS NOT NULL AND mesh_uuid IS NULL) OR (sculpt_hash IS NOT NULL AND sculpt_uuid IS NULL)
+            LIMIT 20";
+            //  ***NEED JSON TERMS ABOVE***
+        let select_params = params! {
+            "grid" => grid.to_lowercase()
+        }; 
+        todo!();
+    }
 }
 
 /// Type of tile

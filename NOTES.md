@@ -582,7 +582,14 @@ Complete, but correct?
        - Replacement is done by uploadimpostors.
        - Need error list.
    Think on this overnight. May have missed something.
-       
+   
+2026-02-08
+   Going well.
+   Need, for sculpts, the base texture hash and optional UUID.
+   - We have hash. Just need to look up by hash in tile_assets.
+   - Asset type needs to be added to unique index.
+   - Change asset type to enum.
+   For meshes, it's not clear where the textures come from yet.
     
 
       
