@@ -700,7 +700,8 @@ fn run(pool: Pool, outdir: PathBuf, grid: String, url_prefix_opt: Option<String>
         ));
     }
     //  Clear old impostors from initial impostors.
-    InitialImpostors::clear_grid(&mut terrain_generator.conn, &grid)?;
+    //  ***TEMP TURNOFF*** to allow running from desktop.
+    //////InitialImpostors::clear_grid(&mut terrain_generator.conn, &grid)?;
     let grid_entry = grids.pop().unwrap(); // get the one grid
     terrain_generator.process_grid(grid_entry)?;
     println!("Statistics:\n{}", terrain_generator.stats);
