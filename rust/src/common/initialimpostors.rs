@@ -13,7 +13,7 @@
 //! Animats
 //! February, 2026.
 //
-use anyhow::{Error, anyhow};
+use anyhow::{Error};
 use mysql::{PooledConn, params};
 use mysql::prelude::Queryable;
 use uuid::{Uuid};
@@ -21,25 +21,28 @@ use crate::{RegionData};
 use crate::{RegionImpostorData, RegionImpostorFaceData, HeightField};
 //////use mysql::prelude::{Queryable};
 
+/// Type of tile
+pub enum TileType {
+    /// As a sculpt
+    Sculpt,
+    /// As a mesh
+    Mesh
+}
+
 /// The initial impostors.
 pub struct InitialImpostors {
-    /// SQL connection
-    conn: PooledConn,
 }
 
 impl InitialImpostors {
     /// Usual new
-    pub fn new(conn: PooledConn) -> Result<Self, Error> {
-
-        //  ***CLEAR initial_region_impostors table***
-        Ok(Self {
-            conn
-        })
+    pub fn new() -> Self {
+        Self {
+        }
     }
     
     /// Add one impostor (sculpt or mesh) to the table. UUIDs may be null.
     /// This is a pure insert into a table that starts empty. Duplicates should not happen.
-    pub fn add_impostor(&mut self, region_impostor_data: RegionImpostorData) -> Result<(), Error> {
+    pub fn add_impostor(conn: &mut PooledConn, region_impostor_data: RegionImpostorData) -> Result<(), Error> {
         log::debug!("Inserting {:?} into initial_impostors.", region_impostor_data.name);
         //  We have all the info now. Update the region_impostor table.
         //  Insert tile, or update hash and uuid if exists. 
@@ -80,21 +83,20 @@ impl InitialImpostors {
             };
         //  Finally insert into the impostor table
         log::debug!("Inserting impostor into initial_impostors, params: {:?}", insert_params);
-        Ok(self.conn.exec_drop(SQL_IMPOSTOR, insert_params)?)
+        Ok(conn.exec_drop(SQL_IMPOSTOR, insert_params)?)
     }
     
-    /// Truncate the table. This table is re-created on each run of generateterrain.
-    /// ***DOES THIS NEED TO BE ONLY FOR ONE GRID???***
-    pub fn clear_grid(&mut self, grid: &str) -> Result<(), Error> {
+    /// Truncate the table for one grid This table is re-created on each run of generateterrain.
+    pub fn clear_grid(conn: &mut PooledConn, grid: &str) -> Result<(), Error> {
         const SQL_DELETE: &str = r"DELETE FROM initial_impostors WHERE LOWERCASE(grid) = :grid;";
         let delete_params = params! {
             "grid" => grid.to_lowercase()
         };
-        Ok(self.conn.exec_drop(SQL_DELETE, delete_params)?)
+        Ok(conn.exec_drop(SQL_DELETE, delete_params)?)
     }
     
     /// Find missing UUIDs. When there are none, we're done.
-    pub fn find_missing_uuids(&mut self, grid: &str) -> Result<(), Error> {
+    pub fn find_missing_uuids(conn: &mut PooledConn, grid: &str) -> Result<(), Error> {
         const SQL_SELECT_MISSING_TILE: &str = "grid, region_loc_x, region_loc_y, name, region_size_x, region_size_y,
             mesh_hash, mesh_uuid, sculpt_hash, sculpt_uuid
             WHERE (grid = :grid) AND ((mesh_hash IS NOT NULL AND mesh_uuid IS NULL) OR (sculpt_hash IS NOT NULL AND sculpt_uuid IS NULL))
@@ -110,41 +112,34 @@ impl InitialImpostors {
         }; 
         todo!();
     }
-}
-
-/// Type of tile
-pub enum TileType {
-    /// As a sculpt
-    Sculpt,
-    /// As a mesh
-    Mesh
-}
-
-/// Format conversion.
-//  There's too much conversion between similar formats in this program.
-//  Some of that is from having to put coordinates into SQL columns.
-//  SQL has neither tuples nor arrays.
-pub fn assemble_region_impostor_data(tile_type: TileType, region: &RegionData, height_field: HeightField, viz_group: u32, asset_hash: &str, asset_uuid_opt: Option<Uuid>, face_data: &[RegionImpostorFaceData], terrain_hash: &str, terrain_uuid: Option<Uuid>) -> RegionImpostorData {
-    let (sculpt_hash, sculpt_uuid, mesh_hash, mesh_uuid) = match tile_type {
-        TileType::Sculpt => (Some(asset_hash), asset_uuid_opt, None, None),
-        TileType::Mesh => (None, None, Some(asset_hash), asset_uuid_opt)
-    };
-    //  This is valid but inefficient.
-    let (scale, offset) = height_field.get_scale_offset().expect("Height field invalid, should be caught by caller.");
-    RegionImpostorData {
-        region_loc: [region.region_loc_x, region.region_loc_y],
-        region_size: [region.region_size_x, region.region_size_y],     
-        scale: [region.region_size_x as f32, region.region_size_y as f32, scale],
-        impostor_lod: region.lod,
-        viz_group,
-        sculpt_uuid,   
-        sculpt_hash: sculpt_hash.map(|s| s.to_string()),
-        mesh_uuid,
-        mesh_hash: mesh_hash.map(|s| s.to_string()),
-        elevation_offset: offset,
-        water_height: Some(height_field.water_level),
-        name: Some(region.name.clone()),
-        grid: region.grid.clone(),
-        faces: face_data.into(),
+    
+    /// Format conversion.
+    //  There's too much conversion between similar formats in this program.
+    //  Some of that is from having to put coordinates into SQL columns.
+    //  SQL has neither tuples nor arrays.
+    pub fn assemble_region_impostor_data(tile_type: TileType, region: &RegionData, height_field: &HeightField, viz_group: u32, 
+        asset_hash: &str, asset_uuid_opt: Option<Uuid>, face_data: &[RegionImpostorFaceData]) -> RegionImpostorData {
+        let (sculpt_hash, sculpt_uuid, mesh_hash, mesh_uuid) = match tile_type {
+            TileType::Sculpt => (Some(asset_hash), asset_uuid_opt, None, None),
+            TileType::Mesh => (None, None, Some(asset_hash), asset_uuid_opt)
+        };
+        //  This is valid but inefficient.
+        let (scale, offset) = height_field.get_scale_offset().expect("Height field invalid, should be caught by caller.");
+        RegionImpostorData {
+            region_loc: [region.region_loc_x, region.region_loc_y],
+            region_size: [region.region_size_x, region.region_size_y],     
+            scale: [region.region_size_x as f32, region.region_size_y as f32, scale],
+            impostor_lod: region.lod,
+            viz_group,
+            sculpt_uuid,   
+            sculpt_hash: sculpt_hash.map(|s| s.to_string()),
+            mesh_uuid,
+            mesh_hash: mesh_hash.map(|s| s.to_string()),
+            elevation_offset: offset,
+            water_height: Some(height_field.water_level),
+            name: Some(region.name.clone()),
+            grid: region.grid.clone(),
+            faces: face_data.into(),
+        }
     }
 }

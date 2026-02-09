@@ -589,7 +589,10 @@ Complete, but correct?
    - We have hash. Just need to look up by hash in tile_assets.
    - Asset type needs to be added to unique index.
    - Change asset type to enum.
-   For meshes, it's not clear where the textures come from yet.
+   For meshes, it's not clear where the textures come from yet. 
+   - Add comments but do not implement.
+   - When to generate an initial_impostors entry during generation? When we have both tile and texture UUIDs, or only tile?
+     - Every time. Fill in the UUIDs later.
     
 
       

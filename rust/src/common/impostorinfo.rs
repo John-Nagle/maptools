@@ -24,6 +24,11 @@ use uuid::Uuid;
 use serde;
 use serde::{Deserialize, Serialize};
 
+/// Hash to hex. Hashes are currently 32 bits and expressed as 8 chars of hex for SQL purposes.
+pub fn hash_to_hex(hash: u32) -> String {
+    format!("{:08x}", hash)
+}
+
 /// RegionData - info about one region relevant to vizgroup computation.
 #[derive(Debug, Clone, PartialEq)]
 pub struct RegionData {

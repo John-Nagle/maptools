@@ -19,7 +19,7 @@ mod sculptmaker;
 mod regionorder;
 mod vizgroup;
 use anyhow::{anyhow, Error};
-use common::{RegionData, HeightField, RegionImpostorFaceData};
+use common::{RegionData, HeightField, RegionImpostorFaceData, InitialImpostors, TileType};
 use envie::Envie;
 use getopts::Options;
 use log::LevelFilter;
@@ -31,6 +31,7 @@ use std::path::PathBuf;
 use vizgroup::{CompletedGroups, VizGroups};
 use sculptmaker::{TerrainSculpt, TerrainSculptTexture};
 use regionorder::{TileLods, homogeneous_group_size};
+use common::{hash_to_hex};
 use ureq::{Agent};
 use uuid::{Uuid};
 
@@ -253,6 +254,8 @@ struct TerrainGenerator {
     generate_mesh: bool,
     /// The height field cache
     height_field_cache: HeightFieldCache,
+    /// Initial impostors. Not all UUIDs filled in yet.
+    initial_impostors: InitialImpostors,
     /// Statistics
     stats: TerrainGeneratorStats,
 }
@@ -279,6 +282,7 @@ impl TerrainGenerator {
             corners_touch_connects,
             generate_mesh,
             height_field_cache: HeightFieldCache::new(),
+            initial_impostors: InitialImpostors::new(),
             stats: TerrainGeneratorStats::new(),
         }
     }
@@ -402,7 +406,7 @@ impl TerrainGenerator {
         region: &RegionData,
         height_field: &HeightField,
         lod: u8,
-        viz_group_id: usize,
+        viz_group_id: u32,
         hash: u32,
     ) -> Result<String, Error> {
         let x = region.region_loc_x;
@@ -465,7 +469,7 @@ impl TerrainGenerator {
         &mut self,
         region: &RegionData,
         height_field: &HeightField,
-        viz_group_id: usize,
+        viz_group_id: u32,
     ) -> Result<(), Error> {
         let hash_info_opt = self. get_hashes_one_tile(&region.grid, region.region_loc_x, region.region_loc_y, region.lod)?;
         log::debug!("Hash info: {:?}", hash_info_opt);
@@ -483,7 +487,7 @@ impl TerrainGenerator {
             )
         }
     }
-    
+/*    
     /// Does asset already exist and is logged in the tile asset table?
     /// If it does, we don't have to generate and upload it again.
     /// Huge optimization.
@@ -510,7 +514,7 @@ impl TerrainGenerator {
             Ok(Some(Uuid::parse_str(&asset_uuids[0])?))
         }
     }
-    
+*/    
     /// Get asset UUID from tile_assets if already available.
     /// Vizgroup and index are not considered.
     fn get_asset_uuid(&mut self, grid: &str, region_loc: [u32;2], region_size: [u32;2], asset_type: &str, asset_hash: u32) -> Result<Option<Uuid>, Error> {
@@ -549,7 +553,7 @@ impl TerrainGenerator {
         &mut self,
         region: &RegionData,
         height_field: &HeightField,
-        viz_group_id: usize,
+        viz_group_id: u32,
     ) -> Result<(), Error> {
         const IMPOSTOR_SCULPT_PREFIX: &str = "RS";
         const IMPOSTOR_TERRAIN_PREFIX: &str = "RT0";
@@ -562,9 +566,10 @@ impl TerrainGenerator {
         let (scale, offset, elevs) = height_field.into_sculpt_array()?;
         terrain_sculpt.setelevs(elevs, scale as f64, offset as f64);
         terrain_sculpt.makeimage();
-        let hash = terrain_sculpt.get_hash()?;
-        let sculpt_name = Self::impostor_name(IMPOSTOR_SCULPT_PREFIX, region, height_field, lod, viz_group_id, hash)?;
-        let sculpt_uuid_opt = self.get_asset_uuid(grid, [region.region_loc_x, region.region_loc_y], [region.region_size_x, region.region_size_y], "SculptTexture", hash)?;
+        let sculpt_hash = terrain_sculpt.get_hash()?;
+        let sculpt_name = Self::impostor_name(IMPOSTOR_SCULPT_PREFIX, region, height_field, lod, viz_group_id, sculpt_hash)?;
+        let sculpt_uuid_opt = self.get_asset_uuid(grid, [region.region_loc_x, region.region_loc_y], [region.region_size_x, region.region_size_y],
+            "SculptTexture", sculpt_hash)?;
         if let Some (uuid) = sculpt_uuid_opt {
             log::info!("Sculpt image asset already exists: {} UUID: {:?}", sculpt_name, uuid);
             self.stats.assets_reused += 1;
@@ -580,11 +585,12 @@ impl TerrainGenerator {
         log::info!("Generating texture image for  \"{}\"", &region.name);
         let mut terrain_image = TerrainSculptTexture::new(region.region_loc_x, region.region_loc_y, lod, &region.name);
         terrain_image.makeimage(TERRAIN_SCULPT_TEXTURE_SIZE)?;
-        let hash = terrain_image.get_hash()?;
-        let terrain_image_name = Self::impostor_name(IMPOSTOR_TERRAIN_PREFIX, region, height_field, lod, viz_group_id, hash)?;
+        let terrain_image_hash = terrain_image.get_hash()?;
+        let terrain_image_name = Self::impostor_name(IMPOSTOR_TERRAIN_PREFIX, region, height_field, lod, viz_group_id, terrain_image_hash)?;
         //  For sculpts, there's only one texture, the base texture, and only one face. Meshes are more complicated.
-        let terrain_uuid_opt = self.get_asset_uuid(grid, [region.region_loc_x, region.region_loc_y], [region.region_size_x, region.region_size_y], "BaseTexture", hash)?;
-        if let Some(uuid) = terrain_uuid_opt {
+        let terrain_image_uuid_opt = self.get_asset_uuid(grid, [region.region_loc_x, region.region_loc_y], [region.region_size_x, region.region_size_y],
+            "BaseTexture", terrain_image_hash)?;
+        if let Some(uuid) = terrain_image_uuid_opt {
             log::info!("Terrain image asset already exists: {} UUID: {:?}", terrain_image_name, uuid);
             self.stats.assets_reused += 1;
         } else {
@@ -595,6 +601,17 @@ impl TerrainGenerator {
             log::info!("Terrain image file saved: \"{}\"", terrain_image_path.display());
             self.stats.assets_generated += 1;      
         }
+        //  Now we can generate the initial impostor database row.
+        //  Sculpts have one face. They have no emissive texture. That's for meshes, in future.
+        let face_0 = RegionImpostorFaceData {
+            base_texture_uuid: terrain_image_uuid_opt,
+            emissive_texture_uuid: None,
+            base_texture_hash: hash_to_hex(terrain_image_hash),
+            emissive_texture_hash: None
+        };      
+        let impostor_data =  InitialImpostors::assemble_region_impostor_data(TileType::Sculpt, region, height_field, viz_group_id, &hash_to_hex(sculpt_hash),
+            sculpt_uuid_opt, &vec![face_0]);
+        log::debug!("Region impostor data: {:?}", impostor_data);
         Ok(())
     }
 
@@ -603,13 +620,13 @@ impl TerrainGenerator {
         &mut self,
         _region: &RegionData,
         _height_field: &HeightField,
-        _viz_group_id: usize,
+        _viz_group_id: u32,
     ) -> Result<(), Error> {
         todo!("glTF mesh generation is not implemented yet");
     }
     
     /// Build an impostor for LOD N.
-    fn build_impostor_for_lod(&mut self, region: &RegionData, _region_region_size_opt: Option<(u32, u32)>, viz_group_id: usize) -> Result<(), Error> {
+    fn build_impostor_for_lod(&mut self, region: &RegionData, _region_region_size_opt: Option<(u32, u32)>, viz_group_id: u32) -> Result<(), Error> {
         log::info!("Region \"{}\", LOD {} starting.", region.name, region.lod);
         let height_field = if region.lod == 0 {
             self.get_height_field_one_region(
@@ -636,7 +653,7 @@ impl TerrainGenerator {
     }
     
     /// Process group, multi-LOD version
-    fn process_group(&mut self, group: Vec<RegionData>, initial_viz_group_id: usize) -> Result<(), Error> {
+    fn process_group(&mut self, group: Vec<RegionData>, initial_viz_group_id: u32) -> Result<(), Error> {
         log::info!("Group #{}: {} entries.", initial_viz_group_id, group.len());
         //  ***NEED TO ASSIGN PERSISTENT GROUP NUMBER***
         let viz_group_id = initial_viz_group_id;    // ***TEMP*** Need real assignment algorithm.
@@ -660,7 +677,7 @@ impl TerrainGenerator {
         //  Sort by length, biggest groups first.
         completed_groups.sort_by(|a, b| b.len().partial_cmp(&a.len()).unwrap());
         for (viz_group_id, group) in completed_groups.into_iter().enumerate() {
-            self.process_group(group, viz_group_id)?;
+            self.process_group(group, viz_group_id.try_into().unwrap())?;
         }
         Ok(())
     }
@@ -669,7 +686,7 @@ impl TerrainGenerator {
 /// Actually do the work
 fn run(pool: Pool, outdir: PathBuf, grid: String, url_prefix_opt: Option<String>, generate_mesh: bool) -> Result<(), Error> {
     let corners_touch_connects = false; // for now, SL only.
-    let conn = pool.get_conn()?;
+    let mut conn = pool.get_conn()?;
     let mut terrain_generator =
         TerrainGenerator::new(conn, outdir, url_prefix_opt, generate_mesh, corners_touch_connects);
     let mut grids = terrain_generator.transitive_closure(&grid)?;
@@ -682,6 +699,8 @@ fn run(pool: Pool, outdir: PathBuf, grid: String, url_prefix_opt: Option<String>
             "More than one grid found but SQL should return only one grid."
         ));
     }
+    //  Clear old impostors from initial impostors.
+    InitialImpostors::clear_grid(&mut terrain_generator.conn, &grid)?;
     let grid_entry = grids.pop().unwrap(); // get the one grid
     terrain_generator.process_grid(grid_entry)?;
     println!("Statistics:\n{}", terrain_generator.stats);

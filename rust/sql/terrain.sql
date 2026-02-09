@@ -54,6 +54,34 @@ CREATE TABLE IF NOT EXISTS region_impostors (
     INDEX(name)
 )
 
+-- Impostor information. What the viewer needs to draw an impostor.
+ 
+CREATE TABLE IF NOT EXISTS initial_impostors (
+    grid VARCHAR(40) NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    region_loc_x INT NOT NULL,
+    region_loc_y INT NOT NULL,
+    region_size_x INT NOT NULL,
+    region_size_y INT NOT NULL,
+    scale_x INT NOT NULL,
+    scale_y INT NOT NULL,
+    scale_z FLOAT NOT NULL,
+    elevation_offset FLOAT NOT NULL,
+    impostor_lod TINYINT NOT NULL,
+    viz_group INT NOT NULL,
+    mesh_uuid CHAR(36) DEFAULT NULL,
+    mesh_hash CHAR(8) DEFAULT NULL,
+    sculpt_uuid CHAR(36) DEFAULT NULL,
+    sculpt_hash CHAR(8) DEFAULT NULL,
+    water_height FLOAT NOT NULL,
+    creator VARCHAR(63) NOT NULL,
+    creation_time TIMESTAMP NOT NULL,
+    faces_json JSON NOT NULL,
+    UNIQUE INDEX (grid, region_loc_x, region_loc_y, impostor_lod, viz_group),
+    INDEX(grid, viz_group),
+    INDEX(name)
+)
+
 --- Region textures. Used to hold texture information which needs to be matched to geometry.
 
 CREATE TABLE IF NOT EXISTS tile_assets (
@@ -70,6 +98,6 @@ CREATE TABLE IF NOT EXISTS tile_assets (
     asset_uuid CHAR(36) NOT NULL,  
     asset_hash CHAR(8) NOT NULL,
     creation_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE INDEX (grid, region_loc_x, region_loc_y, impostor_lod, viz_group, texture_index),
+    UNIQUE INDEX (grid, region_loc_x, region_loc_y, impostor_lod, viz_group, texture_index, asset_type),
     UNIQUE INDEX (grid, asset_name)
 )
