@@ -593,6 +593,15 @@ Complete, but correct?
    - Add comments but do not implement.
    - When to generate an initial_impostors entry during generation? When we have both tile and texture UUIDs, or only tile?
      - Every time. Fill in the UUIDs later.
+     
+2026-02-09
+    DB Access issue. Generateterrain wants to write terrain.interim_impostors table but is not allowed to do so from desktop.
+    - Run on server?
+    - Do updates via another server side program?
+    - Make database locally and then upload the whole thing?
+    - Temporarily, use
+       ./generateterrain -c ../../../keys/generate_credentials.txt -o /tmp/imgs  -g agni
+      which has a database account allowing remote access.
     
 
       

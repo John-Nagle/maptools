@@ -612,6 +612,7 @@ impl TerrainGenerator {
         let impostor_data =  InitialImpostors::assemble_region_impostor_data(TileType::Sculpt, region, height_field, viz_group_id, &hash_to_hex(sculpt_hash),
             sculpt_uuid_opt, &vec![face_0]);
         log::debug!("Region impostor data: {:?}", impostor_data);
+        InitialImpostors::add_impostor(&mut self.conn, impostor_data)?;
         Ok(())
     }
 

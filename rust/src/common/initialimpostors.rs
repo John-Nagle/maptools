@@ -49,12 +49,12 @@ impl InitialImpostors {
         const SQL_IMPOSTOR: &str = r"INSERT INTO initial_impostors
                 (grid, name, region_loc_x, region_loc_y, region_size_x, region_size_y, viz_group,
                 scale_x, scale_y, scale_z, 
-                elevation_offset, impostor_lod, viz_group, 
+                elevation_offset, impostor_lod,
                 mesh_uuid, sculpt_uuid,
-                mesh_hash, sculpt_hasn
+                mesh_hash, sculpt_hash,
                 water_height, creation_time, faces_json) 
             VALUES 
-                (:grid, :name, :region_loc_x, :region_loc_y, :region_size_x, :region_size_y, :viz_group,
+                (:grid, :name, :region_loc_x, :region_loc_y, :region_size_x, :region_size_y,
                 :scale_x, :scale_y, :scale_z,
                 :elevation_offset, :impostor_lod, :viz_group, 
                 :mesh_uuid, :sculpt_uuid, 
