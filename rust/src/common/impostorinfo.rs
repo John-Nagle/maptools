@@ -29,6 +29,15 @@ pub fn hash_to_hex(hash: u32) -> String {
     format!("{:08x}", hash)
 }
 
+/// Optional UUID to SQL string
+pub fn uuid_opt_to_string(uuid_opt: Option<Uuid>) -> Option<String> {
+    if let Some(uuid) = uuid_opt {
+        Some(uuid.to_string())
+    } else {
+        None
+    }
+}
+
 /// RegionData - info about one region relevant to vizgroup computation.
 #[derive(Debug, Clone, PartialEq)]
 pub struct RegionData {

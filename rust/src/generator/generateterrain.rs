@@ -685,7 +685,7 @@ impl TerrainGenerator {
 /// Actually do the work
 fn run(pool: Pool, outdir: PathBuf, grid: String, url_prefix_opt: Option<String>, generate_mesh: bool) -> Result<(), Error> {
     let corners_touch_connects = false; // for now, SL only.
-    let mut conn = pool.get_conn()?;
+    let conn = pool.get_conn()?;
     let mut terrain_generator =
         TerrainGenerator::new(conn, outdir, url_prefix_opt, generate_mesh, corners_touch_connects);
     let mut grids = terrain_generator.transitive_closure(&grid)?;

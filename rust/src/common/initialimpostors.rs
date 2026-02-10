@@ -19,6 +19,7 @@ use mysql::prelude::Queryable;
 use uuid::{Uuid};
 use crate::{RegionData};
 use crate::{RegionImpostorData, RegionImpostorFaceData, HeightField};
+use crate::{uuid_opt_to_string};
 //////use mysql::prelude::{Queryable};
 
 /// Type of tile
@@ -64,8 +65,8 @@ impl InitialImpostors {
         let insert_params = params! {
                 "grid" => region_impostor_data.grid.to_lowercase().clone(),
                 "name" => region_impostor_data.name,
-                "mesh_uuid" => region_impostor_data.mesh_uuid,
-                "sculpt_uuid" => region_impostor_data.sculpt_uuid,
+                "mesh_uuid" => uuid_opt_to_string(region_impostor_data.mesh_uuid),
+                "sculpt_uuid" => uuid_opt_to_string(region_impostor_data.sculpt_uuid),
                 "mesh_hash" => region_impostor_data.mesh_hash,
                 "sculpt_hash" => region_impostor_data.sculpt_hash,
                 "region_loc_x" => region_impostor_data.region_loc[0],
