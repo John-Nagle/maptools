@@ -47,9 +47,9 @@ impl InitialImpostors {
         //  We have all the info now. Update the region_impostor table.
         //  Insert tile, or update hash and uuid if exists. 
         const SQL_IMPOSTOR: &str = r"INSERT INTO initial_impostors
-                (grid, name, region_loc_x, region_loc_y, region_size_x, region_size_y, viz_group,
+                (grid, name, region_loc_x, region_loc_y, region_size_x, region_size_y,
                 scale_x, scale_y, scale_z, 
-                elevation_offset, impostor_lod,
+                elevation_offset, impostor_lod, viz_group,
                 mesh_uuid, sculpt_uuid,
                 mesh_hash, sculpt_hash,
                 water_height, creation_time, faces_json) 
@@ -88,7 +88,7 @@ impl InitialImpostors {
     
     /// Truncate the table for one grid This table is re-created on each run of generateterrain.
     pub fn clear_grid(conn: &mut PooledConn, grid: &str) -> Result<(), Error> {
-        const SQL_DELETE: &str = r"DELETE FROM initial_impostors WHERE LOWERCASE(grid) = :grid;";
+        const SQL_DELETE: &str = r"DELETE FROM initial_impostors WHERE grid = :grid;";
         let delete_params = params! {
             "grid" => grid.to_lowercase()
         };

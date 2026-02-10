@@ -654,10 +654,8 @@ impl TerrainGenerator {
     }
     
     /// Process group, multi-LOD version
-    fn process_group(&mut self, group: Vec<RegionData>, initial_viz_group_id: u32) -> Result<(), Error> {
-        log::info!("Group #{}: {} entries.", initial_viz_group_id, group.len());
-        //  ***NEED TO ASSIGN PERSISTENT GROUP NUMBER***
-        let viz_group_id = initial_viz_group_id;    // ***TEMP*** Need real assignment algorithm.
+    fn process_group(&mut self, group: Vec<RegionData>, viz_group_id: u32) -> Result<(), Error> {
+        log::info!("Group #{}: {} entries.", viz_group_id, group.len());
         let region_size_opt = homogeneous_group_size(&group);
         if region_size_opt.is_some() && group.len() > 1 {
             //  Do the LOD thing.
@@ -701,8 +699,7 @@ fn run(pool: Pool, outdir: PathBuf, grid: String, url_prefix_opt: Option<String>
         ));
     }
     //  Clear old impostors from initial impostors.
-    //  ***TEMP TURNOFF*** to allow running from desktop.
-    //////InitialImpostors::clear_grid(&mut terrain_generator.conn, &grid)?;
+    InitialImpostors::clear_grid(&mut terrain_generator.conn, &grid)?;
     let grid_entry = grids.pop().unwrap(); // get the one grid
     terrain_generator.process_grid(grid_entry)?;
     println!("Statistics:\n{}", terrain_generator.stats);
