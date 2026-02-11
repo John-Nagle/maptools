@@ -96,11 +96,16 @@ impl InitialImpostors {
         Ok(conn.exec_drop(SQL_DELETE, delete_params)?)
     }
     
-    /// Find missing UUIDs. When there are none, we're done.
-    pub fn find_missing_uuids(conn: &mut PooledConn, grid: &str) -> Result<(), Error> {
-        const SQL_SELECT_MISSING_TILE: &str = "grid, region_loc_x, region_loc_y, name, region_size_x, region_size_y,
-            mesh_hash, mesh_uuid, sculpt_hash, sculpt_uuid
-            WHERE (grid = :grid) AND ((mesh_hash IS NOT NULL AND mesh_uuid IS NULL) OR (sculpt_hash IS NOT NULL AND sculpt_uuid IS NULL))
+    /// Find missing UUIDs. When there are none, intitial_impostors is in sync and can be deployed as region_impostors.
+    pub fn find_missing_uuids(conn: &mut PooledConn, grid: &str) -> Result<Vec<RegionData>, Error> {
+        const SQL_SELECT_MISSING_TILE: &str = r"SELECT grid, region_loc_x, region_loc_y, name, region_size_x, region_size_y,
+            mesh_hash, mesh_uuid, sculpt_hash, sculpt_uuid,
+            faces_json
+            FROM initial_impostors             
+            WHERE (grid = :grid) AND (
+                (mesh_hash IS NOT NULL AND mesh_uuid IS NULL) 
+                OR (sculpt_hash IS NOT NULL AND sculpt_uuid IS NULL)
+                )
             LIMIT 20";
             
         const SQL_SELECT_MISSING_TEXTURE: &str = "grid, region_loc_x, region_loc_y, name, region_size_x, region_size_y,
@@ -111,7 +116,29 @@ impl InitialImpostors {
         let select_params = params! {
             "grid" => grid.to_lowercase()
         }; 
-        todo!();
+        
+        let tiles_missing_uuids = conn.exec_map(
+            SQL_SELECT_MISSING_TILE,
+            select_params, 
+            |(grid, region_loc_x, region_loc_y, name, region_size_x, region_size_y,
+            mesh_hash, mesh_uuid, sculpt_hash, sculpt_uuid, impostor_lod,
+            faces_json):
+            (String, u32, u32, String, u32, u32,
+            String, String, String, String, u8,
+            String) | {
+                let region_data = RegionData {
+                    grid,
+                    region_loc_x,
+                    region_loc_y,
+                    region_size_x,
+                    region_size_y,
+                    name,
+                    lod: impostor_lod,
+                    };
+                log::debug!("Missing UUID for {:?}", region_data);
+                region_data
+            })?;
+        Ok(tiles_missing_uuids)
     }
     
     /// Format conversion.
