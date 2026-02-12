@@ -470,7 +470,7 @@ impl AssetUploadHandler {
     /// Internal handler. Caller sends HTTP response.
     fn handler_internal(
         &mut self,
-        out: &mut dyn Write,
+        _out: &mut dyn Write,
         request: &Request,
         env: &HashMap<String, String> ,
     ) -> Result<(), Error> {
@@ -497,9 +497,11 @@ impl AssetUploadHandler {
         let query_params_map: HashMap<&str, &str> = query_params.into_iter().collect();
         if let Some(grid) = query_params_map.get("grid_finished") {
             //  Client says all done. Try to process.
+            log::info!("Final grid_finished request for {}", grid);
             self.process_finish_grid(grid)?;
         } else {
             //  Main path - this is data about assets just uploaded.
+            log::info!("Impostor upload request");
             let req = Self::parse_request(&request.standard_input, env)?;
             self.process_request(req, &params)?;
         }
@@ -517,7 +519,7 @@ impl Handler for AssetUploadHandler {
         //  Process params and authorization
         log::info!("Request made: {:?} env {:?}", request, env);
         match self.handler_internal(out, request, env) {
-            Ok(req) => {
+            Ok(_) => {
                 //  Success. Send a plain "OK"
                 let http_response = Response::http_response("text/plain", 200, "OK");
                 //  Return something useful.
