@@ -18,11 +18,12 @@ use common::{RegionImpostorFaceData};
 use mysql::prelude::{Queryable};
 use mysql::{Pool};
 use mysql::{PooledConn, params};
-use std::collections::HashMap;
+use std::collections::{HashMap};
 use std::io::Write;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use common::{Authorizer, AuthorizeType};
+use common::InitialImpostors;
 
 /// MySQL Credentials for uploading.
 /// This filename will be searched for in parent directories,
@@ -416,6 +417,7 @@ impl AssetUploadHandler {
     ) -> Result<(usize, String), Error> {
         //  We have an array of assets.
         log::info!("Processing {} assets.", asset_info_short.len());
+        //  An empty list means it's time to check to see if we're done and report errors.
         for asset_upload_short in &asset_info_short {
             let asset_upload = AssetUpload::new_from_asset_upload_short(asset_upload_short)?;
             match &asset_upload.tile_asset_type {
@@ -439,6 +441,70 @@ impl AssetUploadHandler {
         }
         Ok((200, "Asset upload successful".to_string()))
     }
+    
+    /// Process a finished grid.
+    /// LSL program sends this request after uploading everything.
+    fn process_finish_grid(&mut self, grid: &str) ->  Result<(), Error> {
+        log::info!("Grid_finished, ready to process: \"{}\"", grid);
+        //  First check to see if uploads are complete.
+        let unfinished_tiles = InitialImpostors::find_missing_uuids(&mut self.conn, grid)?;
+        for tile in &unfinished_tiles {
+            log::debug!("Unfinished tile: {:?}", tile);
+        }
+        println!("{} unfinished tiles.", unfinished_tiles.len());
+        if unfinished_tiles.is_empty() {
+            self.deploy_impostors(grid)?;
+        } else {
+            return Err(anyhow!("{} tiles still need to be uploaded: {:?}", unfinished_tiles.len(), unfinished_tiles));
+        }
+        Ok(())
+    }
+    
+    /// Deploy impostors by copying all entries from this grid from initial_impostors to region_impostors table.
+    fn deploy_impostors(&mut self, grid: &str) -> Result<(), Error> {
+        log::info!("Deploying impostors for {}", grid);
+        //  ***MORE*** actually copy over impostors
+        Ok(())
+    }
+    
+    /// Internal handler. Caller sends HTTP response.
+    fn handler_internal(
+        &mut self,
+        out: &mut dyn Write,
+        request: &Request,
+        env: &HashMap<String, String> ,
+    ) -> Result<(), Error> {
+        //  Process params and authorization
+        log::info!("Request made: {:?} env {:?}", request, env);
+        let params = request
+            .params
+            .as_ref()
+            .ok_or_else(|| anyhow!("No HTTP parameters found"))?;
+             //  This must be a POST
+             if let Some(request_method) = params.get("REQUEST_METHOD") {  
+                if request_method.to_uppercase().trim() != "POST" {             
+                    return Err(anyhow!("Request method \"{}\" was not POST.", request_method));
+            }
+        } else {
+            return Err(anyhow!("No HTTP request method."));
+        };
+        //  Authorize
+        self.owner_name = Some(Authorizer::authorize(AuthorizeType::UploadImpostors, env, params)?);
+        //  Check params from URL
+        //  Presence of ?grid_finished=gridname triggers this.
+        let query_string = params.get("QUERY_STRING").ok_or_else(|| anyhow!("No QUERY_STRING from FCGI"))?;
+        let query_params = querystring::querify(query_string);
+        let query_params_map: HashMap<&str, &str> = query_params.into_iter().collect();
+        if let Some(grid) = query_params_map.get("grid_finished") {
+            //  Client says all done. Try to process.
+            self.process_finish_grid(grid)?;
+        } else {
+            //  Main path - this is data about assets just uploaded.
+            let req = Self::parse_request(&request.standard_input, env)?;
+            self.process_request(req, &params)?;
+        }
+        return Ok(())
+    }
 }
 //  Our "handler"
 impl Handler for AssetUploadHandler {
@@ -448,58 +514,27 @@ impl Handler for AssetUploadHandler {
         request: &Request,
         env: &HashMap<String, String>,
     ) -> Result<(), Error> {
-        //  We have a request. It's supposed to be in JSON.
-        //  Parse. Error 400 with message if fail.
-        match Self::parse_request(&request.standard_input, env) {
+        //  Process params and authorization
+        log::info!("Request made: {:?} env {:?}", request, env);
+        match self.handler_internal(out, request, env) {
             Ok(req) => {
-                log::info!("Request made: {:?} env {:?}", req, env);
-                let params = request
-                    .params
-                    .as_ref()
-                    .ok_or_else(|| anyhow!("No HTTP parameters found"))?;
-                //  This must be a POST
-                if let Some(request_method) = params.get("REQUEST_METHOD") {  
-                    if request_method.to_uppercase().trim() != "POST" {             
-                        return Err(anyhow!("Request method \"{}\" was not POST.", request_method));
-                    }
-                } else {
-                    return Err(anyhow!("No HTTP request method."));
-                }
-                //  Authorize
-                self.owner_name = Some(Authorizer::authorize(AuthorizeType::UploadImpostors, env, params)?);
-                //  Process. Error 500 if fail.
-                match self.process_request(req, &params) {
-                    Ok((status, msg)) => {
-                        //  Success. Send a plain "OK"
-                        let http_response = Response::http_response("text/plain", status, "OK");
-                        //  Return something useful.
-                        let b = msg.into_bytes();
-                        Response::write_response(out, request, http_response.as_slice(), &b)?;
-                    }
-                    Err(e) => {
-                        let http_response = Response::http_response(
-                            "text/plain",
-                            500,
-                            format!("Problem processing request: {:?}", e).as_str(),
-                        );
-                        Response::write_response(out, request, http_response.as_slice(), &[])?;
-                    }
-                }
+                //  Success. Send a plain "OK"
+                let http_response = Response::http_response("text/plain", 200, "OK");
+                //  Return something useful.
+                let b = "Done".as_bytes();
+                Response::write_response(out, request, http_response.as_slice(), &b)?;
             }
             Err(e) => {
                 let http_response = Response::http_response(
                     "text/plain",
-                    400,
-                    format!("Incorrect request: {:?}", e).as_str(),
+                    500,
+                    format!("Problem processing request: {:?}", e).as_str(),
                 );
-                //  Return something useful.
-                //////let b = format!("Env: {:?}\nParams: {:?}\n", env, request.params).into_bytes();
-                let b = [];
-                Response::write_response(out, request, http_response.as_slice(), &b)?;
+                Response::write_response(out, request, http_response.as_slice(), &[])?;
             }
         }
-        Ok(())
-    }
+        return Ok(())
+     }
 }
 
 /// Run the responder.
