@@ -602,6 +602,9 @@ Complete, but correct?
     - Temporarily, use
        ./generateterrain -c ../../../keys/generate_credentials.txt -o /tmp/imgs  -g agni
       which has a database account allowing remote access.
+      
+2026-02-10
+     Final update runs, but fails to find missing UUIDs. Check SQL in initialimpostors.
     
 
       

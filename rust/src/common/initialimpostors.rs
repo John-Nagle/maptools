@@ -17,6 +17,7 @@ use anyhow::{Error};
 use mysql::{PooledConn, params};
 use mysql::prelude::Queryable;
 use uuid::{Uuid};
+use json::parse;
 use crate::{RegionData};
 use crate::{RegionImpostorData, RegionImpostorFaceData, HeightField};
 use crate::{uuid_opt_to_string};
@@ -98,7 +99,7 @@ impl InitialImpostors {
     
     /// Find missing UUIDs. When there are none, intitial_impostors is in sync and can be deployed as region_impostors.
     pub fn find_missing_uuids(conn: &mut PooledConn, grid: &str) -> Result<Vec<RegionData>, Error> {
-        const SQL_SELECT_MISSING_TILE: &str = r"SELECT grid, region_loc_x, region_loc_y, name, region_size_x, region_size_y,
+        const SQL_SELECT_MISSING_TILE: &str = r"SELECT region_loc_x, region_loc_y, name, region_size_x, region_size_y,
             mesh_hash, mesh_uuid, sculpt_hash, sculpt_uuid,
             faces_json
             FROM initial_impostors             
@@ -108,26 +109,29 @@ impl InitialImpostors {
                 )
             LIMIT 20";
             
-        const SQL_SELECT_MISSING_TEXTURE: &str = "grid, region_loc_x, region_loc_y, name, region_size_x, region_size_y,
-            mesh_hash, mesh_uuid, sculpt_hash, sculpt_uuid
-            WHERE (grid = :grid) AND (mesh_hash IS NOT NULL AND mesh_uuid IS NULL) OR (sculpt_hash IS NOT NULL AND sculpt_uuid IS NULL)
-            LIMIT 20";
-            //  ***NEED JSON TERMS ABOVE***
+        /*
+                        OR (sculpt_hash IS NOT NULL AND sculpt_uuid IS NULL)
+                OR EXISTS (
+                    SELECT 1 FROM jsonb_array_elements(faces_json) AS elem
+                    WHERE elem -> base_texture_uuid IS NULL
+                    )
+                )
+        */
         let select_params = params! {
             "grid" => grid.to_lowercase()
         }; 
-        
-        let tiles_missing_uuids = conn.exec_map(
+        //  Check sculpt/mesh IDs.
+        let mut tiles_missing_uuids = conn.exec_map(
             SQL_SELECT_MISSING_TILE,
-            select_params, 
-            |(grid, region_loc_x, region_loc_y, name, region_size_x, region_size_y,
+            &select_params, 
+            |(region_loc_x, region_loc_y, name, region_size_x, region_size_y,
             mesh_hash, mesh_uuid, sculpt_hash, sculpt_uuid, impostor_lod,
             faces_json):
-            (String, u32, u32, String, u32, u32,
+            (u32, u32, String, u32, u32,
             String, String, String, String, u8,
             String) | {
                 let region_data = RegionData {
-                    grid,
+                    grid: grid.to_string(),
                     region_loc_x,
                     region_loc_y,
                     region_size_x,
@@ -135,10 +139,50 @@ impl InitialImpostors {
                     name,
                     lod: impostor_lod,
                     };
-                log::debug!("Missing UUID for {:?}", region_data);
+                log::debug!("Missing sculpt UUID for {:?}", region_data);
                 region_data
             })?;
-        Ok(tiles_missing_uuids)
+        //  Check texture IDs, which is a full slow table scan.
+        //  We can't get MySQL 8.0 to do this for us.
+        const SQL_SELECT_MISSING_TEXTURE: &str = r"SELECT region_loc_x, region_loc_y, name, region_size_x, region_size_y, impostor_lod,
+            faces_json
+            FROM initial_impostors
+            WHERE (grid = :grid)";
+        let mut tiles_missing_texture_uuids = Vec::new();
+        let is_missing_uuid = | v: &RegionImpostorFaceData | {
+            v.base_texture_uuid.is_none() || (v.emissive_texture_hash.is_some() && v.emissive_texture_uuid.is_none())
+        };
+        let _ = conn.exec_map(
+            SQL_SELECT_MISSING_TEXTURE,
+            &select_params, 
+            |(region_loc_x, region_loc_y, name, region_size_x, region_size_y, impostor_lod,        
+            faces_json):
+            (u32, u32, String, u32, u32, u8,
+            String) | {
+                //  Keep ones where there is a problem.
+                let face_data_result: Result<Vec<RegionImpostorFaceData>, _> = serde_json::from_str(&faces_json);
+                let keep = match face_data_result {
+                    Ok(v) => v.iter().find(|face: &&RegionImpostorFaceData| is_missing_uuid(*face)).is_some(),
+                    Err(e) => true
+                };
+                if keep { 
+                    //  Bad entry, keep.                
+                    let region_data = RegionData {
+                        grid: grid.to_string(),
+                        region_loc_x,
+                        region_loc_y,
+                        region_size_x,
+                        region_size_y,
+                        name,
+                        lod: impostor_lod,
+                        };
+                    log::debug!("Missing texture UUID for {:?}", region_data);
+                    tiles_missing_texture_uuids.push(region_data);
+                }
+                ()
+            })?;
+        tiles_missing_texture_uuids.append(&mut tiles_missing_uuids);
+        Ok(tiles_missing_texture_uuids)
     }
     
     /// Format conversion.
