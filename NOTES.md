@@ -603,8 +603,17 @@ Complete, but correct?
        ./generateterrain -c ../../../keys/generate_credentials.txt -o /tmp/imgs  -g agni
       which has a database account allowing remote access.
       
+      
 2026-02-10
      Final update runs, but fails to find missing UUIDs. Check SQL in initialimpostors.
+     
+2026-02-13
+     Impostors are updated both in initialimpostors and in uploadimpostors. 
+     - It looks like that if the texture info changes but the sculpt info does not, the new texture is not used.
+       - Correct. Uploaded assets were textures only, so only the tile_assets table was updated.
+       - Need to update initial_impostors when a new texture asset comes in.
+         - Moderate sized design problem. Do this when textures come in, or wait until final commit?
+         - Do it at final commit. The missing textures are detected there now, so fix them there.
     
 
       

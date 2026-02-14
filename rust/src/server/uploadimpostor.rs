@@ -308,10 +308,10 @@ impl AssetUploadHandler {
     /// Update impostor info in region_impostors table.
     fn update_impostor_info(&mut self, asset_upload: &AssetUpload, name: &str, mesh_uuid: Option<String>, sculpt_uuid: Option<String>, faces_json: serde_json::Value) -> Result<(), Error> {
 
-        log::debug!("Inserting {} into region_impostors.", name);
+        log::debug!("Inserting {} into initial_impostors.", name);
         //  We have all the info now. Update the region_impostor table.
         //  Insert tile, or update hash and uuid if exists. 
-        const SQL_IMPOSTOR: &str = r"INSERT INTO region_impostors
+        const SQL_IMPOSTOR: &str = r"INSERT INTO initial_impostors
                 (grid, name, region_loc_x, region_loc_y, region_size_x, region_size_y, uniqueness_viz_group,
                 scale_x, scale_y, scale_z, 
                 elevation_offset, impostor_lod, viz_group, 
@@ -350,7 +350,7 @@ impl AssetUploadHandler {
                 "faces_json" => faces_json.to_string(),
             };
         //  Finally insert into the impostor table
-        log::debug!("Inserting impostor into region_impostors, params: {:?}", insert_params);
+        log::debug!("Inserting impostor into initial_impostors, params: {:?}", insert_params);
         Ok(self.conn.exec_drop(SQL_IMPOSTOR, insert_params)?)
     }
     

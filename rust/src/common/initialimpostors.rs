@@ -175,6 +175,51 @@ impl InitialImpostors {
         Ok(tiles_missing_texture_uuids)
     }
     
+    /// Find missing UUIDs. When there are none, intitial_impostors is in sync and can be deployed as region_impostors.
+    pub fn fix_missing_texture_uuids(conn: &mut PooledConn, grid: &str, tiles: &Vec<(RegionData, Vec<RegionImpostorFaceData>)>) -> Result<Vec<RegionData>, Error> {
+        for tile in tiles {
+            //  What's missing in the JSON?
+            //  ***MORE***
+        }
+        // ***MORE***
+        todo!();
+    }
+    
+    /// Find and fix a missing UUID in a face texture entry.
+    /// This tends to happen if something went wrong in upload and an upload had to be rerun.
+    pub fn fix_missing_texture_uuid(conn: &mut PooledConn, grid: &str, region_data: &RegionData, face: RegionImpostorFaceData) 
+            -> Result<Option<RegionImpostorFaceData>, Error> {
+        let mut changed = false;
+        let mut face = face.clone();
+        //  Fix up base texture.
+        if face.base_texture_uuid.is_none() {
+            if let Some(uuid) = Self::look_up_uuid(conn, grid, region_data, &face.base_texture_hash)? {
+                face.base_texture_uuid = Some(uuid);
+                changed = true;
+            }
+        }
+        //  Fix up emissive texture if present.
+        if let Some(hash) = &face.emissive_texture_hash {
+            if face.emissive_texture_uuid.is_none() {
+                if let Some(uuid) = Self::look_up_uuid(conn, grid, region_data, hash)? {
+                    face.emissive_texture_uuid = Some(uuid);
+                    changed = true;
+                }
+            }
+        };
+        //  Do we have new face data?
+        if changed {
+            Ok(Some(face))
+        } else {
+            Ok(None)
+        }
+    }
+    
+    /// Look up a missing UUID in tile_assets.
+    pub fn look_up_uuid(conn: &mut PooledConn, grid: &str, region_data: &RegionData, hash: &str) -> Result<Option<Uuid>, Error> {
+        todo!();
+    }
+    
     /// Format conversion.
     //  There's too much conversion between similar formats in this program.
     //  Some of that is from having to put coordinates into SQL columns.
