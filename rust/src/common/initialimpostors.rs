@@ -17,7 +17,6 @@ use anyhow::{Error};
 use mysql::{PooledConn, params};
 use mysql::prelude::Queryable;
 use uuid::{Uuid};
-use json::parse;
 use crate::{RegionData};
 use crate::{RegionImpostorData, RegionImpostorFaceData, HeightField};
 use crate::{uuid_opt_to_string};
@@ -108,15 +107,6 @@ impl InitialImpostors {
                 OR (sculpt_hash IS NOT NULL AND sculpt_uuid IS NULL)
                 )
             LIMIT 20";
-            
-        /*
-                        OR (sculpt_hash IS NOT NULL AND sculpt_uuid IS NULL)
-                OR EXISTS (
-                    SELECT 1 FROM jsonb_array_elements(faces_json) AS elem
-                    WHERE elem -> base_texture_uuid IS NULL
-                    )
-                )
-        */
         let select_params = params! {
             "grid" => grid.to_lowercase()
         }; 
@@ -139,7 +129,7 @@ impl InitialImpostors {
                     name,
                     lod: impostor_lod,
                     };
-                log::debug!("Missing sculpt UUID for {:?}", region_data);
+                log::debug!("Missing sculpt UUID for {:?}   Sculpt hash: {}, sculpt uuid {:?}", region_data, sculpt_hash, sculpt_uuid);
                 region_data
             })?;
         //  Check texture IDs, which is a full slow table scan.
@@ -161,7 +151,7 @@ impl InitialImpostors {
             String) | {
                 //  Keep ones where there is a problem.
                 let face_data_result: Result<Vec<RegionImpostorFaceData>, _> = serde_json::from_str(&faces_json);
-                let keep = match face_data_result {
+                let keep = match &face_data_result {
                     Ok(v) => v.iter().find(|face: &&RegionImpostorFaceData| is_missing_uuid(*face)).is_some(),
                     Err(e) => true
                 };
@@ -176,7 +166,7 @@ impl InitialImpostors {
                         name,
                         lod: impostor_lod,
                         };
-                    log::debug!("Missing texture UUID for {:?}", region_data);
+                    log::debug!("Missing texture UUID for {:?}, face_data: {:?}", region_data, face_data_result);
                     tiles_missing_texture_uuids.push(region_data);
                 }
                 ()
