@@ -153,7 +153,7 @@ impl InitialImpostors {
                 let face_data_result: Result<Vec<RegionImpostorFaceData>, _> = serde_json::from_str(&faces_json);
                 let keep = match &face_data_result {
                     Ok(v) => v.iter().find(|face: &&RegionImpostorFaceData| is_missing_uuid(*face)).is_some(),
-                    Err(e) => true
+                    Err(_e) => true
                 };
                 if keep { 
                     //  Bad entry, keep.                
@@ -187,7 +187,30 @@ impl InitialImpostors {
     
     /// Find and fix a missing UUID in a face texture entry.
     /// This tends to happen if something went wrong in upload and an upload had to be rerun.
-    pub fn fix_missing_texture_uuid(conn: &mut PooledConn, grid: &str, region_data: &RegionData, face: RegionImpostorFaceData) 
+    /// Returns a new faces_json if something was fixed.
+    pub fn fix_missing_texture_uuids_for_tile(conn: &mut PooledConn, grid: &str, region_data: &RegionData, faces_json: String) ->
+            Result<Option<String>, Error> {
+        //  Get old JSON
+        let mut changed = false;
+        let mut face_data: Vec<RegionImpostorFaceData> = serde_json::from_str(&faces_json)?;
+        for face in &mut face_data {
+            if let Some(new_face) = Self::fix_missing_texture_uuid_for_face(conn, grid, region_data, face)? {
+                *face = new_face;
+                changed = true;
+            }
+        }
+        //  If anything changed, new JSON
+        if changed {
+            Ok(Some(serde_json::to_string(&face_data)?))
+        } else {
+            Ok(None)
+        }
+
+    }
+    
+    /// Find and fix a missing UUID in a face texture entry.
+    /// This tends to happen if something went wrong in upload and an upload had to be rerun.
+    pub fn fix_missing_texture_uuid_for_face(conn: &mut PooledConn, grid: &str, region_data: &RegionData, face: &RegionImpostorFaceData) 
             -> Result<Option<RegionImpostorFaceData>, Error> {
         let mut changed = false;
         let mut face = face.clone();
@@ -216,7 +239,7 @@ impl InitialImpostors {
     }
     
     /// Look up a missing UUID in tile_assets.
-    pub fn look_up_uuid(conn: &mut PooledConn, grid: &str, region_data: &RegionData, hash: &str) -> Result<Option<Uuid>, Error> {
+    pub fn look_up_uuid(conn: &mut PooledConn, grid: &str, region_data: &RegionData, asset_hash: &str) -> Result<Option<Uuid>, Error> {
         todo!();
     }
     
