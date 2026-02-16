@@ -248,12 +248,14 @@ impl InitialImpostors {
         if let Some(faces_json) = faces_json_opt {              
             let mut changed = false;
             let mut face_data: Vec<RegionImpostorFaceData> = serde_json::from_str(&faces_json)?;
+            log::debug!("Faces before change: {:?}", face_data); // ***TEMP***
             for (face_id, face) in &mut face_data.iter_mut().enumerate() {
                 if let Some(new_face) = Self::fix_missing_texture_uuid_for_face(conn, key, &face, face_id)? {
                     *face = new_face;
                     changed = true;
                 }
             }
+            log::debug!("Faces after change: {:?}", face_data); // ***TEMP***
             let faces_json: String = faces_json;
             //  Parse into a JSON string.
             let new_faces_json = serde_json::to_string(&face_data)?;
