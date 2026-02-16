@@ -32,7 +32,7 @@ pub enum TileType {
 
 /// These values uniquely identify an impostor record.
 /// The initial impostors table has UNIQUE KEY (grid, region_loc_x, region_loc_y, impostor_lod, viz_group)
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct UniqueImpostorKey {
     /// Which grid
     grid: String,
@@ -187,6 +187,7 @@ impl InitialImpostors {
                 }
                 ()
             })?;
+        //  ***DO FIXES HERE***
         tiles_missing_texture_uuids.append(&mut tiles_missing_uuids);
         Ok(tiles_missing_texture_uuids)
     }
@@ -197,17 +198,20 @@ impl InitialImpostors {
     ///
     /// This is slow but is only applied to missing tiles.
     pub fn fix_missing_texture_uuids(conn: &mut PooledConn, keys: &[UniqueImpostorKey]) -> Result<Vec<UniqueImpostorKey>, Error> {
+        let mut fails = Vec::new();
         for key in keys {
-            Self::fix_missing_texture_uuids_for_tile(conn, key)?;
+            if !Self::fix_missing_texture_uuids_for_tile(conn, key)? {
+                fails.push((*key).clone())
+            }
         }
-        //  ***NEED ERROR REPORT***
-        Ok(Vec::new())
+        //  Return unsuccessful fixes. 
+        Ok(fails)
     }
     
     /// Find and fix a missing UUID in a face texture entry.
     /// This tends to happen if something went wrong in upload and an upload had to be rerun.
     pub fn fix_missing_texture_uuids_for_tile(conn: &mut PooledConn, key: &UniqueImpostorKey) ->
-            Result<(), Error> {
+            Result<bool, Error> {
         //  Get old json_faces.
         const SQL_SELECT_FACES_JSON: &str = r"SELECT faces_json FROM initial_impostors 
             WHERE grid = :grid
@@ -232,14 +236,13 @@ impl InitialImpostors {
             "viz_group" => key.viz_group,
         };
         //  Get entry to fix.
-        //////if let Some(faces_json) = conn.exec_first(SQL_SELECT_FACES_JSON, key_params)? {  
         let faces_json_opt: Option<String> = conn.exec_first(SQL_SELECT_FACES_JSON, key_params)?;
         if let Some(faces_json) = faces_json_opt {              
             let mut changed = false;
             let mut face_data: Vec<RegionImpostorFaceData> = serde_json::from_str(&faces_json)?;
-            for face in &mut face_data {
-                if let Some(new_face) = Self::fix_missing_texture_uuid_for_face(conn, key, face)? {
-                    *face = new_face;
+            for (face_id, mut face) in &mut face_data.into_iter().enumerate() {
+                if let Some(new_face) = Self::fix_missing_texture_uuid_for_face(conn, key, &face, face_id)? {
+                    face = new_face;
                     changed = true;
                 }
             }
@@ -253,27 +256,28 @@ impl InitialImpostors {
                     "viz_group" => key.viz_group,
                     "faces_json" => faces_json.to_string(),
                 };
-                
-                conn.exec_drop(SQL_UPDATE_FACES_JSON, key_params)?;
-                // ***MORE***               
+                log::info!("Fixed missing texture UUID: {:?}", key_params);    
+                conn.exec_drop(SQL_UPDATE_FACES_JSON, key_params)?;        
             } else {
-                log::error!("Fixing missing texture UUIDs, no chnage to tile {:?}: {:?}", key, face_data);
+                log::warn!("Fixing missing texture UUIDs, no change to tile {:?}: {:?}", key, faces_json);
+                return Ok(false)
             }
         } else {
-            log::error!("Fixing missing texture UUIDs, could not find tile {:?}", key);
+            log::warn!("Fixing missing texture UUIDs, could not find tile {:?}", key);
+            return Ok(false)
         }
-        Ok(())
+        Ok(true)
     }
     
     /// Find and fix a missing UUID in a face texture entry.
     /// This tends to happen if something went wrong in upload and an upload had to be rerun.
-    pub fn fix_missing_texture_uuid_for_face(conn: &mut PooledConn, key: &UniqueImpostorKey, face: &RegionImpostorFaceData) 
+    pub fn fix_missing_texture_uuid_for_face(conn: &mut PooledConn, key: &UniqueImpostorKey, face: &RegionImpostorFaceData, face_id: usize) 
             -> Result<Option<RegionImpostorFaceData>, Error> {
         let mut changed = false;
         let mut face = face.clone();
         //  Fix up base texture.
         if face.base_texture_uuid.is_none() {
-            if let Some(uuid) = Self::look_up_uuid(conn, key, &face.base_texture_hash)? {
+            if let Some(uuid) = Self::look_up_uuid(conn, key, face_id, &face.base_texture_hash)? {
                 face.base_texture_uuid = Some(uuid);
                 changed = true;
             }
@@ -281,7 +285,7 @@ impl InitialImpostors {
         //  Fix up emissive texture if present.
         if let Some(hash) = &face.emissive_texture_hash {
             if face.emissive_texture_uuid.is_none() {
-                if let Some(uuid) = Self::look_up_uuid(conn, key, hash)? {
+                if let Some(uuid) = Self::look_up_uuid(conn, key, face_id, hash)? {
                     face.emissive_texture_uuid = Some(uuid);
                     changed = true;
                 }
@@ -296,7 +300,7 @@ impl InitialImpostors {
     }
     
     /// Look up a missing UUID in tile_assets.
-    pub fn look_up_uuid(conn: &mut PooledConn, key: &UniqueImpostorKey, asset_hash: &str) -> Result<Option<Uuid>, Error> {
+    pub fn look_up_uuid(conn: &mut PooledConn, key: &UniqueImpostorKey, face_id: usize, asset_hash: &str) -> Result<Option<Uuid>, Error> {
         todo!();
     }
     
