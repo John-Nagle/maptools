@@ -13,7 +13,7 @@
 //! Animats
 //! February, 2026.
 //
-use anyhow::{Error};
+use anyhow::{Error, anyhow};
 use mysql::{PooledConn, params};
 use mysql::prelude::Queryable;
 use uuid::{Uuid};
@@ -33,7 +33,7 @@ pub enum TileType {
 /// These values uniquely identify an impostor record.
 /// The initial impostors table has UNIQUE KEY (grid, region_loc_x, region_loc_y, impostor_lod, viz_group)
 #[derive(Debug, Clone)]
-struct UniqueImpostorKey {
+pub struct UniqueImpostorKey {
     /// Which grid
     grid: String,
     /// Region location X
@@ -127,7 +127,7 @@ impl InitialImpostors {
             "grid" => grid.to_lowercase()
         }; 
         //  Check sculpt/mesh IDs.
-        let mut tiles_missing_uuids = conn.exec_map(
+        let tiles_missing_uuids = conn.exec_map(
             SQL_SELECT_MISSING_TILE,
             &select_params, 
             |(region_loc_x, region_loc_y, name, region_size_x, region_size_y,
@@ -150,7 +150,7 @@ impl InitialImpostors {
             })?;
         //  Check texture IDs, which is a full slow table scan.
         //  We can't get MySQL 8.0 to do this for us.
-        const SQL_SELECT_MISSING_TEXTURE: &str = r"SELECT region_loc_x, region_loc_y, name, region_size_x, region_size_y, impostor_lod,
+        const SQL_SELECT_MISSING_TEXTURE: &str = r"SELECT region_loc_x, region_loc_y, name, impostor_lod, viz_group,
             faces_json
             FROM initial_impostors
             WHERE (grid = :grid)";
@@ -161,9 +161,9 @@ impl InitialImpostors {
         let _ = conn.exec_map(
             SQL_SELECT_MISSING_TEXTURE,
             &select_params, 
-            |(region_loc_x, region_loc_y, name, region_size_x, region_size_y, impostor_lod,        
+            |(region_loc_x, region_loc_y, _name, impostor_lod, viz_group,     
             faces_json):
-            (u32, u32, String, u32, u32, u8,
+            (u32, u32, String, u8, u32,
             String) | {
                 //  Keep ones where there is a problem.
                 let face_data_result: Result<Vec<RegionImpostorFaceData>, _> = serde_json::from_str(&faces_json);
@@ -173,23 +173,31 @@ impl InitialImpostors {
                 };
                 if keep { 
                     //  Bad entry, keep.                
-                    let region_data = RegionData {
+                    let tile_key = UniqueImpostorKey {
                         grid: grid.to_string(),
                         region_loc_x,
                         region_loc_y,
-                        region_size_x,
-                        region_size_y,
-                        name,
-                        lod: impostor_lod,
+                        impostor_lod,
+                        viz_group,
                         };
-                    log::debug!("Missing texture UUID for {:?}, face_data: {:?}", region_data, face_data_result);
-                    tiles_missing_texture_uuids.push(region_data);
+                    log::debug!("Missing texture UUID for {:?}, face_data: {:?}", tile_key, face_data_result);
+                    tiles_missing_texture_uuids.push(tile_key);
                 }
                 ()
             })?;
-        //  ***DO FIXES HERE***
-        tiles_missing_texture_uuids.append(&mut tiles_missing_uuids);
-        Ok(tiles_missing_texture_uuids)
+        //  Perform repairs here.
+        if !tiles_missing_texture_uuids.is_empty() {
+            log::info!("{} tiles are missing texture UUIDs. Starting repair.", tiles_missing_texture_uuids.len());
+            let tiles_still_missing_texture_uuids = Self::fix_missing_texture_uuids(conn, &tiles_missing_texture_uuids)?;
+            if !tiles_still_missing_texture_uuids.is_empty() {
+                log::error!("{} tiles are still missing texture UUIDs. Failed repair.", tiles_still_missing_texture_uuids.len());
+                return Err(anyhow!("{} tiles are still missing texture UUIDs. Failed repair.", tiles_still_missing_texture_uuids.len()));
+            } else {
+                log::info!("Tile missing UUID repair successful.");
+            }          
+        }
+        //////tiles_missing_texture_uuids.append(&mut tiles_missing_uuids);
+        Ok(tiles_missing_uuids)
     }
        
     /// Fix missing UUIDs. When there are none, initial_impostors is in sync and can be deployed as region_impostors.
@@ -240,13 +248,15 @@ impl InitialImpostors {
         if let Some(faces_json) = faces_json_opt {              
             let mut changed = false;
             let mut face_data: Vec<RegionImpostorFaceData> = serde_json::from_str(&faces_json)?;
-            for (face_id, mut face) in &mut face_data.into_iter().enumerate() {
+            for (face_id, face) in &mut face_data.iter_mut().enumerate() {
                 if let Some(new_face) = Self::fix_missing_texture_uuid_for_face(conn, key, &face, face_id)? {
-                    face = new_face;
+                    *face = new_face;
                     changed = true;
                 }
             }
             let faces_json: String = faces_json;
+            //  Parse into a JSON string.
+            let new_faces_json = serde_json::to_string(&face_data)?;
             if changed {
                 let key_params = params! {
                     "grid" => key.grid.clone(),
@@ -254,7 +264,7 @@ impl InitialImpostors {
                     "region_loc_y" => key.region_loc_y,
                     "impostor_lod" => key.impostor_lod,
                     "viz_group" => key.viz_group,
-                    "faces_json" => faces_json.to_string(),
+                    "faces_json" => new_faces_json.to_string(),
                 };
                 log::info!("Fixed missing texture UUID: {:?}", key_params);    
                 conn.exec_drop(SQL_UPDATE_FACES_JSON, key_params)?;        
