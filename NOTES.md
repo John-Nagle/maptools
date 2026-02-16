@@ -615,5 +615,6 @@ Complete, but correct?
          - Moderate sized design problem. Do this when textures come in, or wait until final commit?
          - Do it at final commit. The missing textures are detected there now, so fix them there.
     
-
-      
+2026-02-16
+    Crashing at let result = conn.exec_first(SQL_LOOK_UP_UUID, select_params);
+    - Not an SQL error, a panic?

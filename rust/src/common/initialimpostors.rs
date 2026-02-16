@@ -317,10 +317,11 @@ impl InitialImpostors {
             WHERE  grid = :grid
                 AND region_loc_x = :region_loc_x 
                 AND region_loc_y = :region_loc_y
-                AND impostor_lod = :impostor_lod,
+                AND impostor_lod = :impostor_lod
                 AND asset_hash = :asset_hash
                 AND asset_type = :asset_type";
         let select_params = params! {
+            "grid" => key.grid.clone(),
             "region_loc_x" => key.region_loc_x,
             "region_loc_y" => key.region_loc_y,
             "impostor_lod" => key.impostor_lod,
@@ -328,7 +329,11 @@ impl InitialImpostors {
             "asset_type" => asset_type,
         };
         //  Look up the tile. Hash is part of the key.
-        Ok(conn.exec_first(SQL_LOOK_UP_UUID, select_params)?)
+        log::debug!("Looking up tile UUID: {:?}", select_params);
+        //////Ok(conn.exec_first(SQL_LOOK_UP_UUID, select_params)?)
+        let result = conn.exec_first(SQL_LOOK_UP_UUID, select_params);
+        log::debug!("Looked up tile UUID: {:?}", result);
+        Ok(result?)
     }
     
     /// Format conversion.
