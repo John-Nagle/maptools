@@ -190,79 +190,19 @@ impl InitialImpostors {
         tiles_missing_texture_uuids.append(&mut tiles_missing_uuids);
         Ok(tiles_missing_texture_uuids)
     }
-/*    
+       
     /// Fix missing UUIDs. When there are none, initial_impostors is in sync and can be deployed as region_impostors.
     /// The tile list here must contain all the info in the UNIQUE INDEX (grid, region_loc_x, region_loc_y, impostor_lod, viz_group)
     /// so that the SELECT and UPDATE will match the same record. So UniqueImpostorKey is used.
     ///
     /// This is slow but is only applied to missing tiles.
-    pub fn fix_missing_texture_uuids(conn: &mut PooledConn, keys: &Vec<UniqueImpostorKey)>) -> Result<Vec<UniqueImpostorKey>, Error> {
-        const SQL_SELECT_FACES_JSON: &str = r"SELECT faces_json FROM initial_impostors 
-            WHERE grid = :grid
-                AND region_loc_x = :region_loc_x 
-                AND region_loc_y = :region_loc_y
-                AND impostor_lod = :impostor_lod
-                AND viz_group = :viz_group";
-        
-        for key in keys {     
-            let select_params =  params! {
-                "grid" => key.grid.to_lowercase(),
-                "region_loc_x" => key.region_loc_x,
-                "region_loc_y" => key.region_loc.y,
-                "impostor_lod" => key.impostor_lod,
-                "viz_group" => key.viz_group,
-            }; 
-        
-            if let Some(faces_json) = conn.query_first(SQL_SELECT_FACES_JSON, select_params)? {
-                Self::fix_missing_texture_uuids_for_tile(conn, key)
-            } else {
-                log::error!("Fixing missing texture UUIDS, could not find tile.");
-            }
-        
-        
-        
-        /// ***WRONG*** needs better check that JSON hashes match.
-        const SQL_UPDATE_JSON: &str = r"UPDATE faces_json FROM initial_impostors 
-                WHERE grid = :grid
-                AND region_loc_x = :region_loc_x 
-                AND region_loc_y = :region_loc_y
-                AND region_size_x = :region_size_x
-                AND region_size_y = :region_size_y";
-        for (region_data, faces_json) in tiles {
-            if let Some(new_face_data) = Self::fix_missing_texture_uuids_for_tile(conn, grid, region_data, faces_json)? {
-                log::info!("Fixing misssing texture UUIDs in {:?}: {:?}", region_data, faces_json);
-                
-            }
-            //  What's missing in the JSON?
-            //  ***MORE***
+    pub fn fix_missing_texture_uuids(conn: &mut PooledConn, keys: &[UniqueImpostorKey]) -> Result<Vec<UniqueImpostorKey>, Error> {
+        for key in keys {
+            Self::fix_missing_texture_uuids_for_tile(conn, key)?;
         }
-        // ***MORE***
-        todo!();
+        //  ***NEED ERROR REPORT***
+        Ok(Vec::new())
     }
-    
-    /// Find and fix a missing UUID in a face texture entry.
-    /// This tends to happen if something went wrong in upload and an upload had to be rerun.
-    /// Returns a new faces_json if something was fixed.
-    pub fn _old_fix_missing_texture_uuids_for_tile(conn: &mut PooledConn, grid: &str, region_data: &RegionData, faces_json: String) ->
-            Result<Option<String>, Error> {
-        //  Get old JSON
-        let mut changed = false;
-        let mut face_data: Vec<RegionImpostorFaceData> = serde_json::from_str(&faces_json)?;
-        for face in &mut face_data {
-            if let Some(new_face) = Self::fix_missing_texture_uuid_for_face(conn, key, face)? {
-                *face = new_face;
-                changed = true;
-            }
-        }
-        //  If anything changed, new JSON
-        if changed {
-            Ok(Some(serde_json::to_string(&face_data)?))
-        } else {
-            Ok(None)
-        }
-
-    }
-*/
     
     /// Find and fix a missing UUID in a face texture entry.
     /// This tends to happen if something went wrong in upload and an upload had to be rerun.
