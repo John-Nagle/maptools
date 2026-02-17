@@ -618,4 +618,8 @@ Complete, but correct?
 2026-02-16
     Crashing at let result = conn.exec_first(SQL_LOOK_UP_UUID, select_params);
     - Not an SQL error, a panic? [FIXED]
-    Remove uniqueness_vizgroup.
+    Remove uniqueness_vizgroup. [DONE]
+    Appears to work. Seemingly valid region_impostors table created.
+    TODO:
+    - Need to tighten up security. How to identify clients?
+    - Fix scripts to wait for status on each HTTP request.
