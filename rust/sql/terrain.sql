@@ -25,35 +25,8 @@ CREATE TABLE IF NOT EXISTS raw_terrain_heights (
     )
     
    
--- Impostor information. What the viewer needs to draw an impostor.
- 
-CREATE TABLE IF NOT EXISTS region_impostors (
-    grid VARCHAR(40) NOT NULL,
-    name VARCHAR(100) NOT NULL,
-    region_loc_x INT NOT NULL,
-    region_loc_y INT NOT NULL,
-    region_size_x INT NOT NULL,
-    region_size_y INT NOT NULL,
-    scale_x INT NOT NULL,
-    scale_y INT NOT NULL,
-    scale_z FLOAT NOT NULL,
-    elevation_offset FLOAT NOT NULL,
-    impostor_lod TINYINT NOT NULL,
-    viz_group INT NOT NULL,
-    mesh_uuid CHAR(36) DEFAULT NULL,
-    mesh_hash CHAR(8) DEFAULT NULL,
-    sculpt_uuid CHAR(36) DEFAULT NULL,
-    sculpt_hash CHAR(8) DEFAULT NULL,
-    water_height FLOAT NOT NULL,
-    creator VARCHAR(63) NOT NULL,
-    creation_time TIMESTAMP NOT NULL,
-    faces_json JSON NOT NULL,
-    UNIQUE INDEX (grid, region_loc_x, region_loc_y, impostor_lod, viz_group),
-    INDEX(grid, viz_group),
-    INDEX(name)
-)
 
--- Impostor information. What the viewer needs to draw an impostor.
+-- Impostor information. What the viewer needs to draw an impostor. The working copy.
  
 CREATE TABLE IF NOT EXISTS initial_impostors (
     grid VARCHAR(40) NOT NULL,
@@ -80,6 +53,9 @@ CREATE TABLE IF NOT EXISTS initial_impostors (
     INDEX(grid, viz_group),
     INDEX(name)
 )
+
+-- The table viewers use for region impostor info.
+CREATE TABLE IF NOT EXISTS region_impostors LIKE initial_impostors;
 
 --- Region textures. Used to hold texture information which needs to be matched to geometry.
 
