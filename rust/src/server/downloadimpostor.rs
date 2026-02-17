@@ -227,7 +227,7 @@ impl TerrainDownloadHandler {
             impostors,
             errors,            
         };
-        let json = serde_json::to_string(&full_reply)?;
+        let json = serde_json::to_string_pretty(&full_reply)?;
         Ok((200, json))
     }
 }
