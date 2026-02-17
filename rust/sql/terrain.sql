@@ -40,7 +40,6 @@ CREATE TABLE IF NOT EXISTS region_impostors (
     elevation_offset FLOAT NOT NULL,
     impostor_lod TINYINT NOT NULL,
     viz_group INT NOT NULL,
-    uniqueness_viz_group INT DEFAULT NULL,
     mesh_uuid CHAR(36) DEFAULT NULL,
     mesh_hash CHAR(8) DEFAULT NULL,
     sculpt_uuid CHAR(36) DEFAULT NULL,
@@ -49,7 +48,7 @@ CREATE TABLE IF NOT EXISTS region_impostors (
     creator VARCHAR(63) NOT NULL,
     creation_time TIMESTAMP NOT NULL,
     faces_json JSON NOT NULL,
-    UNIQUE INDEX (grid, region_loc_x, region_loc_y, impostor_lod, uniqueness_vizgroup),
+    UNIQUE INDEX (grid, region_loc_x, region_loc_y, impostor_lod, viz_group),
     INDEX(grid, viz_group),
     INDEX(name)
 )

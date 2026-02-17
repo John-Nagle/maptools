@@ -16,8 +16,7 @@ use common::init_fcgi;
 use common::{Handler, Request, Response};
 use common::{RegionImpostorFaceData};
 use mysql::prelude::{Queryable};
-use mysql::{Pool};
-use mysql::{PooledConn, params};
+use mysql::{Pool, TxOpts, PooledConn, params};
 use std::collections::{HashMap};
 use std::io::Write;
 use serde::{Deserialize, Serialize};
@@ -454,6 +453,7 @@ impl AssetUploadHandler {
         println!("{} unfinished tiles.", unfinished_tiles.len());
         if unfinished_tiles.is_empty() {
             self.deploy_impostors(grid)?;
+            log::info!("New impostors deployed.");
         } else {
             return Err(anyhow!("{} tiles still need to be uploaded: {:?}", unfinished_tiles.len(), unfinished_tiles));
         }
@@ -463,8 +463,19 @@ impl AssetUploadHandler {
     /// Deploy impostors by copying all entries from this grid from initial_impostors to region_impostors table.
     fn deploy_impostors(&mut self, grid: &str) -> Result<(), Error> {
         log::info!("Deploying impostors for {}", grid);
-        //  ***MORE*** actually copy over impostors
-        Ok(())
+        const SQL_DELETE_GRID: &str = r"DELETE FROM region_impostors WHERE grid = :grid";
+        const SQL_COPY_GRID: &str = r"INSERT INTO region_impostors SELECT * FROM initial_impostors WHERE grid = :grid";
+        let params = params! {
+            "grid" => grid
+        };
+        //  Atomic transaction. Must complete successfully or rolled back.
+        let mut tx = self.conn.start_transaction(TxOpts::default())?;
+        log::debug!("Deleting old.");
+        tx.exec_drop(SQL_DELETE_GRID, &params)?;
+        log::debug!("Inserting new.");
+        tx.exec_drop(SQL_COPY_GRID, &params)?;
+        log::debug!("Deploy complete.");
+        Ok(tx.commit()?)
     }
     
     /// Internal handler. Caller sends HTTP response.

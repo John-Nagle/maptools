@@ -20,7 +20,6 @@ use uuid::{Uuid};
 use crate::{RegionData};
 use crate::{RegionImpostorData, RegionImpostorFaceData, HeightField};
 use crate::{uuid_opt_to_string};
-//////use mysql::prelude::{Queryable};
 
 /// Type of tile
 pub enum TileType {
@@ -113,7 +112,7 @@ impl InitialImpostors {
     }
     
     /// Find missing UUIDs. When there are none, intitial_impostors is in sync and can be deployed as region_impostors.
-    pub fn find_missing_uuids(conn: &mut PooledConn, grid: &str) -> Result<Vec<RegionData>, Error> {
+    pub fn find_missing_uuids(conn: &mut PooledConn, grid: &str) -> Result<Vec<UniqueImpostorKey>, Error> {
         const SQL_SELECT_MISSING_TILE: &str = r"SELECT region_loc_x, region_loc_y, name, region_size_x, region_size_y,
             mesh_hash, mesh_uuid, sculpt_hash, sculpt_uuid,
             faces_json
@@ -127,26 +126,24 @@ impl InitialImpostors {
             "grid" => grid.to_lowercase()
         }; 
         //  Check sculpt/mesh IDs.
-        let tiles_missing_uuids = conn.exec_map(
+        let mut tiles_missing_uuids = conn.exec_map(
             SQL_SELECT_MISSING_TILE,
             &select_params, 
-            |(region_loc_x, region_loc_y, name, region_size_x, region_size_y,
-            mesh_hash, mesh_uuid, sculpt_hash, sculpt_uuid, impostor_lod,
+            |(region_loc_x, region_loc_y, name, 
+            mesh_hash, mesh_uuid, sculpt_hash, sculpt_uuid, impostor_lod, viz_group,
             faces_json):
-            (u32, u32, String, u32, u32,
-            String, String, String, String, u8,
+            (u32, u32, String,
+            String, String, String, String, u8, u32,
             String) | {
-                let region_data = RegionData {
+                let tile_key = UniqueImpostorKey {
                     grid: grid.to_string(),
                     region_loc_x,
                     region_loc_y,
-                    region_size_x,
-                    region_size_y,
-                    name,
-                    lod: impostor_lod,
+                    impostor_lod,
+                    viz_group,
                     };
-                log::debug!("Missing sculpt UUID for {:?}   Sculpt hash: {}, sculpt uuid {:?}", region_data, sculpt_hash, sculpt_uuid);
-                region_data
+                log::debug!("Missing sculpt UUID for {:?}   Sculpt hash: {}, sculpt uuid {:?}", tile_key, sculpt_hash, sculpt_uuid);
+                tile_key
             })?;
         //  Check texture IDs, which is a full slow table scan.
         //  We can't get MySQL 8.0 to do this for us.
@@ -196,7 +193,8 @@ impl InitialImpostors {
                 log::info!("Tile missing UUID repair successful.");
             }          
         }
-        //////tiles_missing_texture_uuids.append(&mut tiles_missing_uuids);
+        //  Construct a vec of all tiles with problems.
+        tiles_missing_uuids.append(&mut tiles_missing_texture_uuids);
         Ok(tiles_missing_uuids)
     }
        
@@ -330,7 +328,6 @@ impl InitialImpostors {
         };
         //  Look up the tile. Hash is part of the key.
         log::debug!("Looking up tile UUID: {:?}", select_params);
-        //////Ok(conn.exec_first(SQL_LOOK_UP_UUID, select_params)?)
         let uuid_opt: Option<String> = conn.exec_first(SQL_LOOK_UP_UUID, select_params)?;
         log::debug!("Looked up tile UUID: {:?}", uuid_opt);
         Ok(if let Some(uuid_str) = uuid_opt {
