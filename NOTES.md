@@ -654,5 +654,11 @@ john@Nagle-LTS:/tmp$
       - Save "last-modified" in creation_time.
         - Only if not in future, as a safety check?
       - If a new read has an earlier last-modified than the one in the database, use the existing tile.
-      - 
+
+2026-02-20
+   Trying to get rid of viz_group in tile info. 
+   - But uploadimpostor can create initial_impostor entries. 
+     - Should it be allowed to do that? Or only update them?
+     - They're created in generateterrain, lacking only the final UUID.
+     - May not need update_impostor_info at all.
     
