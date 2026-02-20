@@ -623,3 +623,36 @@ Complete, but correct?
     TODO:
     - Need to tighten up security. How to identify clients?
     - Fix scripts to wait for status on each HTTP request.
+    BUG:
+    - Hashing of textures is not, apparently, totally repeatable.
+
+2026-02-17
+    Image files look the same but change from run to run.
+    Pixels change, but not by more than 2 values.
+    cmp imgs2/RT0_288768_268288_1024_1024_30.92_0.00_2_0_20.00_4fbb66fa.png 
+        imgs3/RT0_288768_268288_1024_1024_30.92_0.00_2_0_20.00_d272bde4.png
+    imgs2/RT0_288768_268288_1024_1024_30.92_0.00_2_0_20.00_4fbb66fa.png imgs3/RT0_288768_268288_1024_1024_30.92_0.00_2_0_20.00_d272bde4.png differ: byte 37, line 3
+john@Nagle-LTS:/tmp$ 
+
+    SL tile shown is 1128-1048, size 1024, or tile
+    
+    https://secondlife-maps-cdn.akamaized.net/map-3-1128-1048-objects.jpg
+    
+2026-02-18
+    Still trying to find source of nonrepeatability.
+    - Can check and store AWS hash if available.
+      - Can check that with a header only read. 
+    - Don't need more than one set of image tiles.
+      - Elevation map has zero elevation for tiles of other viz groups.
+      - So they won't show.
+      - Add a dirt layer at elevation 0.01 to hide them if desired.
+      
+2026-02-19
+    Definitely an Akamai stale cache situation alternatly serving two different
+    versions of the same file.
+    - Need to store timestamps in the tile_asset table.
+      - Save "last-modified" in creation_time.
+        - Only if not in future, as a safety check?
+      - If a new read has an earlier last-modified than the one in the database, use the existing tile.
+      - 
+    
