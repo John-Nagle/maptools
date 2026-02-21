@@ -10,6 +10,8 @@ use std::hash::{Hash, Hasher, DefaultHasher};
 use std::f64;
 use anyhow::{anyhow, Error};
 use std::io::{Cursor};
+use http::header::{HeaderValue, HeaderMap};
+use chrono::{DateTime, Utc};
 
 /// Calculate hash for duplicate check.
 fn calc_rgbimage_hash(img: &RgbImage) -> u32 {
@@ -159,7 +161,9 @@ impl TerrainSculptTexture {
     pub fn makeimage(&mut self, _resolution: u32) -> Result<(), Error> {
         //  ***NEED TO GET OS PREFIX FROM - WHERE? ***
         const URL_PREFIX: &str = "https://secondlife-maps-cdn.akamaized.net/map-";
-        let img = Self::fetch_terrain_image(URL_PREFIX, self.region_coords_x, self.region_coords_y, self.lod)?;
+        let (img, last_modified_str) = Self::fetch_terrain_image(URL_PREFIX, self.region_coords_x, self.region_coords_y, self.lod)?;
+        let last_modified = DateTime::parse_from_rfc2822(&last_modified_str)?.with_timezone(&Utc);
+        log::debug!("Image last modified at {:?}", last_modified);
         self.image = Some(img.into());
         Ok(())
     }
@@ -181,7 +185,7 @@ impl TerrainSculptTexture {
         url_prefix: &str,
         region_coords_x: u32,
         region_coords_y: u32,
-        lod: u8) -> Result<DynamicImage, Error> {
+        lod: u8) -> Result<(DynamicImage, String), Error> {
         const STANDARD_TILE_SIZE: u32 = 256; // Even on OS
         let tile_id_x = region_coords_x / STANDARD_TILE_SIZE;
         let tile_id_y = region_coords_y / STANDARD_TILE_SIZE;
@@ -201,14 +205,19 @@ impl TerrainSculptTexture {
             .map_err(anyhow::Error::msg)?;
             //////.with_context(|| format!("Reading map tile  {}", url))?;
         //////let content_type = resp.headers().get("Content-Type").ok_or_else(|| anyhow!("No content type for image fetch"))?;
+        //  Get last_modified time, used to disambiguate problems with cache servers.
+        let last_modified = resp.headers().get("Last-Modified")
+            .ok_or_else(|| anyhow!("No Last-Modified time for image fetch"))?
+            .to_str()?
+            .to_string();
         let raw_data = resp.body_mut().read_to_vec()?;     
         let reader = ImageReader::new(Cursor::new(raw_data))
             .with_guessed_format()
             .expect("Cursor io never fails");
         //////assert_eq!(reader.format(), Some(ImageFormat::Pnm));
 
-        let image = reader.decode()?;
-        Ok(image)
+        let image: DynamicImage = reader.decode()?;
+        Ok((image, last_modified))
     }
 }
 

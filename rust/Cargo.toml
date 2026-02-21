@@ -78,6 +78,7 @@ hex = "0.4"
 uuid = { version = "1", features = ["serde"] }
 querystring = "1"
 ureq = "3"
+http = "1"
 
 num = "0.4"
 num-traits = "0.2"
