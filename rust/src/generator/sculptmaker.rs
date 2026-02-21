@@ -138,6 +138,8 @@ pub struct TerrainSculptTexture {
     region_coords_x: u32,
     region_coords_y: u32,
     lod: u8,
+    /// Last modified timestamp
+    last_modified: Option<DateTime<Utc>>,
     /// Generated image
     pub image: Option<RgbImage>,
     
@@ -151,6 +153,7 @@ impl TerrainSculptTexture {
             region_coords_y,
             lod,
             image: None,
+            last_modified: None,
         }
     }
     
@@ -165,6 +168,7 @@ impl TerrainSculptTexture {
         let last_modified = DateTime::parse_from_rfc2822(&last_modified_str)?.with_timezone(&Utc);
         log::debug!("Image last modified at {:?}", last_modified);
         self.image = Some(img.into());
+        self.last_modified = Some(last_modified);
         Ok(())
     }
     

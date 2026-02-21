@@ -661,4 +661,11 @@ john@Nagle-LTS:/tmp$
      - Should it be allowed to do that? Or only update them?
      - They're created in generateterrain, lacking only the final UUID.
      - May not need update_impostor_info at all.
+       - Dont. Commented out.
+    - Got rid of viz_group in tile info.
+    
+    Working on timestamp fixes. Reading last_modified time OK.
+    - Checking rules:
+      - Last modified time not later than current UTC time.
+      - 
     
