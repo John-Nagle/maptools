@@ -529,7 +529,7 @@ impl TerrainGenerator {
             "region_size_x" => region_size[0],
             "region_size_y" => region_size[1],
             "asset_type" => asset_type,
-            "asset_hash" => format!("{:08x}",asset_hash),
+            "asset_hash" => hash_to_hex(asset_hash),
             };
          let asset_uuids = self.conn.exec_map(
             SQL_GET_ASSET_UUID,
