@@ -69,7 +69,7 @@ CREATE TABLE IF NOT EXISTS tile_assets (
     asset_name VARCHAR(63) NOT NULL,
     asset_type VARCHAR(20) NOT NULL,
     texture_index SMALLINT DEFAULT NULL,
-    asset_uuid CHAR(36) NOT NULL,  
+    asset_uuid CHAR(36) DEFAULT NULL,  
     asset_hash CHAR(8) NOT NULL,
     creation_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE INDEX (grid, region_loc_x, region_loc_y, impostor_lod, asset_hash, texture_index, asset_type),

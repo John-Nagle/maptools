@@ -687,4 +687,9 @@ john@Nagle-LTS:/tmp$
       
       New step: garbage collection. After successful upload and a new region_impostors file,
       remove all the unused tile entries.
+      
+      Progress:
+      - Moved common code to tileassets.
+      TODO:
+      - generate new format impostor names - only need ident info, not water level, etc.
     

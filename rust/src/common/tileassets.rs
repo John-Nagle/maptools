@@ -45,6 +45,26 @@ impl TileAssetType {
         }
     }
     
+    /// The reverse operation, prefix from value
+    pub fn to_prefix(&self) -> String {
+        match self {
+            Self::SculptTexture => "RS".to_string(),
+            Self::Mesh => "RM".to_string(),
+            Self::BaseTexture(n) => format!("RT{}", n),
+            Self::EmissiveTexture(n) => format!("RE{}", n),
+        }
+    }
+    
+    /// To string, used with SQL.
+    pub fn to_string(&self) -> &str {
+        match self {
+            Self::SculptTexture => "SculptTexture",
+            Self::Mesh => "Mesh",
+            Self::BaseTexture(n) => "BaseTexture",
+            Self::EmissiveTexture(n) => "EmissiveTexture",
+        }
+    }
+    
     /// Get one digit, with checking
     fn get_texture_index(prefix: &str) -> Result<u8, Error> {
         if prefix.len() < 3 {
@@ -101,7 +121,8 @@ impl AssetUpload {
         let region_loc = [region_data.region_loc_x, region_data.region_loc_y];
         let region_size = [region_data.region_size_x, region_data.region_size_y];
         let grid = region_data.grid.clone();
-        let asset_name = "???".to_string();   // ***TEMP*** Need to generate name
+        //  Construct name that encodes the coords and hash. viz_group is no longer used.
+        let asset_name = Self::impostor_name(&tile_asset_type.to_prefix(), region_data, height_field, impostor_lod, 0, asset_hash)?;
         
         Ok(Self {
             asset_name,
@@ -118,8 +139,9 @@ impl AssetUpload {
         })
     }
     
-        /// Encoded name for impostor asset file.
+    /// Encoded name for impostor asset file.
     /// The name contains all the info we need to generate the impostor.
+    /// viz_group_id is no longer used.
     /// Format: RS_x_y_sx_sy_sz_offset_lod_waterlevel_vizgroup_hash_
     fn impostor_name(
         prefix: &str,
@@ -145,8 +167,10 @@ impl AssetUpload {
         }
     }
 
+    /// Create asset entry from asset name. 
     pub fn new_from_asset_name(asset_name: &str, grid: &str, asset_uuid: &str) -> Result<Self, Error> {
-        //  Extract 11 fields from asset name
+        //  Extract 11 fields from asset name.
+        //  viz_group is no longer used but present as 0.
         const FIELD_COUNT: usize = 11;
         let fields: Vec<&str> = asset_name.split('_').collect();
         if fields.len() != FIELD_COUNT {
@@ -179,7 +203,19 @@ impl AssetUpload {
         Ok(uuid.to_string())
     }
     
-    /// Update terrain tile. A new terrain tile has been added, and needs to be added to the database.
+    /// Insert a tile without a UUID. This is used before the asset has been created in the asset servers.
+    /// Returns true if a new asset entry was created. False means this is a duplicate.
+    pub fn insert_tile_without_uuid(&self, conn: &mut PooledConn, texture_index: Option<u8>) -> Result<bool, Error> {
+        todo!();
+    }
+    
+    /// Insert a tile without a UUID. This is used before the asset has been created in the asset servers.
+    /// Returns true if a UUID was inserted. Returns false if no match.
+    pub fn insert_uuid(&self, conn: &mut PooledConn, texture_index: Option<u8>, uuid: Uuid) -> Result<bool, Error> {
+        todo!();
+    }
+    
+    /// Update terrain tile. A new terrain tile has been added, and needs to be added to the database. OLD.
     fn update_tile(&self, conn: &mut PooledConn, texture_index: Option<u8>, asset_type: &str) -> Result<(), Error> {
         //  Allowed types. Must match exactly.
         assert!(asset_type == "BaseTexture" || asset_type == "EmissiveTexture" || asset_type == "SculptTexture" || asset_type == "Mesh");
