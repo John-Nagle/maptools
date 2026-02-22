@@ -10,11 +10,9 @@
 //
 use anyhow::{Error, anyhow};
 use log::LevelFilter;
-use crate::{RegionImpostorFaceData};
+use crate::{RegionData, HeightField, RegionImpostorFaceData};
 use mysql::prelude::{Queryable};
 use mysql::{Pool, TxOpts, PooledConn, params};
-use std::collections::{HashMap};
-use std::io::Write;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -73,7 +71,7 @@ pub struct AssetUpload {
     /// Grid name
     grid: String,
     /// UUID of asset
-    asset_uuid: String,
+    asset_uuid: Option<String>,
     /// Elevation offset 
     elevation_offset: f32,
     /// Scale
@@ -87,6 +85,66 @@ pub struct AssetUpload {
 }
 
 impl AssetUpload {
+
+    /// New, from available data.
+    /// UUID is optional so that we can create tile_asset rows with a UUID to be filled in later.
+    pub fn new(tile_asset_type: TileAssetType, region_data: &RegionData, height_field: &HeightField, impostor_lod: u8, asset_hash: u32, asset_uuid: Option<String>) -> Result<Self, Error> {
+        let x = region_data.region_loc_x;
+        let y = region_data.region_loc_y;
+        let (zscale, elevation_offset) = height_field.get_scale_offset()?;
+        let sx = region_data.region_size_x;
+        let sy = region_data.region_size_y;
+        let sz = zscale;
+        let scale = [sx as f32, sy as f32, sz];
+        let water_height = height_field.water_level;
+        
+        let region_loc = [region_data.region_loc_x, region_data.region_loc_y];
+        let region_size = [region_data.region_size_x, region_data.region_size_y];
+        let grid = region_data.grid.clone();
+        let asset_name = "???".to_string();   // ***TEMP*** Need to generate name
+        
+        Ok(Self {
+            asset_name,
+            asset_hash: asset_hash.to_string(),
+            region_loc,
+            region_size,
+            grid,
+            asset_uuid,
+            elevation_offset,
+            scale,
+            water_height,
+            impostor_lod,
+            tile_asset_type         
+        })
+    }
+    
+        /// Encoded name for impostor asset file.
+    /// The name contains all the info we need to generate the impostor.
+    /// Format: RS_x_y_sx_sy_sz_offset_lod_waterlevel_vizgroup_hash_
+    fn impostor_name(
+        prefix: &str,
+        region: &RegionData,
+        height_field: &HeightField,
+        lod: u8,
+        viz_group_id: u32,
+        hash: u32,
+    ) -> Result<String, Error> {
+        let x = region.region_loc_x;
+        let y = region.region_loc_y;
+        let (scale, offset) = height_field.get_scale_offset()?;
+        let sx = region.region_size_x;
+        let sy = region.region_size_y;
+        let sz = scale;
+        let water_level = height_field.water_level;
+        //////Ok(format!("{}_{}_{}_{}_{}_{:.2}_{:.2}_{}_{}_{:.2}_0x{:016x}", prefix, x, y, sx, sy, sz, offset, lod, viz_group_id, water_level, hash))
+        let s = format!("{}_{}_{}_{}_{}_{:.2}_{:.2}_{}_{}_{:.2}_{:08x}", prefix, x, y, sx, sy, sz, offset, lod, viz_group_id, water_level, hash);
+        if s.len() > 63 {
+            Err(anyhow!("Generated filename is too long: {}", s))
+        } else {
+            Ok(s)
+        }
+    }
+
     pub fn new_from_asset_name(asset_name: &str, grid: &str, asset_uuid: &str) -> Result<Self, Error> {
         //  Extract 11 fields from asset name
         const FIELD_COUNT: usize = 11;
@@ -105,7 +163,7 @@ impl AssetUpload {
             //////viz_group: fields[8].parse()?,
             water_height: fields[9].parse()?,
             asset_hash: fields[10].to_string(),
-            asset_uuid: Self::fix_uuid_string(asset_uuid)?,
+            asset_uuid: Some(Self::fix_uuid_string(asset_uuid)?),
             tile_asset_type: TileAssetType::new_from_prefix(fields[0])?,
         })
     }
