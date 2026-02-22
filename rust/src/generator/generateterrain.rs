@@ -588,6 +588,7 @@ impl TerrainGenerator {
         let terrain_image_hash = terrain_image.get_hash()?;
         let terrain_image_name = Self::impostor_name(IMPOSTOR_TERRAIN_PREFIX, region, height_field, lod, viz_group_id, terrain_image_hash)?;
         //  For sculpts, there's only one texture, the base texture, and only one face. Meshes are more complicated.
+        //  ***NEED TO CHECK last_modified DATE HERE TO SEE IF IT IS EARLIER THAN THE ONE CURRENTLY STORED***
         let terrain_image_uuid_opt = self.get_asset_uuid(grid, [region.region_loc_x, region.region_loc_y], [region.region_size_x, region.region_size_y],
             "BaseTexture", terrain_image_hash)?;
         if let Some(uuid) = terrain_image_uuid_opt {

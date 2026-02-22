@@ -666,6 +666,25 @@ john@Nagle-LTS:/tmp$
     
     Working on timestamp fixes. Reading last_modified time OK.
     - Checking rules:
-      - Last modified time not later than current UTC time.
-      - 
+      - Where do we use last_modified time?
+      - It really ought to be part of the filename of an asset, but it won't fit.
+      - Put in a tile_asset entry with no uuid and a timestamp when generating the asset?
+      - Design trouble, again.
+      
+2026-02-21
+    New plan:
+    - Allow NULL for UUID in tile_asset.
+      - Means generateterrain wants asset but it's not uploaded yet.
+    - At generate time, check tile assets for matching x,y, lod, type.
+      - If match, and has UUID, check for later last_modified for tile already loaded.
+        - If so, use that tile, even if hash does not match. 
+        - If new tile is later, tile has changed, generate the image file for it.
+      - If match, and no UUID, generate. There's no existing asset.
+    - Generation includes making a tile_asset row with no UUID but all other fields.
+      
+      At upload time, update items with no UUID, overwriting when we have an upload with a UUID.
+      - What if there's a UUID already?
+      
+      New step: garbage collection. After successful upload and a new region_impostors file,
+      remove all the unused tile entries.
     
