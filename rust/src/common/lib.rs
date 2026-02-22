@@ -17,5 +17,5 @@ pub use uploadedregioninfo::{elev_min_max_to_scale_offset, elev_to_u8, u8_to_ele
 pub use impostorinfo::{RegionData, RegionImpostorReply, RegionImpostorData, RegionImpostorFaceData, RegionImpostorLod, hash_to_hex, uuid_opt_to_string};
 pub use initialimpostors::{InitialImpostors, TileType};
 pub use testlogger::{test_logger};
-pub use tileassets::{AssetUpload, AssetUploadShort, AssetUploadArrayShort};
+pub use tileassets::{AssetUpload, AssetUploadShort, AssetUploadArrayShort, TileAssetType};
 pub use auth::{Authorizer, AuthorizeType};

@@ -83,7 +83,7 @@ pub struct AssetUpload {
     /// Impostor LOD. 0 is highest level of detail.
     impostor_lod: u8,
     /// Tile assset type - derived from prefix
-    tile_asset_type: TileAssetType,
+    pub tile_asset_type: TileAssetType,
 }
 
 impl AssetUpload {
@@ -111,7 +111,7 @@ impl AssetUpload {
     }
     
     /// Construct from input JSON.
-    fn new_from_asset_upload_short(upload_short: &AssetUploadShort) -> Result<Self, Error> {
+    pub fn new_from_asset_upload_short(upload_short: &AssetUploadShort) -> Result<Self, Error> {
         Self::new_from_asset_name(&upload_short.asset_name, &upload_short.grid, &upload_short.asset_uuid)
     }
     
@@ -236,7 +236,7 @@ impl AssetUpload {
     
     /// Update terrain tile. A new terrain tile has been added, and needs to be added to the database.
     /// ***WRONG*** for a mesh tile.
-    fn update_mesh_tile(&mut self, conn: PooledConn) -> Result<(), Error> {
+    pub fn update_mesh_tile(&mut self, conn: &mut PooledConn) -> Result<(), Error> {
         //  Most of the info we need is in asset_upload, but we also need:
         //  - name
         //  - face texture data.
@@ -256,7 +256,7 @@ impl AssetUpload {
     }
 
     /// Update a sculpt tile.
-    fn update_sculpt_tile(&mut self, conn: &mut PooledConn) -> Result<(), Error> {
+    pub fn update_sculpt_tile(&mut self, conn: &mut PooledConn) -> Result<(), Error> {
         //  Most of the info we need is in asset_upload, but we also need:
         //  - name
         //  - face texture data.

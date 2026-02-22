@@ -23,6 +23,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use common::{Authorizer, AuthorizeType};
 use common::InitialImpostors;
+use common::{AssetUpload, AssetUploadShort, AssetUploadArrayShort, TileAssetType};
 
 /// MySQL Credentials for uploading.
 /// This filename will be searched for in parent directories,
@@ -50,7 +51,7 @@ fn logger() {
     )]);
     log::warn!("Logging to {:?}", LOG_FILE_NAME); // where the log is going
 }
-
+/*
 /// Asset type
 #[derive(Clone, Debug, PartialEq, PartialOrd, Deserialize, Serialize)]
 pub enum TileAssetType {
@@ -172,7 +173,7 @@ pub struct AssetUploadShort {
 
 /// Array of impostor data as uploaded. This is what comes in as JSON.
 pub type AssetUploadArrayShort = Vec<AssetUploadShort>;
-
+*/
 ///  Our handler
 
 struct AssetUploadHandler {
@@ -191,7 +192,7 @@ impl AssetUploadHandler {
         let conn = pool.get_conn()?;
         Ok(Self { pool, conn, owner_name: None  })
     }
-
+/*
     /// Update terrain tile. A new terrain tile has been added, and needs to be added to the database.
     fn update_tile(&mut self, asset_upload: &AssetUpload, texture_index: Option<u8>, asset_type: &str) -> Result<(), Error> {
         //  Allowed types. Must match exactly.
@@ -302,6 +303,7 @@ impl AssetUploadHandler {
         log::debug!("Textures for sculpt/mesh {:?}  {:?}", asset_upload.asset_name, texture_tuples);
         RegionImpostorFaceData::json_from_tuples(&texture_tuples)
     }
+*/
 /*    
     /// Update impostor info in region_impostors table.
     fn update_impostor_info(&mut self, asset_upload: &AssetUpload, name: &str, mesh_uuid: Option<String>, sculpt_uuid: Option<String>, faces_json: serde_json::Value) -> Result<(), Error> {
@@ -350,7 +352,8 @@ impl AssetUploadHandler {
         log::debug!("Inserting impostor into initial_impostors, params: {:?}", insert_params);
         Ok(self.conn.exec_drop(SQL_IMPOSTOR, insert_params)?)
     }
-*/    
+*/
+/*    
     /// Update terrain tile. A new terrain tile has been added, and needs to be added to the database.
     /// ***WRONG*** for a mesh tile.
     fn update_mesh_tile(&mut self, asset_upload: &AssetUpload) -> Result<(), Error> {
@@ -389,7 +392,8 @@ impl AssetUploadHandler {
         let mesh_uuid = None;
         self.update_impostor_info(asset_upload, &name, mesh_uuid, sculpt_uuid, faces_json)
 */
-    }    
+    } 
+*/   
     /// Parse a request
     fn parse_request(
         b: &[u8],
@@ -421,23 +425,23 @@ impl AssetUploadHandler {
         log::info!("Processing {} assets.", asset_info_short.len());
         //  An empty list means it's time to check to see if we're done and report errors.
         for asset_upload_short in &asset_info_short {
-            let asset_upload = AssetUpload::new_from_asset_upload_short(asset_upload_short)?;
+            let mut asset_upload = AssetUpload::new_from_asset_upload_short(asset_upload_short)?;
             match &asset_upload.tile_asset_type {
                 TileAssetType::SculptTexture => {
                     //  Sculpt
-                    self.update_sculpt_tile(&asset_upload)?;
+                    asset_upload.update_sculpt_tile(&mut self.conn)?;
                 }
                 TileAssetType::Mesh => {
                     //  Texture
-                    self.update_mesh_tile(&asset_upload)?;
+                    asset_upload.update_mesh_tile(&mut self.conn)?;
                 }
                 TileAssetType::BaseTexture(ix) => {
                     //  Texture
-                    self.update_texture_tile(&asset_upload, *ix, "BaseTexture")?;
+                    asset_upload.update_texture_tile(&mut self.conn, *ix, "BaseTexture")?;
                 }
                 TileAssetType::EmissiveTexture(ix) => {
                     //  Texture
-                    self.update_texture_tile(&asset_upload, *ix, "EmissiveTexture")?;
+                    asset_upload.update_texture_tile(&mut self.conn, *ix, "EmissiveTexture")?;
                 }
             }
         }
