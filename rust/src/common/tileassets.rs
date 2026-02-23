@@ -10,6 +10,7 @@
 //
 use anyhow::{Error, anyhow};
 use log::LevelFilter;
+use chrono::{Utc, DateTime};
 use crate::{RegionData, HeightField, RegionImpostorFaceData};
 use mysql::prelude::{Queryable};
 use mysql::{Pool, TxOpts, PooledConn, params};
@@ -56,7 +57,7 @@ impl TileAssetType {
     }
     
     /// To string, used with SQL.
-    pub fn to_string(&self) -> &str {
+    pub fn to_str(&self) -> &str {
         match self {
             Self::SculptTexture => "SculptTexture",
             Self::Mesh => "Mesh",
@@ -205,13 +206,66 @@ impl AssetUpload {
     
     /// Insert a tile without a UUID. This is used before the asset has been created in the asset servers.
     /// Returns true if a new asset entry was created. False means this is a duplicate.
-    pub fn insert_tile_without_uuid(&self, conn: &mut PooledConn, texture_index: Option<u8>) -> Result<bool, Error> {
-        todo!();
+    pub fn insert_tile_without_uuid(&self, conn: &mut PooledConn, texture_index: Option<u8>, last_modified: &DateTime<Utc>) -> Result<bool, Error> {
+        //  Insert tile, or update hash and clear uuid if exists. 
+        //  ***WRONG SQL*** ***NEEDS WORK*** Must do insert even if asset_hash does not match.
+        //  ***NEED WHERE CLAUSE ON new last_modified BEING OLDER THAN NEW VALUE IN TABLE TO AVOID REPLACING WITH OLD ITEM.
+        //  ***NEED PRECHECK FOR new last_modified NOT IN FUTURE***
+        //  ***IS AN UPDATE ON DUPLICATE KEY EVEN POSSIBLE? Plan is to allow duplicates with different hashes and take out the old ones later in GC.
+        //  Insert if either nothing present, or matches on everything and creation time is old.
+        assert!(self.asset_uuid.is_none());  // must not have UUID yet.
+        const SQL_UPDATE_TILE: &str = r"INSERT INTO tile_assets
+                (grid, region_loc_x, region_loc_y, region_size_x, region_size_y,
+                impostor_lod, texture_index, asset_hash, asset_uuid,
+                asset_name, asset_type,
+                creation_time) 
+            VALUES 
+                (:grid, :region_loc_x, :region_loc_y, :region_size_x, :region_size_y,
+                :impostor_lod, :texture_index, :asset_hash, :asset_uuid,
+                :asset_name, :asset_type,
+                :creation_time)";
+            //////ON DUPLICATE KEY UPDATE
+            //////    asset_hash = :asset_hash, asset_uuid = :asset_uuid, creation_time = :creation_time;"
+        //  UNIQUE INDEX (grid, region_loc_x, region_loc_y, impostor_lod, asset_hash, texture_index, asset_type),
+        //  UNIQUE INDEX (grid, asset_name)
+        let params = params! {
+            "grid" => self.grid.to_lowercase(),
+            "asset_name" => self.asset_name.clone(),
+            "asset_type" => self.tile_asset_type.to_str().to_string(),
+            "region_loc_x" => self.region_loc[0],
+            "region_loc_y" => self.region_loc[1],
+            "region_size_x" => self.region_size[0],
+            "region_size_y" => self.region_size[1],
+            "impostor_lod" => self.impostor_lod,
+            "texture_index" => texture_index,
+            "asset_uuid" => self.asset_uuid.clone(),
+            "asset_hash" => self.asset_hash.clone(),
+            "creation_time" => last_modified.naive_utc().to_string(),
+        };
+        log::debug!("SQL tile asset creation: {:?}", params);
+        //////conn.exec_drop(SQL_UPDATE_TILE, params)?;
+        let row_count: Option<usize> = conn.exec_first(SQL_UPDATE_TILE, params)?;
+        //  ***NEED TO KNOW IF SUCCESS*** return true if insert changed a row.
+        log::debug!("tile asset creation succeeded. Rows: {:?}", row_count);
+        Ok(row_count == Some(1))
     }
     
-    /// Insert a tile without a UUID. This is used before the asset has been created in the asset servers.
+    /// Add the UUID to a previously inserted tile.
     /// Returns true if a UUID was inserted. Returns false if no match.
     pub fn insert_uuid(&self, conn: &mut PooledConn, texture_index: Option<u8>, uuid: Uuid) -> Result<bool, Error> {
+        //  ***MORE***
+        let params = params! {
+            "grid" => self.grid.to_lowercase(),
+            "asset_type" => self.tile_asset_type.to_str().to_string(),
+            "region_loc_x" => self.region_loc[0],
+            "region_loc_y" => self.region_loc[1],
+            "region_size_x" => self.region_size[0],
+            "region_size_y" => self.region_size[1],
+            "impostor_lod" => self.impostor_lod,
+            "texture_index" => texture_index,
+            "asset_uuid" => self.asset_uuid.clone(),
+            "asset_hash" => self.asset_hash.clone(),
+        };
         todo!();
     }
     
