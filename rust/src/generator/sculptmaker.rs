@@ -139,7 +139,7 @@ pub struct TerrainSculptTexture {
     region_coords_y: u32,
     lod: u8,
     /// Last modified timestamp
-    last_modified: Option<DateTime<Utc>>,
+    pub last_modified: Option<DateTime<Utc>>,
     /// Generated image
     pub image: Option<RgbImage>,
     

@@ -39,8 +39,8 @@ impl TileAssetType {
             match &prefix[0..2] {
                 "RS" => Ok(Self::SculptTexture),
                 "RM" => Ok(Self::Mesh),
-                "RT" => Ok(Self::BaseTexture(Self::get_texture_index(prefix)?)),
-                "RE" => Ok(Self::EmissiveTexture(Self::get_texture_index(prefix)?)),
+                "RT" => Ok(Self::BaseTexture(Self::parse_texture_index(prefix)?)),
+                "RE" => Ok(Self::EmissiveTexture(Self::parse_texture_index(prefix)?)),
                 _ => Err(anyhow!("Invalid tile asset name prefix: {}", prefix))
             }
         }
@@ -56,6 +56,16 @@ impl TileAssetType {
         }
     }
     
+    /// Access to texture index
+    pub fn get_texture_index(&self) -> Option<u8> {
+        match self {
+            Self::SculptTexture => None,
+            Self::Mesh => None,
+            Self::BaseTexture(n) => Some(*n),
+            Self::EmissiveTexture(n) => Some(*n)
+        }
+    }
+    
     /// To string, used with SQL.
     pub fn to_str(&self) -> &str {
         match self {
@@ -67,7 +77,7 @@ impl TileAssetType {
     }
     
     /// Get one digit, with checking
-    fn get_texture_index(prefix: &str) -> Result<u8, Error> {
+    fn parse_texture_index(prefix: &str) -> Result<u8, Error> {
         if prefix.len() < 3 {
             Err(anyhow!("Too short tile asset name prefix: {}", prefix))
         } else {
@@ -107,9 +117,9 @@ pub struct AssetUpload {
 
 impl AssetUpload {
 
-    /// New, from available data.
-    /// UUID is optional so that we can create tile_asset rows with a UUID to be filled in later.
-    pub fn new(tile_asset_type: TileAssetType, region_data: &RegionData, height_field: &HeightField, impostor_lod: u8, asset_hash: u32, asset_uuid: Option<String>) -> Result<Self, Error> {
+    /// New, from available data. No UUID yet.
+    /// UUID to be filled in later in uploadimpostor after upload of asset to SL/OS server.
+    pub fn new(tile_asset_type: TileAssetType, region_data: &RegionData, height_field: &HeightField, asset_hash: u32) -> Result<Self, Error> {
         let x = region_data.region_loc_x;
         let y = region_data.region_loc_y;
         let (zscale, elevation_offset) = height_field.get_scale_offset()?;
@@ -122,6 +132,8 @@ impl AssetUpload {
         let region_loc = [region_data.region_loc_x, region_data.region_loc_y];
         let region_size = [region_data.region_size_x, region_data.region_size_y];
         let grid = region_data.grid.clone();
+        let impostor_lod = region_data.lod;
+        let asset_uuid = None;
         //  Construct name that encodes the coords and hash. viz_group is no longer used.
         let asset_name = Self::impostor_name(&tile_asset_type.to_prefix(), region_data, height_field, impostor_lod, 0, asset_hash)?;
         
@@ -206,7 +218,7 @@ impl AssetUpload {
     
     /// Insert a tile without a UUID. This is used before the asset has been created in the asset servers.
     /// Returns true if a new asset entry was created. False means this is a duplicate.
-    pub fn insert_tile_without_uuid(&self, conn: &mut PooledConn, texture_index: Option<u8>, last_modified: &DateTime<Utc>) -> Result<bool, Error> {
+    pub fn insert_tile_without_uuid(&self, conn: &mut PooledConn, last_modified_opt: Option<DateTime<Utc>>) -> Result<bool, Error> {
         //  Insert tile, or update hash and clear uuid if exists. 
         //  ***WRONG SQL*** ***NEEDS WORK*** Must do insert even if asset_hash does not match.
         //  ***NEED WHERE CLAUSE ON new last_modified BEING OLDER THAN NEW VALUE IN TABLE TO AVOID REPLACING WITH OLD ITEM.
@@ -233,6 +245,11 @@ impl AssetUpload {
                 :creation_time)";
             //////ON DUPLICATE KEY UPDATE
             //////    asset_hash = :asset_hash, asset_uuid = :asset_uuid, creation_time = :creation_time;"
+        let creation_time = if let Some(last_modified) = last_modified_opt {
+            last_modified
+        } else {
+            Utc::now()
+        };
         let params = params! {
             "grid" => self.grid.to_lowercase(),
             "asset_name" => self.asset_name.clone(),
@@ -242,19 +259,22 @@ impl AssetUpload {
             "region_size_x" => self.region_size[0],
             "region_size_y" => self.region_size[1],
             "impostor_lod" => self.impostor_lod,
-            "texture_index" => texture_index,
+            "texture_index" => self.tile_asset_type.get_texture_index(),
             "asset_uuid" => self.asset_uuid.clone(),
             "asset_hash" => self.asset_hash.clone(),
-            "creation_time" => last_modified.naive_utc().to_string(),
+            "creation_time" => creation_time.naive_utc().to_string(),
         };
         //////let creation_time_opt: Option<DateTime<Utc>> = conn.exec_first(SQL_GET_CREATION_TIME, params)?;
-        let naive_creation_time_opt: Option<NaiveDateTime> = conn.exec_first(SQL_GET_CREATION_TIME, &params)?;
-        if let Some(naive_creation_time) = naive_creation_time_opt {
-            let creation_time = DateTime::<Utc>::from_naive_utc_and_offset(naive_creation_time, Utc);
-            if *last_modified < creation_time {
-                log::warn!("Out of order asset info from server: {:?} is earlier than {:?} for {:?}",
-                    last_modified, creation_time, params);
-                return Ok(false)
+        log::debug!("Timestamp compare: last_modified: {:?}", last_modified_opt);
+        if let Some(last_modified) = last_modified_opt {
+            let naive_creation_time_opt: Option<NaiveDateTime> = conn.exec_first(SQL_GET_CREATION_TIME, &params)?;
+            if let Some(naive_creation_time) = naive_creation_time_opt {
+                let creation_time = DateTime::<Utc>::from_naive_utc_and_offset(naive_creation_time, Utc);
+                if last_modified < creation_time {
+                    log::warn!("Out of order asset info from server: {:?} is earlier than {:?} for {:?}",
+                        last_modified, creation_time, params);
+                    return Ok(false)
+                }
             }
         }
         log::debug!("SQL tile asset creation: {:?}", params);

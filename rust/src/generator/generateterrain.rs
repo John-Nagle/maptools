@@ -31,7 +31,7 @@ use std::path::PathBuf;
 use vizgroup::{CompletedGroups, VizGroups};
 use sculptmaker::{TerrainSculpt, TerrainSculptTexture};
 use regionorder::{TileLods, homogeneous_group_size};
-use common::{hash_to_hex};
+use common::{hash_to_hex, AssetUpload, TileAssetType};
 use ureq::{Agent};
 use uuid::{Uuid};
 
@@ -586,6 +586,15 @@ impl TerrainGenerator {
         let mut terrain_image = TerrainSculptTexture::new(region.region_loc_x, region.region_loc_y, lod, &region.name);
         terrain_image.makeimage(TERRAIN_SCULPT_TEXTURE_SIZE)?;
         let terrain_image_hash = terrain_image.get_hash()?;
+        //  Test new tile creation code
+        //  Create an AssetUpload
+        let image_asset_upload = AssetUpload::new(TileAssetType::BaseTexture(0), region, height_field, terrain_image_hash)?;    
+        //  Use it to create a new tile_asset entry with no UUID.
+        //  Sculpts have only one face.
+        let texture_index = 0;
+        let last_modified = terrain_image.last_modified;
+        let successful_insert = image_asset_upload.insert_tile_without_uuid(&mut self.conn, last_modified)?;
+        //  End test
         let terrain_image_name = Self::impostor_name(IMPOSTOR_TERRAIN_PREFIX, region, height_field, lod, viz_group_id, terrain_image_hash)?;
         //  For sculpts, there's only one texture, the base texture, and only one face. Meshes are more complicated.
         //  ***NEED TO CHECK last_modified DATE HERE TO SEE IF IT IS EARLIER THAN THE ONE CURRENTLY STORED***
