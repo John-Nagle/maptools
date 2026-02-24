@@ -9,14 +9,16 @@
 //!     August, 2025.
 //
 use anyhow::{Error, anyhow};
-use log::LevelFilter;
 use chrono::{Utc, DateTime, NaiveDateTime};
 use crate::{RegionData, HeightField, RegionImpostorFaceData};
 use mysql::prelude::{Queryable};
-use mysql::{Pool, TxOpts, PooledConn, params};
+use mysql::{Pool, TxOpts, PooledConn, params, Error::MySqlError};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+/// MySQL error constants. Ought to be in some crate.
+/// Duplicate entry
+const ER_DUP_ENTRY: u16 = 1062;
 /// Asset type
 #[derive(Clone, Debug, PartialEq, PartialOrd, Deserialize, Serialize)]
 pub enum TileAssetType {
@@ -248,6 +250,7 @@ impl AssetUpload {
         let creation_time = if let Some(last_modified) = last_modified_opt {
             last_modified
         } else {
+            log::warn!("No last_modified timestamp, using current time.");
             Utc::now()
         };
         let params = params! {
@@ -278,10 +281,19 @@ impl AssetUpload {
             }
         }
         log::debug!("SQL tile asset creation: {:?}", params);
-        let row_count: Option<usize> = conn.exec_first(SQL_INSERT_TILE, &params)?;
-        //  ***NEED TO KNOW IF SUCCESS*** return true if insert changed a row.
-        log::debug!("tile asset creation succeeded. Rows: {:?}", row_count);
-        Ok(row_count == Some(1))
+        //  Try the insert
+        let result: Result<Option<usize>, _> = conn.exec_first(SQL_INSERT_TILE, &params);
+        //  Check for duplicate type error as special case.
+        if let Err(e) = result {
+            if let MySqlError(ref sqerr) = e {
+                if sqerr.code == ER_DUP_ENTRY {
+                    log::debug!("Insert rejected, duplicate.");
+                    return Ok(false);
+                }
+            }
+            return Err(e.into())
+        }
+        Ok(true)
     }
     
     /// Add the UUID to a previously inserted tile.
