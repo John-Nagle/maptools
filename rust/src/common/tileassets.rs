@@ -218,10 +218,10 @@ impl AssetUpload {
         //   UNIQUE INDEX (grid, asset_name)
         assert!(self.asset_uuid.is_none());  // must not have UUID yet.
         
-        const SQL_GET_CREATION_TIME: &str = "SELECT creation_time 
+        const SQL_GET_CREATION_TIME: &str = "SELECT creation_time FROM tile_assets
             WHERE grid = :grid AND region_loc_x = :region_loc_x AND impostor_lod = :impostor_lod AND texture_index = :texture_index AND asset_type = :asset_type";
              
-        const SQL_UPDATE_TILE: &str = r"INSERT INTO tile_assets
+        const SQL_INSERT_TILE: &str = r"INSERT INTO tile_assets
                 (grid, region_loc_x, region_loc_y, region_size_x, region_size_y,
                 impostor_lod, texture_index, asset_hash, asset_uuid,
                 asset_name, asset_type,
@@ -258,7 +258,7 @@ impl AssetUpload {
             }
         }
         log::debug!("SQL tile asset creation: {:?}", params);
-        let row_count: Option<usize> = conn.exec_first(SQL_UPDATE_TILE, &params)?;
+        let row_count: Option<usize> = conn.exec_first(SQL_INSERT_TILE, &params)?;
         //  ***NEED TO KNOW IF SUCCESS*** return true if insert changed a row.
         log::debug!("tile asset creation succeeded. Rows: {:?}", row_count);
         Ok(row_count == Some(1))
@@ -267,7 +267,11 @@ impl AssetUpload {
     /// Add the UUID to a previously inserted tile.
     /// Returns true if a UUID was inserted. Returns false if no match.
     pub fn insert_uuid(&self, conn: &mut PooledConn, texture_index: Option<u8>, uuid: Uuid) -> Result<bool, Error> {
-        //  ***MORE***
+        const SQL_UPDATE_UUID: &str = r"
+            UPDATE tile_assets 
+            SET asset_uuid = :asset_uuid
+            WHERE grid = :grid AND region_loc_x = :region_loc_x AND impostor_lod = :impostor_lod AND texture_index = :texture_index AND asset_type = :asset_type
+                AND asset_uuid IS NULL";
         let params = params! {
             "grid" => self.grid.to_lowercase(),
             "asset_type" => self.tile_asset_type.to_str().to_string(),
@@ -280,7 +284,10 @@ impl AssetUpload {
             "asset_uuid" => self.asset_uuid.clone(),
             "asset_hash" => self.asset_hash.clone(),
         };
-        todo!();
+        let row_count: Option<usize> = conn.exec_first(SQL_UPDATE_UUID, &params)?;
+        //  ***NEED TO KNOW IF SUCCESS*** return true if insert changed a row.
+        log::debug!("Tile asset UUID update succeeded. Rows: {:?}, params {:?}", row_count, params);
+        Ok(row_count == Some(1))
     }
     
     /// Update terrain tile. A new terrain tile has been added, and needs to be added to the database. OLD.
