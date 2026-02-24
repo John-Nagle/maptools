@@ -10,7 +10,7 @@
 //
 use anyhow::{Error, anyhow};
 use log::LevelFilter;
-use chrono::{Utc, DateTime};
+use chrono::{Utc, DateTime, NaiveDateTime};
 use crate::{RegionData, HeightField, RegionImpostorFaceData};
 use mysql::prelude::{Queryable};
 use mysql::{Pool, TxOpts, PooledConn, params};
@@ -213,7 +213,14 @@ impl AssetUpload {
         //  ***NEED PRECHECK FOR new last_modified NOT IN FUTURE***
         //  ***IS AN UPDATE ON DUPLICATE KEY EVEN POSSIBLE? Plan is to allow duplicates with different hashes and take out the old ones later in GC.
         //  Insert if either nothing present, or matches on everything and creation time is old.
+        //  Unique indicates for this table are:
+        //   UNIQUE INDEX (grid, region_loc_x, region_loc_y, impostor_lod, asset_hash, texture_index, asset_type),
+        //   UNIQUE INDEX (grid, asset_name)
         assert!(self.asset_uuid.is_none());  // must not have UUID yet.
+        
+        const SQL_GET_CREATION_TIME: &str = "SELECT creation_time 
+            WHERE grid = :grid AND region_loc_x = :region_loc_x AND impostor_lod = :impostor_lod AND texture_index = :texture_index AND asset_type = :asset_type";
+             
         const SQL_UPDATE_TILE: &str = r"INSERT INTO tile_assets
                 (grid, region_loc_x, region_loc_y, region_size_x, region_size_y,
                 impostor_lod, texture_index, asset_hash, asset_uuid,
@@ -226,8 +233,6 @@ impl AssetUpload {
                 :creation_time)";
             //////ON DUPLICATE KEY UPDATE
             //////    asset_hash = :asset_hash, asset_uuid = :asset_uuid, creation_time = :creation_time;"
-        //  UNIQUE INDEX (grid, region_loc_x, region_loc_y, impostor_lod, asset_hash, texture_index, asset_type),
-        //  UNIQUE INDEX (grid, asset_name)
         let params = params! {
             "grid" => self.grid.to_lowercase(),
             "asset_name" => self.asset_name.clone(),
@@ -242,9 +247,18 @@ impl AssetUpload {
             "asset_hash" => self.asset_hash.clone(),
             "creation_time" => last_modified.naive_utc().to_string(),
         };
+        //////let creation_time_opt: Option<DateTime<Utc>> = conn.exec_first(SQL_GET_CREATION_TIME, params)?;
+        let naive_creation_time_opt: Option<NaiveDateTime> = conn.exec_first(SQL_GET_CREATION_TIME, &params)?;
+        if let Some(naive_creation_time) = naive_creation_time_opt {
+            let creation_time = DateTime::<Utc>::from_naive_utc_and_offset(naive_creation_time, Utc);
+            if *last_modified < creation_time {
+                log::warn!("Out of order asset info from server: {:?} is earlier than {:?} for {:?}",
+                    last_modified, creation_time, params);
+                return Ok(false)
+            }
+        }
         log::debug!("SQL tile asset creation: {:?}", params);
-        //////conn.exec_drop(SQL_UPDATE_TILE, params)?;
-        let row_count: Option<usize> = conn.exec_first(SQL_UPDATE_TILE, params)?;
+        let row_count: Option<usize> = conn.exec_first(SQL_UPDATE_TILE, &params)?;
         //  ***NEED TO KNOW IF SUCCESS*** return true if insert changed a row.
         log::debug!("tile asset creation succeeded. Rows: {:?}", row_count);
         Ok(row_count == Some(1))
