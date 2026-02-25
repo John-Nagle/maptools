@@ -703,3 +703,8 @@ john@Nagle-LTS:/tmp$
     - All UUIDs are set in the upload impostors missing UUID fixup? Slow.
     - Do we need update_tile any more?
     
+2026-02-24
+    Generate side works, now need to do uploadimpostor side.
+    - Don't really need all that info encoded in name. Just x, y, sx, sy, lod, hash.
+      - But keep the name format for now. Change later, maybe.
+    

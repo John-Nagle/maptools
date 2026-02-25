@@ -221,11 +221,6 @@ impl AssetUpload {
     /// Insert a tile without a UUID. This is used before the asset has been created in the asset servers.
     /// Returns true if a new asset entry was created. False means this is a duplicate.
     pub fn insert_tile_without_uuid(&self, conn: &mut PooledConn, last_modified_opt: Option<DateTime<Utc>>) -> Result<bool, Error> {
-        //  Insert tile, or update hash and clear uuid if exists. 
-        //  ***WRONG SQL*** ***NEEDS WORK*** Must do insert even if asset_hash does not match.
-        //  ***NEED WHERE CLAUSE ON new last_modified BEING OLDER THAN NEW VALUE IN TABLE TO AVOID REPLACING WITH OLD ITEM.
-        //  ***NEED PRECHECK FOR new last_modified NOT IN FUTURE***
-        //  ***IS AN UPDATE ON DUPLICATE KEY EVEN POSSIBLE? Plan is to allow duplicates with different hashes and take out the old ones later in GC.
         //  Insert if either nothing present, or matches on everything and creation time is old.
         //  Unique indicates for this table are:
         //   UNIQUE INDEX (grid, region_loc_x, region_loc_y, impostor_lod, asset_hash, texture_index, asset_type),
@@ -495,6 +490,8 @@ impl AssetUpload {
     }
 
     /// Update a sculpt tile.
+    /// ***NEEDS WORK***
+    /// Here we set the UUID in the tile info and the initial_impostors.
     pub fn update_sculpt_tile(&mut self, conn: &mut PooledConn) -> Result<(), Error> {
         //  Most of the info we need is in asset_upload, but we also need:
         //  - name
@@ -511,6 +508,20 @@ impl AssetUpload {
         let mesh_uuid = None;
         self.update_impostor_info(conn, &name, mesh_uuid, sculpt_uuid, faces_json)
 */
+    }
+    
+    /// All the info is already present in self. This just adds the UUID.
+    pub fn update_sculpt_tile_new(&mut self, conn: &mut PooledConn) -> Result<(), Error> {
+        //  Update tile assets
+        if let Some(asset_uuid_str) = &self.asset_uuid {
+            let uuid = Uuid::parse_str(&asset_uuid_str)?;
+            let inserted = self.insert_uuid(conn, None, uuid)?;
+        } else {
+            return Err(anyhow!("Null UUID in update: {:?}", self));
+        }
+        //  Update interim_impostors
+        //  ***MORE***
+        Ok(())
     }
 }
 

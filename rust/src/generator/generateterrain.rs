@@ -33,7 +33,6 @@ use sculptmaker::{TerrainSculpt, TerrainSculptTexture};
 use regionorder::{TileLods, homogeneous_group_size};
 use common::{hash_to_hex, AssetUpload, TileAssetType};
 use ureq::{Agent};
-use uuid::{Uuid};
 use chrono::Utc;
 
 /// MySQL Credentials for uploading.
