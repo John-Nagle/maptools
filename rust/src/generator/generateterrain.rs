@@ -76,7 +76,7 @@ pub enum UuidUsage {
     Mesh
 }
 
-   
+/*   
 /// Hash info for all components of one tile.
 /// Used for unduplication.
 /// Hashes here are 16 hex characters.
@@ -96,12 +96,7 @@ struct TileHashes {
     face_data: Vec<RegionImpostorFaceData>,
 }
 
-impl TileHashes {
-    /// Is this terrain model known?
-    pub fn is_model_known(&self, terrain_generator: &TerrainGenerator) -> Result<bool, Error> {
-        todo!();
-    }
-    
+impl TileHashes {   
     /// Is this texture known?
     pub fn is_texture_known(&self, terrain_generator: &TerrainGenerator, texture_ix: usize, base_texture_hash: &String, emissive_texture_hash: &Option<String>)
         -> bool {
@@ -162,6 +157,7 @@ impl TileHashes {
         }
     }
 }
+*/
 
 /// Key for cache of region info for all LODs.
 /// All cache items must be from the same grid.
@@ -395,34 +391,7 @@ impl TerrainGenerator {
         self.height_field_cache.insert(key, height_field.clone());
         Ok(height_field)
     }
-    
-    /// Encoded name for impostor asset file.
-    /// The name contains all the info we need to generate the impostor.
-    /// Format: RS_x_y_sx_sy_sz_offset_lod_waterlevel_vizgroup_hash_
-    fn impostor_name(
-        prefix: &str,
-        region: &RegionData,
-        height_field: &HeightField,
-        lod: u8,
-        viz_group_id: u32,
-        hash: u32,
-    ) -> Result<String, Error> {
-        let x = region.region_loc_x;
-        let y = region.region_loc_y;
-        let (scale, offset) = height_field.get_scale_offset()?;
-        let sx = region.region_size_x;
-        let sy = region.region_size_y;
-        let sz = scale;
-        let water_level = height_field.water_level;
-        //////Ok(format!("{}_{}_{}_{}_{}_{:.2}_{:.2}_{}_{}_{:.2}_0x{:016x}", prefix, x, y, sx, sy, sz, offset, lod, viz_group_id, water_level, hash))
-        let s = format!("{}_{}_{}_{}_{}_{:.2}_{:.2}_{}_{}_{:.2}_{:08x}", prefix, x, y, sx, sy, sz, offset, lod, viz_group_id, water_level, hash);
-        if s.len() > 63 {
-            Err(anyhow!("Generated filename is too long: {}", s))
-        } else {
-            Ok(s)
-        }
-    }
-    
+/*    
     /// Get all the hash values for one tile.
     /// This is used to see if the tile has already been uploaded.
     fn get_hashes_one_tile(&mut self, grid: &str, region_loc_x: u32, region_loc_y: u32, impostor_lod: u8) -> Result<Option<TileHashes>, Error> {
@@ -461,6 +430,7 @@ impl TerrainGenerator {
                   grid, region_loc_x, region_loc_y, impostor_lod)),
         }
     }
+*/
     
     /// Build the impostor
     pub fn build_impostor(
@@ -469,8 +439,8 @@ impl TerrainGenerator {
         height_field: &HeightField,
         viz_group_id: u32,
     ) -> Result<(), Error> {
-        let hash_info_opt = self. get_hashes_one_tile(&region.grid, region.region_loc_x, region.region_loc_y, region.lod)?;
-        log::debug!("Hash info: {:?}", hash_info_opt);
+        //////let hash_info_opt = self. get_hashes_one_tile(&region.grid, region.region_loc_x, region.region_loc_y, region.lod)?;
+        //////log::debug!("Hash info: {:?}", hash_info_opt);
         if self.generate_mesh {
             self.build_impostor_mesh(
                 region,
@@ -553,7 +523,6 @@ impl TerrainGenerator {
         height_field: &HeightField,
         viz_group_id: u32,
     ) -> Result<(), Error> {
-        const IMPOSTOR_SCULPT_PREFIX: &str = "RS";
         let lod = region.lod;
         let grid = &region.grid;
         log::info!("Generating sculpt for \"{}\": {}", region.name, height_field);
