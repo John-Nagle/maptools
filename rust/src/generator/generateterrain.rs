@@ -481,8 +481,7 @@ impl TerrainGenerator {
             assert_eq!(asset_uuids.len(), 1);
             Ok(Some(Uuid::parse_str(&asset_uuids[0])?))
         }
-    }
-*/    
+    }    
     /// Get asset UUID from tile_assets if already available.
     /// Vizgroup and index are not considered.
     fn get_asset_uuid(&mut self, grid: &str, region_loc: [u32;2], region_size: [u32;2], asset_type: &str, asset_hash: u32) -> Result<Option<Uuid>, Error> {
@@ -515,6 +514,7 @@ impl TerrainGenerator {
         }
         Ok(Some(Uuid::parse_str(&asset_uuids[0])?))
     }
+*/
 
     /// Build the impostor as a sculpt.
     pub fn build_impostor_sculpt(
@@ -524,7 +524,6 @@ impl TerrainGenerator {
         viz_group_id: u32,
     ) -> Result<(), Error> {
         let lod = region.lod;
-        let grid = &region.grid;
         log::info!("Generating sculpt for \"{}\": {}", region.name, height_field);
         // TerrainSculpt was translated from Python with an LLM. NEEDS WORK
         //  Do sculpt
@@ -535,8 +534,7 @@ impl TerrainGenerator {
         let sculpt_hash = terrain_sculpt.get_hash()?;
         //  Create an AssetUpload for the one texture.
         let sculpt_asset_upload = AssetUpload::new(TileAssetType::SculptTexture, region, height_field, sculpt_hash)?;    
-        let sculpt_uuid_opt = self.get_asset_uuid(grid, [region.region_loc_x, region.region_loc_y], [region.region_size_x, region.region_size_y],
-            "SculptTexture", sculpt_hash)?;
+        let sculpt_uuid_opt = sculpt_asset_upload.get_asset_uuid(&mut self.conn)?;
         if let Some (uuid) = sculpt_uuid_opt {
             log::info!("Sculpt image asset already exists: {} UUID: {:?}", sculpt_asset_upload.asset_name, uuid);
             self.stats.assets_reused += 1;
@@ -563,8 +561,7 @@ impl TerrainGenerator {
         //  Create an AssetUpload for the one texture.
         let image_asset_upload = AssetUpload::new(TileAssetType::BaseTexture(0), region, height_field, terrain_image_hash)?;    
         //  For sculpts, there's only one texture, the base texture, and only one face. Meshes are more complicated.
-        let terrain_image_uuid_opt = self.get_asset_uuid(grid, [region.region_loc_x, region.region_loc_y], [region.region_size_x, region.region_size_y],
-            "BaseTexture", terrain_image_hash)?;
+        let terrain_image_uuid_opt = image_asset_upload.get_asset_uuid(&mut self.conn)?;
         if let Some(uuid) = terrain_image_uuid_opt {
             log::info!("Terrain image asset already exists, reusing: {} UUID: {:?}", &image_asset_upload.asset_name, uuid);
             self.stats.assets_reused += 1;

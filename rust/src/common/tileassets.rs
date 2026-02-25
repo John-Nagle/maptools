@@ -10,7 +10,7 @@
 //
 use anyhow::{Error, anyhow};
 use chrono::{Utc, DateTime, NaiveDateTime};
-use crate::{RegionData, HeightField, RegionImpostorFaceData};
+use crate::{RegionData, HeightField, RegionImpostorFaceData, hash_to_hex};
 use mysql::prelude::{Queryable};
 use mysql::{Pool, TxOpts, PooledConn, params, Error::MySqlError};
 use serde::{Deserialize, Serialize};
@@ -141,7 +141,7 @@ impl AssetUpload {
         
         Ok(Self {
             asset_name,
-            asset_hash: asset_hash.to_string(),
+            asset_hash: hash_to_hex(asset_hash),
             region_loc,
             region_size,
             grid,
@@ -320,6 +320,44 @@ impl AssetUpload {
         //  ***NEED TO KNOW IF SUCCESS*** return true if insert changed a row.
         log::debug!("Tile asset UUID update succeeded. Rows: {:?}, params {:?}", row_count, params);
         Ok(row_count == Some(1))
+    }
+    
+    /// Get asset UUID from tile_assets if already available.
+    /// Vizgroup and index are not considered.
+    pub fn get_asset_uuid(&self, conn: &mut PooledConn) -> Result<Option<Uuid>, Error> {
+        const SQL_GET_ASSET_UUID: &str = r"SELECT asset_uuid FROM tile_assets 
+            WHERE grid = :grid AND region_loc_x = :region_loc_x AND region_loc_y = :region_loc_y 
+            AND region_size_x = :region_size_x AND region_size_y = :region_size_y
+            AND asset_type = :asset_type AND asset_hash = :asset_hash
+            AND asset_uuid IS NOT NULL";
+        let params = params! {
+            "grid" => self.grid.to_lowercase().clone(), 
+            "region_loc_x" => self.region_loc[0],
+            "region_loc_y" => self.region_loc[1],
+            "region_size_x" => self.region_size[0],
+            "region_size_y" => self.region_size[1],
+            "asset_type" => self.tile_asset_type.to_str().to_string(),
+            "asset_hash" => self.asset_hash.clone(),
+            };
+         log::debug!("get_asset_uuid params: {:?} from {:?}", params, self);
+         let asset_uuids = conn.exec_map(
+            SQL_GET_ASSET_UUID,
+            params,
+            |(uuid) : (String)| {
+                log::debug!("get_asset_uuid result: {:?}", uuid);
+                uuid
+            })?;
+        log::debug!("get_asset_uuid results: {:?}", asset_uuids);
+        if asset_uuids.is_empty() {
+            return Ok(None);
+        }
+        //  Found something
+        if asset_uuids.len() > 1 {
+            //  This is possible when viz_group numbers change, but is not fatal.
+            log::warn!("Duplicate hashes for grid {} looking up {:?} asset at {:?} size {:?}", self.grid, self.tile_asset_type, self.region_loc, self.region_size);
+        }
+        let uuid_str = &asset_uuids[0];
+        Ok(Some(Uuid::parse_str(uuid_str)?))
     }
     
     /// Update terrain tile. A new terrain tile has been added, and needs to be added to the database. OLD.
