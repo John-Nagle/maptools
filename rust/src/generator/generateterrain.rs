@@ -34,6 +34,7 @@ use regionorder::{TileLods, homogeneous_group_size};
 use common::{hash_to_hex, AssetUpload, TileAssetType};
 use ureq::{Agent};
 use uuid::{Uuid};
+use chrono::Utc;
 
 /// MySQL Credentials for uploading.
 /// This filename will be searched for in parent directories,
@@ -563,18 +564,26 @@ impl TerrainGenerator {
         terrain_sculpt.setelevs(elevs, scale as f64, offset as f64);
         terrain_sculpt.makeimage();
         let sculpt_hash = terrain_sculpt.get_hash()?;
-        let sculpt_name = Self::impostor_name(IMPOSTOR_SCULPT_PREFIX, region, height_field, lod, viz_group_id, sculpt_hash)?;
+        //  Create an AssetUpload for the one texture.
+        let sculpt_asset_upload = AssetUpload::new(TileAssetType::SculptTexture, region, height_field, sculpt_hash)?;    
         let sculpt_uuid_opt = self.get_asset_uuid(grid, [region.region_loc_x, region.region_loc_y], [region.region_size_x, region.region_size_y],
             "SculptTexture", sculpt_hash)?;
         if let Some (uuid) = sculpt_uuid_opt {
-            log::info!("Sculpt image asset already exists: {} UUID: {:?}", sculpt_name, uuid);
+            log::info!("Sculpt image asset already exists: {} UUID: {:?}", sculpt_asset_upload.asset_name, uuid);
             self.stats.assets_reused += 1;
         } else {
             let sculpt_image = terrain_sculpt.image.unwrap();
             let mut sculpt_image_path = self.outdir.clone();
-            sculpt_image_path.push(sculpt_name.to_owned() + ".png");
+            sculpt_image_path.push(sculpt_asset_upload.asset_name.to_owned() + ".png");
             sculpt_image.save(&sculpt_image_path)?;
-            log::info!("Sculpt image file saved: \"{}\"", sculpt_image_path.display());  
+            log::info!("Sculpt image file saved: \"{}\"", sculpt_image_path.display());
+            //  Timestamp for sculpt is local time, because we built this asset.
+            let last_modified = Some(Utc::now());
+            let new_tile_created = sculpt_asset_upload.insert_tile_without_uuid(&mut self.conn, last_modified)?;
+            if !new_tile_created {
+                //  This ought not to happen much, if at all. If it happens generating and uploading were probably out of sequence.
+                log::warn!("Duplicate tile sculpt: {:?}", sculpt_asset_upload);
+            }
             self.stats.assets_generated += 1;  
         }
         //  Do texture
@@ -582,7 +591,7 @@ impl TerrainGenerator {
         let mut terrain_image = TerrainSculptTexture::new(region.region_loc_x, region.region_loc_y, lod, &region.name);
         terrain_image.makeimage(TERRAIN_SCULPT_TEXTURE_SIZE)?;
         let terrain_image_hash = terrain_image.get_hash()?;
-        //  Create an AssetUpload
+        //  Create an AssetUpload for the one texture.
         let image_asset_upload = AssetUpload::new(TileAssetType::BaseTexture(0), region, height_field, terrain_image_hash)?;    
         //  For sculpts, there's only one texture, the base texture, and only one face. Meshes are more complicated.
         let terrain_image_uuid_opt = self.get_asset_uuid(grid, [region.region_loc_x, region.region_loc_y], [region.region_size_x, region.region_size_y],
@@ -602,7 +611,7 @@ impl TerrainGenerator {
             let new_tile_created = image_asset_upload.insert_tile_without_uuid(&mut self.conn, last_modified)?;
             if !new_tile_created {
                 //  This ought not to happen much, if at all. If it happens generating and uploading were probably out of sequence.
-                log::warn!("Duplicate tile: {:?}", image_asset_upload);
+                log::warn!("Duplicate tile image: {:?}", image_asset_upload);
             }
             self.stats.assets_generated += 1;      
         }
