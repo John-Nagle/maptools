@@ -691,5 +691,15 @@ john@Nagle-LTS:/tmp$
       Progress:
       - Moved common code to tileassets.
       TODO:
-      - generate new format impostor names - only need ident info, not water level, etc.
+      - generate new format impostor names - only need ident info, not water level, etc. 
+      
+2026-02-23
+    Partway through new plan.
+    - Finish generateterrain fixes. Not clear what happens on insert of duplicate entry for tile.
+      - Generate texture object if we don't have a UUID yet?
+        - Yes, but only if we don't have a UUID. Move insert tile check to after check for already having a UUID.
+      
+    - Need to fix uploadimpostors to set UUIDs in tiles.
+    - All UUIDs are set in the upload impostors missing UUID fixup? Slow.
+    - Do we need update_tile any more?
     

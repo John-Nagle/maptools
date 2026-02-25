@@ -254,8 +254,6 @@ struct TerrainGenerator {
     generate_mesh: bool,
     /// The height field cache
     height_field_cache: HeightFieldCache,
-    /// Initial impostors. Not all UUIDs filled in yet.
-    initial_impostors: InitialImpostors,
     /// Statistics
     stats: TerrainGeneratorStats,
 }
@@ -282,7 +280,6 @@ impl TerrainGenerator {
             corners_touch_connects,
             generate_mesh,
             height_field_cache: HeightFieldCache::new(),
-            initial_impostors: InitialImpostors::new(),
             stats: TerrainGeneratorStats::new(),
         }
     }
@@ -556,7 +553,6 @@ impl TerrainGenerator {
         viz_group_id: u32,
     ) -> Result<(), Error> {
         const IMPOSTOR_SCULPT_PREFIX: &str = "RS";
-        const IMPOSTOR_TERRAIN_PREFIX: &str = "RT0";
         let lod = region.lod;
         let grid = &region.grid;
         log::info!("Generating sculpt for \"{}\": {}", region.name, height_field);
@@ -586,29 +582,28 @@ impl TerrainGenerator {
         let mut terrain_image = TerrainSculptTexture::new(region.region_loc_x, region.region_loc_y, lod, &region.name);
         terrain_image.makeimage(TERRAIN_SCULPT_TEXTURE_SIZE)?;
         let terrain_image_hash = terrain_image.get_hash()?;
-        //  Test new tile creation code
         //  Create an AssetUpload
         let image_asset_upload = AssetUpload::new(TileAssetType::BaseTexture(0), region, height_field, terrain_image_hash)?;    
-        //  Use it to create a new tile_asset entry with no UUID.
-        //  Sculpts have only one face.
-        let texture_index = 0;
-        let last_modified = terrain_image.last_modified;
-        let successful_insert = image_asset_upload.insert_tile_without_uuid(&mut self.conn, last_modified)?;
-        //  End test
-        let terrain_image_name = Self::impostor_name(IMPOSTOR_TERRAIN_PREFIX, region, height_field, lod, viz_group_id, terrain_image_hash)?;
         //  For sculpts, there's only one texture, the base texture, and only one face. Meshes are more complicated.
-        //  ***NEED TO CHECK last_modified DATE HERE TO SEE IF IT IS EARLIER THAN THE ONE CURRENTLY STORED***
         let terrain_image_uuid_opt = self.get_asset_uuid(grid, [region.region_loc_x, region.region_loc_y], [region.region_size_x, region.region_size_y],
             "BaseTexture", terrain_image_hash)?;
         if let Some(uuid) = terrain_image_uuid_opt {
-            log::info!("Terrain image asset already exists: {} UUID: {:?}", terrain_image_name, uuid);
+            log::info!("Terrain image asset already exists, reusing: {} UUID: {:?}", &image_asset_upload.asset_name, uuid);
             self.stats.assets_reused += 1;
         } else {
             let mut terrain_image_path = self.outdir.clone();
-            terrain_image_path.push(terrain_image_name.to_owned() + ".png");
-            let terrain_image = terrain_image.image.unwrap();
-            terrain_image.save(&terrain_image_path)?;
+            terrain_image_path.push(image_asset_upload.asset_name.to_owned() + ".png");
+            let terrain_image_img = terrain_image.image.unwrap();
+            terrain_image_img.save(&terrain_image_path)?;
             log::info!("Terrain image file saved: \"{}\"", terrain_image_path.display());
+            //  Use it to create a new tile_asset entry with no UUID.
+            //  Sculpts have only one face.
+            let last_modified = terrain_image.last_modified;
+            let new_tile_created = image_asset_upload.insert_tile_without_uuid(&mut self.conn, last_modified)?;
+            if !new_tile_created {
+                //  This ought not to happen much, if at all. If it happens generating and uploading were probably out of sequence.
+                log::warn!("Duplicate tile: {:?}", image_asset_upload);
+            }
             self.stats.assets_generated += 1;      
         }
         //  Now we can generate the initial impostor database row.

@@ -93,7 +93,7 @@ impl TileAssetType {
 #[derive(Deserialize, Clone, Debug)]
 pub struct AssetUpload {
     /// Asset name - the name used in SL/OS
-    asset_name: String,
+    pub asset_name: String,
     /// File name prefix. "RS", "RM", or RTn"
     /// Hash of asset content. Hex value.
     asset_hash: String,
