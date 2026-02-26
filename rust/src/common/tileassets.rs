@@ -96,15 +96,15 @@ pub struct AssetUpload {
     pub asset_name: String,
     /// File name prefix. "RS", "RM", or RTn"
     /// Hash of asset content. Hex value.
-    asset_hash: String,
+    pub asset_hash: String,
     /// Region location (meters)
-    region_loc: [u32;2],
+    pub region_loc: [u32;2],
     /// Region size (meters)
-    region_size: [u32;2],
+    pub region_size: [u32;2],
     /// Grid name
-    grid: String,
+    pub grid: String,
     /// UUID of asset
-    asset_uuid: Option<String>,
+    pub asset_uuid: Option<String>,
     /// Elevation offset 
     elevation_offset: f32,
     /// Scale
@@ -112,7 +112,7 @@ pub struct AssetUpload {
     /// Water height
     water_height: f32,
     /// Impostor LOD. 0 is highest level of detail.
-    impostor_lod: u8,
+    pub impostor_lod: u8,
     /// Tile assset type - derived from prefix
     pub tile_asset_type: TileAssetType,
 }

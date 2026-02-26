@@ -18,6 +18,7 @@ use mysql::{PooledConn, params};
 use mysql::prelude::Queryable;
 use uuid::{Uuid};
 use crate::{RegionData};
+use crate::{AssetUpload, TileAssetType};
 use crate::{RegionImpostorData, RegionImpostorFaceData, HeightField};
 use crate::{uuid_opt_to_string};
 
@@ -58,6 +59,9 @@ impl InitialImpostors {
     
     /// Add one impostor (sculpt or mesh) to the table. UUIDs may be null.
     /// This is a pure insert into a table that starts empty. Duplicates should not happen.
+    /// Impostors may be added with or without UUIDs in the approrpriate slots.
+    /// UUIDs can be filled in later after items are uploaded.
+    /// Called at generate time.
     pub fn add_impostor(conn: &mut PooledConn, region_impostor_data: RegionImpostorData) -> Result<(), Error> {
         log::debug!("Inserting {:?} into initial_impostors.", region_impostor_data.name);
         //  We have all the info now. Update the region_impostor table.
@@ -100,6 +104,83 @@ impl InitialImpostors {
         //  Finally insert into the impostor table
         log::debug!("Inserting impostor into initial_impostors, params: {:?}", insert_params);
         Ok(conn.exec_drop(SQL_IMPOSTOR, insert_params)?)
+    }
+    
+    //  Insert UUID into existing region impostors.
+    //  Called from uploadimpostor.
+    pub fn insert_uuid(conn: &mut PooledConn, asset_upload: &AssetUpload) -> Result<bool, Error> {
+        match asset_upload.tile_asset_type {
+            TileAssetType::SculptTexture => Self::insert_sculpt_uuid(conn, asset_upload),
+            TileAssetType::Mesh => Self::insert_mesh_uuid(conn, asset_upload),
+            TileAssetType::BaseTexture(n) => Self::insert_texture_uuid(conn, asset_upload),
+            TileAssetType::EmissiveTexture(n) => Self::insert_texture_uuid(conn, asset_upload),
+        }
+    }
+    
+    //  Insert UUID into existing region impostors.
+    //  Called from uploadimpostor.
+    fn insert_sculpt_uuid(conn: &mut PooledConn, asset_upload: &AssetUpload) -> Result<bool, Error> {
+        assert!(asset_upload.asset_uuid.is_some());
+        const SQL_UPDATE_SCULPT_UUID: &str = r"UPDATE initial_impostors 
+            SET sculpt_uuid = :sculpt_uuid,
+            WHERE grid = :grid
+                AND region_loc_x = :region_loc_x 
+                AND region_loc_y = :region_loc_y
+                AND region_size_x = :region_size_x 
+                AND region_loc_y = :region_loc_y
+                AND impostor_lod = :impostor_lod
+                AND sculpt_hash = :sculpt_hash";
+
+        let params = params! {
+            "grid" => asset_upload.grid.to_lowercase(),
+            "asset_type" => asset_upload.tile_asset_type.to_str().to_string(),
+            "region_loc_x" => asset_upload.region_loc[0],
+            "region_loc_y" => asset_upload.region_loc[1],
+            "region_size_x" => asset_upload.region_size[0],
+            "region_size_y" => asset_upload.region_size[1],
+            "impostor_lod" => asset_upload.impostor_lod,
+            "sculpt_uuid" => asset_upload.asset_uuid.clone(),
+            "sculpt_hash" => asset_upload.asset_hash.clone(),
+        };
+        let row_count: Option<usize> = conn.exec_first(SQL_UPDATE_SCULPT_UUID, &params)?;
+        log::debug!("Initial impostor UUID update succeeded. Rows: {:?}, params {:?}", row_count, params);
+        Ok(row_count != Some(0))
+    }
+    
+    //  Insert UUID into existing region impostors.
+    //  Called from uploadimpostor.
+    fn insert_mesh_uuid(conn: &mut PooledConn, asset_upload: &AssetUpload) -> Result<bool, Error> {
+        assert!(asset_upload.asset_uuid.is_some());
+        const SQL_UPDATE_MESH_UUID: &str = r"UPDATE initial_impostors 
+            SET mesh_uuid = :mesh_uuid,
+            WHERE grid = :grid
+                AND region_loc_x = :region_loc_x 
+                AND region_loc_y = :region_loc_y
+                AND region_size_x = :region_size_x 
+                AND region_loc_y = :region_loc_y
+                AND impostor_lod = :impostor_lod
+                AND mesh_hash = :mesh_hash";
+
+        let params = params! {
+            "grid" => asset_upload.grid.to_lowercase(),
+            "asset_type" => asset_upload.tile_asset_type.to_str().to_string(),
+            "region_loc_x" => asset_upload.region_loc[0],
+            "region_loc_y" => asset_upload.region_loc[1],
+            "region_size_x" => asset_upload.region_size[0],
+            "region_size_y" => asset_upload.region_size[1],
+            "impostor_lod" => asset_upload.impostor_lod,
+            "mesh_uuid" => asset_upload.asset_uuid.clone(),
+            "mesh_hash" => asset_upload.asset_hash.clone(),
+        };
+        let row_count: Option<usize> = conn.exec_first(SQL_UPDATE_MESH_UUID, &params)?;
+        log::debug!("Initial impostor UUID update succeeded. Rows: {:?}, params {:?}", row_count, params);
+        Ok(row_count != Some(0))
+    }
+    
+    //  Insert UUID into existing region impostors.
+    //  Called from uploadimpostor.
+    fn insert_texture_uuid(conn: &mut PooledConn, asset_upload: &AssetUpload) -> Result<bool, Error> {
+        todo!();
     }
     
     /// Truncate the table for one grid This table is re-created on each run of generateterrain.

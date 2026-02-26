@@ -707,4 +707,13 @@ john@Nagle-LTS:/tmp$
     Generate side works, now need to do uploadimpostor side.
     - Don't really need all that info encoded in name. Just x, y, sx, sy, lod, hash.
       - But keep the name format for now. Change later, maybe.
-    
+      
+2026-02-25
+    Updating UUIDs in tiles.
+    - tile_asssets get_faces_json will generate the JSON with UUIDs. Use that in updateimpostors.
+     - Apply that to initial_impostor which matches loc data for incoming impostor.
+    - sculpt UUID in initial_impostor needs to be updated.
+     - use add_impostor?
+       - No, don't have height field any more.
+       - Need new fn that just updates UUID - insert_uuid
+         - Just needs key info and UUID.
