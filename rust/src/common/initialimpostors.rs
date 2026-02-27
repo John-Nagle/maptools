@@ -243,12 +243,13 @@ impl InitialImpostors {
         //  If changed, update the interim impostor
         if changed {
             const SQL_UPDATE_TEXTURE_UUIDS: &str = r"UPDATE initial_impostors 
-                SET faces_json = :faces_json,
+                SET faces_json = :faces_json
                 WHERE grid = :grid
                 AND region_loc_x = :region_loc_x 
                 AND region_loc_y = :region_loc_y
                 AND region_size_x = :region_size_x 
                 AND region_size_y = :region_size_y
+                AND viz_group = :viz_group
                 AND impostor_lod = :impostor_lod";
             let faces_json: String = serde_json::to_string(&face_data)?;
             let update_params = params! {

@@ -447,8 +447,8 @@ impl AssetUploadHandler {
 */
             log::debug!("Inserting UUID in impostors: {:?}", asset_upload); 
             //  Tile asset updated. Now update initial impostors.
-            if !InitialImpostors::insert_uuid(&mut self.conn, &asset_upload)
-                .with_context(|| format!("Insert uuid failed for {:?}", asset_upload))? {
+            if !InitialImpostors::insert_uuid(&mut self.conn, &asset_upload)? {
+                //////.with_context(|| format!("Insert uuid failed for {:?}", asset_upload))? {
                 log::debug!("Upload had no effect on impostors: {:?}", asset_upload);
             }
         }
