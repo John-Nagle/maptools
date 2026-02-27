@@ -17,6 +17,7 @@ use anyhow::{Error, anyhow};
 use mysql::{PooledConn, params};
 use mysql::prelude::Queryable;
 use uuid::{Uuid};
+use mysql::{Transaction, TxOpts};
 use crate::{RegionData};
 use crate::{AssetUpload, TileAssetType};
 use crate::{RegionImpostorData, RegionImpostorFaceData, HeightField};
@@ -127,13 +128,12 @@ impl InitialImpostors {
                 AND region_loc_x = :region_loc_x 
                 AND region_loc_y = :region_loc_y
                 AND region_size_x = :region_size_x 
-                AND region_loc_y = :region_loc_y
+                AND region_size_y = :region_size_y
                 AND impostor_lod = :impostor_lod
                 AND sculpt_hash = :sculpt_hash";
 
         let params = params! {
             "grid" => asset_upload.grid.to_lowercase(),
-            "asset_type" => asset_upload.tile_asset_type.to_str().to_string(),
             "region_loc_x" => asset_upload.region_loc[0],
             "region_loc_y" => asset_upload.region_loc[1],
             "region_size_x" => asset_upload.region_size[0],
@@ -157,13 +157,12 @@ impl InitialImpostors {
                 AND region_loc_x = :region_loc_x 
                 AND region_loc_y = :region_loc_y
                 AND region_size_x = :region_size_x 
-                AND region_loc_y = :region_loc_y
+                AND region_size_y = :region_size_y
                 AND impostor_lod = :impostor_lod
                 AND mesh_hash = :mesh_hash";
 
         let params = params! {
             "grid" => asset_upload.grid.to_lowercase(),
-            "asset_type" => asset_upload.tile_asset_type.to_str().to_string(),
             "region_loc_x" => asset_upload.region_loc[0],
             "region_loc_y" => asset_upload.region_loc[1],
             "region_size_x" => asset_upload.region_size[0],
@@ -179,9 +178,139 @@ impl InitialImpostors {
     
     //  Insert UUID into existing region impostors.
     //  Called from uploadimpostor.
+    //  Needs to be reasonably efficient because it's called for every UUID.
     fn insert_texture_uuid(conn: &mut PooledConn, asset_upload: &AssetUpload) -> Result<bool, Error> {
+    /*
+        let unique_impostor_key = UniqueImpostorKey {
+            grid: asset_upload.grid.clone(),
+            region_loc_x: asset_upload.region_loc[0],
+            region_loc_y: asset_upload.region_loc[1],
+            impostor_lod: asset_upload.impostor_lod,
+            viz_group: 9999,    // ***WRONG*** can't get this from UIK
+        };
         todo!();
+    */
+        const SQL_SELECT_IMPOSTORS: &str = r"SELECT viz_group, faces_json
+            FROM initial_impostors 
+            WHERE grid = :grid            
+            AND region_loc_x = :region_loc_x 
+            AND region_loc_y = :region_loc_y
+            AND region_size_x = :region_size_x 
+            AND region_size_y = :region_size_y
+            AND impostor_lod = :impostor_lod";
+            
+        let select_params = params! {
+            "grid" => asset_upload.grid.to_lowercase(),
+            "region_loc_x" => asset_upload.region_loc[0],
+            "region_loc_y" => asset_upload.region_loc[1],
+            "region_size_x" => asset_upload.region_size[0],
+            "region_size_y" => asset_upload.region_size[1],
+            "impostor_lod" => asset_upload.impostor_lod,
+            "mesh_uuid" => asset_upload.asset_uuid.clone(),
+            "mesh_hash" => asset_upload.asset_hash.clone(),
+        };
+        //  Start transaction.
+        //  Select initial_impostors at indicated location, any viz group.
+        //  Save JSON and viz_group.
+        //  Update JSON with new UUID where hash matches.
+        //  Update selected impostors.
+        //  Atomic transaction. Must complete successfully or rolled back.
+        let mut tx = conn.start_transaction(TxOpts::default())?;
+        let items = tx.exec_map(
+            SQL_SELECT_IMPOSTORS,
+            select_params,
+            |(viz_group, faces_json) : (u32, String)| {
+                //  ***MORE*** find items that match on texture hash, etc.
+                (viz_group, faces_json)
+            }
+        )?;
+        //  Now we have an array of all possible matching initial_impostor items that might need UUID insertion.
+        let mut changed: bool = false;
+        for (viz_group, faces_json) in items {
+            changed = changed | Self::insert_texture_uuid_for_tile(&mut tx, asset_upload, viz_group, faces_json)?;
+        }
+        tx.commit()?;
+        Ok(changed)           
     }
+    
+    /// Insert a missing UUID in a texture entry.
+    /// This tends to happen if something went wrong in upload and an upload had to be rerun.
+    fn insert_texture_uuid_for_tile(tx: &mut Transaction, asset_upload: &AssetUpload, viz_group: u32, faces_json_in: String) 
+            -> Result<bool, Error> {
+        let mut changed = false;
+        let mut face_data: Vec<RegionImpostorFaceData> = serde_json::from_str(&faces_json_in)?;
+        let uuid = if let Some(uuid_str) = &asset_upload.asset_uuid {
+            Uuid::parse_str(&uuid_str)? 
+        } else {
+            return Err(anyhow!("Null UUID at insert-texture_uuid_for_tile: {:?}", asset_upload));
+        };
+        for face in &mut face_data {
+            changed = changed | Self::insert_texture_uuid_for_face
+                (&asset_upload.tile_asset_type, &asset_upload.asset_hash, uuid, face)?;            
+        };
+        //  If changed, update the interim impostor
+        if changed {
+            const SQL_UPDATE_TEXTURE_UUIDS: &str = r"UPDATE initial_impostors 
+                SET faces_json = :faces_json,
+                WHERE grid = :grid
+                AND region_loc_x = :region_loc_x 
+                AND region_loc_y = :region_loc_y
+                AND region_size_x = :region_size_x 
+                AND region_size_y = :region_size_y
+                AND impostor_lod = :impostor_lod";
+            let faces_json: String = serde_json::to_string(&face_data)?;
+            let update_params = params! {
+            "grid" => asset_upload.grid.to_lowercase(),
+            "region_loc_x" => asset_upload.region_loc[0],
+            "region_loc_y" => asset_upload.region_loc[1],
+            "region_size_x" => asset_upload.region_size[0],
+            "region_size_y" => asset_upload.region_size[1],
+            "impostor_lod" => asset_upload.impostor_lod,
+            "viz_group" => viz_group,
+            "faces_json" => faces_json.clone(),
+            };
+            log::debug!("insert_texture_uuid_for_tile: changing: params: {:?}, before: {}, after: {}",
+                    update_params, faces_json_in, faces_json);          
+            let row_count: Option<usize> = tx.exec_first(SQL_UPDATE_TEXTURE_UUIDS, &update_params)?;
+            if row_count != Some(1) {
+                log::error!("insert_texture_uuid_for_tile: update did not change JSON: params: {:?}, before: {}, after: {}",
+                    update_params, faces_json_in, faces_json);                    
+            }          
+        }
+        Ok(changed)
+    }
+    
+    /// Update texture UUID in JSON for one face
+    fn insert_texture_uuid_for_face(tile_asset_type: &TileAssetType, asset_hash: &str, asset_uuid: Uuid, 
+        face_data: &mut RegionImpostorFaceData) -> Result<bool, Error> {
+            todo!();      
+    }
+/*
+        let mut changed = false;
+        let mut face = face.clone();
+        //  Fix up base texture.
+        if face.base_texture_uuid.is_none() {
+            if let Some(uuid) = Self::look_up_uuid(conn, key, face_id, &face.base_texture_hash, "BaseTexture")? {
+                face.base_texture_uuid = Some(uuid);
+                changed = true;
+            }
+        }
+        //  Fix up emissive texture if present.
+        if let Some(hash) = &face.emissive_texture_hash {
+            if face.emissive_texture_uuid.is_none() {
+                if let Some(uuid) = Self::look_up_uuid(conn, key, face_id, hash, "EmissiveTexture")? {
+                    face.emissive_texture_uuid = Some(uuid);
+                    changed = true;
+                }
+            }
+        };
+        //  Do we have new face data?
+        if changed {
+            Ok(Some(face))
+        } else {
+            Ok(None)
+        }
+*/    
     
     /// Truncate the table for one grid This table is re-created on each run of generateterrain.
     pub fn clear_grid(conn: &mut PooledConn, grid: &str) -> Result<(), Error> {
