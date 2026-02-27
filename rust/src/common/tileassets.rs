@@ -354,7 +354,7 @@ impl AssetUpload {
         let uuid_str = &asset_uuids[0];
         Ok(Some(Uuid::parse_str(uuid_str)?))
     }
-    
+/*    
     /// Update terrain tile. A new terrain tile has been added, and needs to be added to the database. OLD.
     fn update_tile(&self, conn: &mut PooledConn, texture_index: Option<u8>, asset_type: &str) -> Result<(), Error> {
         //  Allowed types. Must match exactly.
@@ -399,6 +399,7 @@ impl AssetUpload {
     pub fn update_texture_tile(&self, conn: &mut PooledConn, texture_index: u8, asset_type: &str) -> Result<(), Error> {
         self.update_tile(conn, Some(texture_index), asset_type)
     }
+*/
     
     //  Look up region name.
     //  Returns name of region if exact match. Otherwise searches for
@@ -467,7 +468,7 @@ impl AssetUpload {
         log::debug!("Textures for sculpt/mesh {:?}  {:?}", asset_upload.asset_name, texture_tuples);
         RegionImpostorFaceData::json_from_tuples(&texture_tuples)
     }
-    
+/*    
     /// Update terrain tile. A new terrain tile has been added, and needs to be added to the database.
     /// ***WRONG*** for a mesh tile.
     pub fn update_mesh_tile(&mut self, conn: &mut PooledConn) -> Result<(), Error> {
@@ -492,7 +493,7 @@ impl AssetUpload {
     /// Update a sculpt tile.
     /// ***NEEDS WORK***
     /// Here we set the UUID in the tile info and the initial_impostors.
-    pub fn update_sculpt_tile(&mut self, conn: &mut PooledConn) -> Result<(), Error> {
+    pub fn update_sculpt_tile_old(&mut self, conn: &mut PooledConn) -> Result<(), Error> {
         //  Most of the info we need is in asset_upload, but we also need:
         //  - name
         //  - face texture data.
@@ -509,9 +510,9 @@ impl AssetUpload {
         self.update_impostor_info(conn, &name, mesh_uuid, sculpt_uuid, faces_json)
 */
     }
-    
+*/   
     /// All the info is already present in self. This just adds the UUID.
-    pub fn update_sculpt_tile_new(&mut self, conn: &mut PooledConn) -> Result<(), Error> {
+    pub fn update_tile(&mut self, conn: &mut PooledConn) -> Result<(), Error> {
         //  Update tile assets
         if let Some(asset_uuid_str) = &self.asset_uuid {
             let uuid = Uuid::parse_str(&asset_uuid_str)?;
@@ -519,8 +520,6 @@ impl AssetUpload {
         } else {
             return Err(anyhow!("Null UUID in update: {:?}", self));
         }
-        //  Update interim_impostors
-        //  ***MORE***
         Ok(())
     }
 }

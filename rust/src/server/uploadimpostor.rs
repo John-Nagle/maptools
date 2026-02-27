@@ -9,21 +9,18 @@
 //!     August, 2025.
 //
 #![forbid(unsafe_code)]
-use anyhow::{Error, anyhow};
+use anyhow::{Error, Context, anyhow};
 use log::LevelFilter;
 use common::Credentials;
 use common::init_fcgi;
 use common::{Handler, Request, Response};
-use common::{RegionImpostorFaceData};
 use mysql::prelude::{Queryable};
 use mysql::{Pool, TxOpts, PooledConn, params};
 use std::collections::{HashMap};
 use std::io::Write;
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 use common::{Authorizer, AuthorizeType};
 use common::InitialImpostors;
-use common::{AssetUpload, AssetUploadShort, AssetUploadArrayShort, TileAssetType};
+use common::{AssetUpload, AssetUploadArrayShort, TileAssetType};
 
 /// MySQL Credentials for uploading.
 /// This filename will be searched for in parent directories,
@@ -426,6 +423,9 @@ impl AssetUploadHandler {
         //  An empty list means it's time to check to see if we're done and report errors.
         for asset_upload_short in &asset_info_short {
             let mut asset_upload = AssetUpload::new_from_asset_upload_short(asset_upload_short)?;
+            log::debug!("Uploading tile: {:?}", asset_upload);
+            asset_upload.update_tile(&mut self.conn)?;
+/*
             match &asset_upload.tile_asset_type {
                 TileAssetType::SculptTexture => {
                     //  Sculpt
@@ -444,8 +444,11 @@ impl AssetUploadHandler {
                     asset_upload.update_texture_tile(&mut self.conn, *ix, "EmissiveTexture")?;
                 }
             }
-            //  Tile assets updated. Now update initiali impostors.
-            if !InitialImpostors::insert_uuid(&mut self.conn, &asset_upload)? {
+*/
+            log::debug!("Inserting UUID in impostors: {:?}", asset_upload); 
+            //  Tile asset updated. Now update initial impostors.
+            if !InitialImpostors::insert_uuid(&mut self.conn, &asset_upload)
+                .with_context(|| format!("Insert uuid failed for {:?}", asset_upload))? {
                 log::debug!("Upload had no effect on impostors: {:?}", asset_upload);
             }
         }
