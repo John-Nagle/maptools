@@ -110,6 +110,7 @@ impl InitialImpostors {
     //  Insert UUID into existing region impostors.
     //  Called from uploadimpostor.
     pub fn insert_uuid(conn: &mut PooledConn, asset_upload: &AssetUpload) -> Result<bool, Error> {
+        log::debug!("Beginning insert_uuid for {:?}", asset_upload);
         match asset_upload.tile_asset_type {
             TileAssetType::SculptTexture => Self::insert_sculpt_uuid(conn, asset_upload),
             TileAssetType::Mesh => Self::insert_mesh_uuid(conn, asset_upload),
@@ -143,7 +144,7 @@ impl InitialImpostors {
             "sculpt_hash" => asset_upload.asset_hash.clone(),
         };
         let row_count: Option<usize> = conn.exec_first(SQL_UPDATE_SCULPT_UUID, &params)?;
-        log::debug!("Initial impostor UUID update succeeded. Rows: {:?}, params {:?}", row_count, params);
+        log::debug!("Initial sculpt impostor UUID update succeeded. Rows: {:?}, params {:?}", row_count, params);
         Ok(row_count != Some(0))
     }
     
@@ -172,7 +173,7 @@ impl InitialImpostors {
             "mesh_hash" => asset_upload.asset_hash.clone(),
         };
         let row_count: Option<usize> = conn.exec_first(SQL_UPDATE_MESH_UUID, &params)?;
-        log::debug!("Initial impostor UUID update succeeded. Rows: {:?}, params {:?}", row_count, params);
+        log::debug!("Initial mesh impostor UUID update succeeded. Rows: {:?}, params {:?}", row_count, params);
         Ok(row_count != Some(0))
     }
     
@@ -180,16 +181,6 @@ impl InitialImpostors {
     //  Called from uploadimpostor.
     //  Needs to be reasonably efficient because it's called for every UUID.
     fn insert_texture_uuid(conn: &mut PooledConn, asset_upload: &AssetUpload) -> Result<bool, Error> {
-    /*
-        let unique_impostor_key = UniqueImpostorKey {
-            grid: asset_upload.grid.clone(),
-            region_loc_x: asset_upload.region_loc[0],
-            region_loc_y: asset_upload.region_loc[1],
-            impostor_lod: asset_upload.impostor_lod,
-            viz_group: 9999,    // ***WRONG*** can't get this from UIK
-        };
-        todo!();
-    */
         const SQL_SELECT_IMPOSTORS: &str = r"SELECT viz_group, faces_json
             FROM initial_impostors 
             WHERE grid = :grid            
@@ -242,6 +233,7 @@ impl InitialImpostors {
         let uuid = if let Some(uuid_str) = &asset_upload.asset_uuid {
             Uuid::parse_str(&uuid_str)? 
         } else {
+            //  Uploaded data must be bogus.
             return Err(anyhow!("Null UUID at insert-texture_uuid_for_tile: {:?}", asset_upload));
         };
         for face in &mut face_data {
@@ -290,7 +282,7 @@ impl InitialImpostors {
         } else {
             false
         }
-        && 
+        || 
         if &face.emissive_texture_hash == &Some(hash) {
             face.emissive_texture_uuid = Some(asset_uuid);
             true

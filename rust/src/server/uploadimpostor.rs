@@ -444,6 +444,10 @@ impl AssetUploadHandler {
                     asset_upload.update_texture_tile(&mut self.conn, *ix, "EmissiveTexture")?;
                 }
             }
+            //  Tile assets updated. Now update initiali impostors.
+            if !InitialImpostors::insert_uuid(&mut self.conn, &asset_upload)? {
+                log::debug!("Upload had no effect on impostors: {:?}", asset_upload);
+            }
         }
         Ok((200, "Asset upload successful".to_string()))
     }
