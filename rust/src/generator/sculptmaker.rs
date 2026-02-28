@@ -10,7 +10,6 @@ use std::hash::{Hash, Hasher, DefaultHasher};
 use std::f64;
 use anyhow::{anyhow, Error};
 use std::io::{Cursor};
-use http::header::{HeaderValue, HeaderMap};
 use chrono::{DateTime, Utc};
 
 /// Calculate hash for duplicate check.
@@ -49,7 +48,7 @@ impl TerrainSculpt {
             self.zheight = Some(maxz - minz);
             self.zoffset = Some(minz);
 
-            println!("Z bounds: {:.2} to {:.2}", minz, maxz);
+            log::debug!("Z bounds: {:.2} to {:.2}", minz, maxz);
 
             let mut img = RgbImage::new(elevs.len() as u32, elevs[0].len() as u32);
             let range = maxz - minz;
@@ -201,7 +200,7 @@ impl TerrainSculptTexture {
         }
         const URL_SUFFIX: &str = "-objects.jpg"; // make sure this is the same for OS
         let url = format!("{}{}-{}-{}{}", url_prefix, lod + 1, tile_id_x, tile_id_y, URL_SUFFIX);
-        println!("URL: {}", url);   // ***TEMP***
+        log::debug!("Fetching URL: {}", url);  
         let mut resp = ureq::get(&url)
             //////.set("User-Agent", USERAGENT)
             .header("Content-Type", "image/jpg") // 

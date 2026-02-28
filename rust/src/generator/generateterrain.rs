@@ -56,7 +56,7 @@ const TERRAIN_SCULPT_TEXTURE_SIZE: u32 = 256;
 /// User agent for talking to asset server
 const TERRAIN_GENERATOR_USER_AGENT: &str = "animats.info impostor asset system";
 /// Files per directory. A convenient size <= 100.
-const FILES_PER_DIRECTORY: usize = 50;
+const FILES_PER_DIRECTORY: usize = 100;
 
 /// Debug logging
 fn logger() {
@@ -582,6 +582,7 @@ impl TerrainGenerator {
             sculpt_image_path.push(sculpt_asset_upload.asset_name.to_owned() + ".png");
             sculpt_image.save(&sculpt_image_path)?;
             log::info!("Sculpt image file saved: \"{}\"", sculpt_image_path.display());
+            println!("Sculpt file: \"{}\"", sculpt_image_path.display());
             //  Timestamp for sculpt is local time, because we built this asset.
             let last_modified = Some(Utc::now());
             let new_tile_created = sculpt_asset_upload.insert_tile_without_uuid(&mut self.conn, last_modified)?;
@@ -609,6 +610,7 @@ impl TerrainGenerator {
             let terrain_image_img = terrain_image.image.unwrap();
             terrain_image_img.save(&terrain_image_path)?;
             log::info!("Terrain image file saved: \"{}\"", terrain_image_path.display());
+            println!("Terrain file: \"{}\"", terrain_image_path.display());
             //  Use it to create a new tile_asset entry with no UUID.
             //  Sculpts have only one face.
             let last_modified = terrain_image.last_modified;
