@@ -55,6 +55,8 @@ const _OWNER_NAME: &str = "HTTP_X_SECONDLIFE_OWNER_NAME";
 const TERRAIN_SCULPT_TEXTURE_SIZE: u32 = 256;
 /// User agent for talking to asset server
 const TERRAIN_GENERATOR_USER_AGENT: &str = "animats.info impostor asset system";
+/// Files per directory. A convenient size <= 100.
+const FILES_PER_DIRECTORY: usize = 50;
 
 /// Debug logging
 fn logger() {
@@ -233,6 +235,42 @@ impl std::fmt::Display for TerrainGeneratorStats {
     }
 }
 
+/// Organizes files into multiple directories, for convenient uploading into SL/OS
+struct FolderGenerator {
+    /// Base directory
+    base_dir: PathBuf,
+    /// Files per directory
+    files_per_directory: usize,
+    /// Files generated
+    file_count: usize,
+}
+
+impl FolderGenerator {
+    /// Usual new
+    fn new(base_dir: &PathBuf, files_per_directory: usize) -> Self {
+        Self {
+            base_dir: base_dir.clone(),
+            files_per_directory,
+            file_count: 0,
+        }
+    }
+    /// Returns desired directory name. Creates directory if needed
+    /// Directory names are simply prefix/Rnn
+    fn next_path(&mut self) -> Result<PathBuf, Error> {
+        //  Create a subdirectory if needed
+        let dir_index = self.file_count / self.files_per_directory;
+        let dir_name = format!("R{:02}", dir_index);
+        let mut path = self.base_dir.clone();
+        path.push(dir_name);
+        if self.file_count % self.files_per_directory == 0 {
+            log::info!("Creating output directory {:?}", path);
+            std::fs::create_dir_all(&path)?;
+        }  
+        self.file_count += 1;
+        Ok(path)
+    }
+}
+
 /// The terrain object generator
 struct TerrainGenerator {
     /// SQL connection
@@ -240,7 +278,7 @@ struct TerrainGenerator {
     /// Network connection pool
     agent: Agent,
     /// Output directory
-    outdir: PathBuf,
+    folder_generator: FolderGenerator,
     /// Asset server URL prefix
     url_prefix_opt: Option<String>,
     /// Are regions with only corners touching adjacent?
@@ -268,10 +306,11 @@ impl TerrainGenerator {
             .user_agent(TERRAIN_GENERATOR_USER_AGENT)
             .build();
         let agent: Agent = config.into();
+        let folder_generator = FolderGenerator::new(&outdir, FILES_PER_DIRECTORY);
         Self {
             conn,
             agent,
-            outdir,
+            folder_generator,
             url_prefix_opt,
             corners_touch_connects,
             generate_mesh,
@@ -539,7 +578,7 @@ impl TerrainGenerator {
             self.stats.assets_reused += 1;
         } else {
             let sculpt_image = terrain_sculpt.image.unwrap();
-            let mut sculpt_image_path = self.outdir.clone();
+            let mut sculpt_image_path = self.folder_generator.next_path()?;
             sculpt_image_path.push(sculpt_asset_upload.asset_name.to_owned() + ".png");
             sculpt_image.save(&sculpt_image_path)?;
             log::info!("Sculpt image file saved: \"{}\"", sculpt_image_path.display());
@@ -565,7 +604,7 @@ impl TerrainGenerator {
             log::info!("Terrain image asset already exists, reusing: {} UUID: {:?}", &image_asset_upload.asset_name, uuid);
             self.stats.assets_reused += 1;
         } else {
-            let mut terrain_image_path = self.outdir.clone();
+            let mut terrain_image_path = self.folder_generator.next_path()?;
             terrain_image_path.push(image_asset_upload.asset_name.to_owned() + ".png");
             let terrain_image_img = terrain_image.image.unwrap();
             terrain_image_img.save(&terrain_image_path)?;
