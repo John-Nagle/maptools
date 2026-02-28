@@ -218,14 +218,14 @@ impl InitialImpostors {
         //  Now we have an array of all possible matching initial_impostor items that might need UUID insertion.
         let mut changed: bool = false;
         for (viz_group, faces_json) in items {
-            changed = changed | Self::insert_texture_uuid_for_tile(&mut tx, asset_upload, viz_group, faces_json)?;
+            changed = changed || Self::insert_texture_uuid_for_tile(&mut tx, asset_upload, viz_group, faces_json)?;
         }
         tx.commit()?;
         Ok(changed)           
     }
     
-    /// Insert a missing UUID in a texture entry.
-    /// This tends to happen if something went wrong in upload and an upload had to be rerun.
+    /// Insert a UUID in a texture entry.
+    /// This is how texture UUIDs get into the impostors.
     fn insert_texture_uuid_for_tile(tx: &mut Transaction, asset_upload: &AssetUpload, viz_group: u32, faces_json_in: String) 
             -> Result<bool, Error> {
         let mut changed = false;
@@ -237,7 +237,7 @@ impl InitialImpostors {
             return Err(anyhow!("Null UUID at insert-texture_uuid_for_tile: {:?}", asset_upload));
         };
         for face in &mut face_data {
-            changed = changed | Self::insert_texture_uuid_for_face
+            changed = changed || Self::insert_texture_uuid_for_face
                 (&asset_upload.tile_asset_type, &asset_upload.asset_hash, uuid, face)?;            
         };
         //  If changed, update the interim impostor
@@ -266,7 +266,7 @@ impl InitialImpostors {
                     update_params, faces_json_in, faces_json);          
             let row_count: Option<usize> = tx.exec_first(SQL_UPDATE_TEXTURE_UUIDS, &update_params)?;
             if row_count != Some(1) {
-                log::error!("insert_texture_uuid_for_tile: update did not change JSON: params: {:?}, before: {}, after: {}",
+                log::warn!("insert_texture_uuid_for_tile: update did not change JSON: params: {:?}, before: {}, after: {}",
                     update_params, faces_json_in, faces_json);                    
             }          
         }

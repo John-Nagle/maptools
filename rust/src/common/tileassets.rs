@@ -517,6 +517,9 @@ impl AssetUpload {
         if let Some(asset_uuid_str) = &self.asset_uuid {
             let uuid = Uuid::parse_str(&asset_uuid_str)?;
             let inserted = self.insert_uuid(conn, None, uuid)?;
+            if !inserted {
+                log::info!("Tile UUID unchanged for {:?}", self);
+            }
         } else {
             return Err(anyhow!("Null UUID in update: {:?}", self));
         }
