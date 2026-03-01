@@ -172,7 +172,7 @@ impl Iterator for TileLods {
                 log::debug!("Runout: Col finished LOD 0: {:?}", self.cursors[0].recent_column_info.region_type_info[0]);  // ***TEMP***
                 //  This fills all with water.
                 self.scan_and_shift();
-                if runaway > 100 { panic!("EOF runaway"); } else { runaway += 1; } // ***TEMP***
+                if runaway > 1000 { panic!("EOF runaway"); } else { runaway += 1; } // ***TEMP***
             }
             log::debug!("Runout done"); 
             //  Return a region, or None if we're all done.

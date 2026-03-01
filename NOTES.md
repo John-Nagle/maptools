@@ -717,3 +717,18 @@ john@Nagle-LTS:/tmp$
        - No, don't have height field any more.
        - Need new fn that just updates UUID - insert_uuid
          - Just needs key info and UUID.
+         
+2026-02-28
+     Working, but sometimes sculpt_hash is null in impostors. Should never happen.
+     - Trouble when two tiles at same loc but different viz group? Check unique key in SQL def. 
+       - Get rid of UNIQUE INDEX (grid, asset_name).
+     - This one shows up in impostors with a null sculpt hash. Why?
+     05:25:13 [DEBUG] (1) generateterrain: Region impostor data: RegionImpostorData { region_loc: [460800, 305152], region_size: [2048, 2048], scale: [2048.0, 2048.0, 34.994167], impostor_lod: 3, viz_group: 1, sculpt_uuid: Some(0453c546-ed8d-2f7f-94e4-5a7eab363271), sculpt_hash: Some("e5ce320f"), mesh_uuid: None, mesh_hash: None, elevation_offset: 0.0, water_height: Some(34.5), name: Some("LOD3 (460800, 305152)"), grid: "agni", faces: [RegionImpostorFaceData { base_texture_uuid: None, emissive_texture_uuid: None, base_texture_hash: "40a7ee78", emissive_texture_hash: None }] }
+     05:25:13 [DEBUG] (1) common::initialimpostors: Inserting impostor into initial_impostors, params: Named({"mesh_uuid": Null, "faces_json": Bytes("[{\"base_.."), "name": Bytes("LOD3 (46.."), "scale_x": Float(2048.0), "region_size_y": UInt(2048), "region_loc_y": UInt(305152), "scale_y": Float(2048.0), "elevation_offset": Float(0.0), "sculpt_uuid": Bytes("0453c546.."), "region_size_x": UInt(2048), "viz_group": UInt(1), "water_height": Float(34.5), "region_loc_x": UInt(460800), "mesh_hash": Null, "sculpt_hash": Bytes("e5ce320f"), "scale_z": Float(34.994167), "grid": Bytes("agni"), "impostor_lod": UInt(3)})
+     - That's valid, and an insert was done with that data. But in region_impostors, sculpt_hash is Null, while all other data is correct.
+     - SQL in initialimpostors looks OK for sculpt_hash field.
+     - What else could overwrite this?
+     - It's downloadimpostor - the hash fields are not read from the database and placed into the JSON. 
+       - Fields are OK in the database, but not copied to the output JSON.
+       - The viewer doesn't use them. So, harmless but probably should be fixed.
+      

@@ -342,6 +342,7 @@ impl InitialImpostors {
             "grid" => grid.to_lowercase()
         }; 
         //  Check sculpt/mesh IDs.
+        log::debug!("Finding missing UUIDs for {}", grid);
         let mut tiles_missing_uuids = conn.exec_map(
             SQL_SELECT_MISSING_TILE,
             &select_params, 
@@ -361,6 +362,7 @@ impl InitialImpostors {
                 log::debug!("Missing sculpt UUID for {:?}   Sculpt hash: {}, sculpt uuid {:?}", tile_key, sculpt_hash, sculpt_uuid);
                 tile_key
             })?;
+        log::debug!("Found {} missing UUIDs for {}", tiles_missing_uuids.len(), grid);
         //  Check texture IDs, which is a full slow table scan.
         //  We can't get MySQL 8.0 to do this for us.
         const SQL_SELECT_MISSING_TEXTURE: &str = r"SELECT region_loc_x, region_loc_y, name, impostor_lod, viz_group,
@@ -371,13 +373,16 @@ impl InitialImpostors {
         let is_missing_uuid = | v: &RegionImpostorFaceData | {
             v.base_texture_uuid.is_none() || (v.emissive_texture_hash.is_some() && v.emissive_texture_uuid.is_none())
         };
+        log::debug!("Finding missing texture UUIDs for {}", grid);
         let _ = conn.exec_map(
             SQL_SELECT_MISSING_TEXTURE,
             &select_params, 
-            |(region_loc_x, region_loc_y, _name, impostor_lod, viz_group,     
+            |(region_loc_x, region_loc_y, name, impostor_lod, viz_group,     
             faces_json):
             (u32, u32, String, u8, u32,
             String) | {
+                log::debug!("SQL missing texture: ({},{}) {} lod: {} viz group: {}",
+                    region_loc_x, region_loc_y, name, impostor_lod, viz_group);
                 //  Keep ones where there is a problem.
                 let face_data_result: Result<Vec<RegionImpostorFaceData>, _> = serde_json::from_str(&faces_json);
                 let keep = match &face_data_result {
