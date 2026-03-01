@@ -731,4 +731,13 @@ john@Nagle-LTS:/tmp$
      - It's downloadimpostor - the hash fields are not read from the database and placed into the JSON. 
        - Fields are OK in the database, but not copied to the output JSON.
        - The viewer doesn't use them. So, harmless but probably should be fixed.
+       
+    Loaded up about 120 regions from Corsica.
+    - Crash in runaway EOF detection. Increased counter from 100 to 1000. Recheck; that's not a permanent fix.
+    - Crash in updateimpostors at let mut tiles_missing_uuids = conn.exec_map(
+            SQL_SELECT_MISSING_TILE,
+      Not just an error return, a hard crash.
+    - There are many initial impostors with no UUID. Why?
+      - There are tile_assets with no sculpt UUID. Why?
+        - The whole AssetUploadArrayShort thing is wrong. Should be x, y, sx, sy, lod, hash, uuid.
       

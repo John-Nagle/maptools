@@ -359,7 +359,7 @@ impl InitialImpostors {
                     impostor_lod,
                     viz_group,
                     };
-                log::debug!("Missing sculpt UUID for {:?}   Sculpt hash: {}, sculpt uuid {:?}", tile_key, sculpt_hash, sculpt_uuid);
+                log::debug!("Missing mesh or sculpt UUID for {:?}   Sculpt hash: {}, sculpt uuid {:?}", tile_key, sculpt_hash, sculpt_uuid);
                 tile_key
             })?;
         log::debug!("Found {} missing UUIDs for {}", tiles_missing_uuids.len(), grid);
