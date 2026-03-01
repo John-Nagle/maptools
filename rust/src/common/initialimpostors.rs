@@ -327,10 +327,10 @@ impl InitialImpostors {
         Ok(conn.exec_drop(SQL_DELETE, delete_params)?)
     }
     
-    /// Find missing UUIDs. When there are none, intitial_impostors is in sync and can be deployed as region_impostors.
+    /// Find impostors missing UUIDs. When there are none, intitial_impostors is in sync and can be deployed as region_impostors.
     pub fn find_missing_uuids(conn: &mut PooledConn, grid: &str) -> Result<Vec<UniqueImpostorKey>, Error> {
-        const SQL_SELECT_MISSING_TILE: &str = r"SELECT region_loc_x, region_loc_y, name, region_size_x, region_size_y,
-            mesh_hash, mesh_uuid, sculpt_hash, sculpt_uuid,
+        const SQL_SELECT_MISSING_TILE: &str = r"SELECT region_loc_x, region_loc_y, name, 
+            impostor_lod, viz_group,
             faces_json
             FROM initial_impostors             
             WHERE (grid = :grid) AND (
@@ -347,10 +347,10 @@ impl InitialImpostors {
             SQL_SELECT_MISSING_TILE,
             &select_params, 
             |(region_loc_x, region_loc_y, name, 
-            mesh_hash, mesh_uuid, sculpt_hash, sculpt_uuid, impostor_lod, viz_group,
+            impostor_lod, viz_group,
             faces_json):
             (u32, u32, String,
-            String, String, String, String, u8, u32,
+            u8, u32,
             String) | {
                 let tile_key = UniqueImpostorKey {
                     grid: grid.to_string(),
@@ -359,7 +359,7 @@ impl InitialImpostors {
                     impostor_lod,
                     viz_group,
                     };
-                log::debug!("Missing mesh or sculpt UUID for {:?}   Sculpt hash: {}, sculpt uuid {:?}", tile_key, sculpt_hash, sculpt_uuid);
+                log::debug!("Missing mesh or sculpt UUID for {}", name);
                 tile_key
             })?;
         log::debug!("Found {} missing UUIDs for {}", tiles_missing_uuids.len(), grid);

@@ -606,6 +606,10 @@ pub fn run_responder() -> Result<(), Error> {
 /// Main program
 pub fn main() {
     logger();
+    // Set a custom panic hook
+    std::panic::set_hook(Box::new(|info| {
+        log::error!("PANIC: {:?}", info);
+    }));
     match run_responder() {
         Ok(()) => {}
         Err(e) => {
