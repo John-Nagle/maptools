@@ -542,7 +542,7 @@ impl Handler for AssetUploadHandler {
         env: &HashMap<String, String>,
     ) -> Result<(), Error> {
         //  Process params and authorization
-        log::info!("Request made: {:?} env {:?}", request, env);
+        log::info!("============ New request made ==================");
         match self.handler_internal(out, request, env) {
             Ok(_) => {
                 //  Success. Send a plain "OK"

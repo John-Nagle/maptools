@@ -293,24 +293,29 @@ impl AssetUpload {
     
     /// Add the UUID to a previously inserted tile.
     /// Returns true if a UUID was inserted. Returns false if no match.
+    /// ***NOT USING UUID FIELD***
     pub fn insert_uuid(&self, conn: &mut PooledConn, texture_index: Option<u8>, uuid: Uuid) -> Result<bool, Error> {
         const SQL_UPDATE_UUID: &str = r"
             UPDATE tile_assets 
             SET asset_uuid = :asset_uuid
-            WHERE grid = :grid AND region_loc_x = :region_loc_x AND impostor_lod = :impostor_lod AND texture_index = :texture_index AND asset_type = :asset_type
-                AND asset_uuid IS NULL";
+            WHERE grid = :grid 
+            AND asset_hash = :asset_hash
+            AND region_loc_x = :region_loc_x 
+            AND impostor_lod = :impostor_lod 
+            AND texture_index = :texture_index 
+            AND asset_type = :asset_type
+            AND asset_uuid IS NULL";
         let params = params! {
             "grid" => self.grid.to_lowercase(),
             "asset_type" => self.tile_asset_type.to_str().to_string(),
             "region_loc_x" => self.region_loc[0],
             "region_loc_y" => self.region_loc[1],
-            "region_size_x" => self.region_size[0],
-            "region_size_y" => self.region_size[1],
             "impostor_lod" => self.impostor_lod,
             "texture_index" => texture_index,
             "asset_uuid" => self.asset_uuid.clone(),
             "asset_hash" => self.asset_hash.clone(),
         };
+        log::debug!("Insert UUID params: {:?}", params);
         let row_count: Option<usize> = conn.exec_first(SQL_UPDATE_UUID, &params)?;
         //  ***NEED TO KNOW IF SUCCESS*** return true if insert changed a row.
         log::debug!("Tile asset UUID update succeeded. Rows: {:?}, params {:?}", row_count, params);
