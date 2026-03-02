@@ -444,7 +444,7 @@ impl ColumnCursor {
         log::debug!("Col finished LOD {} start, yix = {}: {:?}", self.lod, self.next_y_index, self.recent_column_info.region_type_info[0]);  // ***TEMP***
         if self.recent_column_info.region_type_info[0][fill_last] == RecentRegionType::Unknown {
             //  This column is not full yet, so we have to fill it out to the end.
-            for n in self.next_y_index as usize .. fill_last + 1 {
+            for n in self.next_y_index .. fill_last + 1 {
                 assert_eq!(self.recent_column_info.region_type_info[0][n], RecentRegionType::Unknown);
                 self.recent_column_info.region_type_info[0][n] = RecentRegionType::Water;
             }
@@ -574,9 +574,8 @@ pub fn get_group_scan_bounds(
     );
     //  Upper right rounds up.
     let upper_right_ix = (
-        ((upper_right.0 + base_region_size.0 - 1) / base_region_size.0),
-        ((upper_right.1 + base_region_size.1 - 1) / base_region_size.1),
-    );
+        upper_right.0.div_ceil(base_region_size.0),
+        upper_right.1.div_ceil(base_region_size.1));
     let (lod, ll_ix, ur_ix) = get_enclosing_square((lower_left_ix, upper_right_ix))?;
     //  Convert back to meters.
     let new_ll = (

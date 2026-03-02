@@ -5,7 +5,7 @@
 // License: GPL
 
 use image::{Rgb, RgbImage, ImageReader, DynamicImage};
-use std::cmp::{max, min};
+use std::cmp::{max};
 use std::hash::{Hash, Hasher, DefaultHasher};
 use std::f64;
 use anyhow::{anyhow, Error};
@@ -57,8 +57,8 @@ impl TerrainSculpt {
                 for y in 0..elevs[0].len() {
                     //////let zscaled = (elevs[x][y] - minz) / (maxz - minz);
                     let zscaled = (elevs[x][y] - minz) / range;
-                    assert!(zscaled >= 0.0 && zscaled <= 1.0);
-                    let zpixel = max(0, min(255, (zscaled * 256.0).floor() as i32)) as u8;
+                    assert!((0.0..=1.0).contains(&zscaled));
+                    let zpixel = ((zscaled * 256.0).floor() as i32).clamp(0, 255) as u8;
                     let xpixel = ((x as f64 * 256.0) / elevs.len() as f64).round() as u8;
                     let ypixel = ((y as f64 * 256.0) / elevs[0].len() as f64).round() as u8;
 
@@ -73,7 +73,7 @@ impl TerrainSculpt {
     
     /// Get uniqueness hash
     pub fn get_hash(&self) -> Result<u32, Error> {
-        Ok(calc_rgbimage_hash(&self.image.as_ref().unwrap()))
+        Ok(calc_rgbimage_hash(self.image.as_ref().unwrap()))
     }
 
     pub fn setelevs(&mut self, elevs: Vec<Vec<u8>>, inputscale: f64, inputoffset: f64) {
