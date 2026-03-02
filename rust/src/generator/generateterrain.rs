@@ -180,7 +180,7 @@ impl FolderGenerator {
         let dir_name = format!("R{:02}", dir_index);
         let mut path = self.base_dir.clone();
         path.push(dir_name);
-        if self.file_count % self.files_per_directory == 0 {
+        if self.file_count.is_multiple_of(self.files_per_directory) {
             log::info!("Creating output directory {:?}", path);
             std::fs::create_dir_all(&path)?;
         }  
