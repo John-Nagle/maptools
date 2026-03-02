@@ -38,7 +38,7 @@
 //
 // [1]: https://tools.ietf.org/html/rfc3875
 //
-/// and the FastCGI specification:
+// and the FastCGI specification:
 //
 // https://www.mit.edu/~yandros/doc/specs/fcgi-spec.html
 //
@@ -247,8 +247,8 @@ impl Request {
     /// True if ready to execute request.
     pub fn add_record(&mut self, mut rec: FcgiRecord) -> Result<bool, Error> {
         //  Check that we're not in multiplex mode
-        if self.id.is_some() {
-            if self.id.unwrap() != rec.header.id {
+        if let Some(id) = self.id {
+            if id != rec.header.id {
                 return Err(anyhow!(
                     "FCGI record IDs differ. Multiplex mode not supported."
                 ));
@@ -378,7 +378,7 @@ impl Request {
     pub fn build_params(b: &[u8]) -> Result<HashMap<String, String>, Error> {
         log::debug!(
             "Param bytes: {:?}",
-            String::from_utf8_lossy(&b[0..b.len().min(2000)].to_vec())
+            String::from_utf8_lossy(&b[0..b.len().min(2000)])
         );
         let mut m = HashMap::new();
         let mut pos = b.iter();
@@ -387,6 +387,13 @@ impl Request {
             m.insert(k, v);
         }
         Ok(m)
+    }
+}
+
+/// Clippy wants this. Unused.
+impl Default for Request {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -425,15 +432,15 @@ impl Response {
             String::from_utf8_lossy(&b[0..b.len().min(200)].to_vec())
         );
         //  Write header
-        out.write(&header.to_bytes())?;
+        let _ = out.write(&header.to_bytes())?;
         //  Write data
         if b.len() > 0 {
-            out.write(b)?;
+            let _ = out.write(b)?;
         }
         //  Write padding
         if header.padding_length > 0 {
             let padding_bytes = vec![0; header.padding_length as usize];
-            out.write(&padding_bytes)?;
+            let _ = out.write(&padding_bytes)?;
         }
         Ok(())
     }

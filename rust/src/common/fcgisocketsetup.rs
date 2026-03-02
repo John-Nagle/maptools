@@ -4,8 +4,6 @@ use std::io;
 use std::io::stdin;
 use std::os::fd::{AsFd, AsRawFd};
 use std::os::unix::net::UnixListener;
-
-use nix;
 use nix::sys::socket::getpeername;
 use nix::unistd::dup2_stdin;
 

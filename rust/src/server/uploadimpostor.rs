@@ -50,7 +50,6 @@ fn logger() {
 }
 
 ///  Our handler
-
 struct AssetUploadHandler {
     /// MySQL onnection pool. We only use one.
     #[allow(dead_code)] // needed to keep the pool alive, but never referenced.
@@ -184,9 +183,9 @@ impl AssetUploadHandler {
             //  Main path - this is data about assets just uploaded.
             log::info!("Impostor upload request");
             let req = Self::parse_request(&request.standard_input, env)?;
-            self.process_request(req, &params)?;
+            self.process_request(req, params)?;
         }
-        return Ok(())
+        Ok(())
     }
 }
 //  Our "handler"
@@ -205,7 +204,7 @@ impl Handler for AssetUploadHandler {
                 let http_response = Response::http_response("text/plain", 200, "OK");
                 //  Return something useful.
                 let b = "Done".as_bytes();
-                Response::write_response(out, request, http_response.as_slice(), &b)?;
+                Response::write_response(out, request, http_response.as_slice(), b)?;
             }
             Err(e) => {
                 let http_response = Response::http_response("text/plain", 500, "Error");
@@ -214,7 +213,7 @@ impl Handler for AssetUploadHandler {
                 Response::write_response(out, request, http_response.as_slice(), &b)?;
             }
         }
-        return Ok(())
+        Ok(())
      }
 }
 

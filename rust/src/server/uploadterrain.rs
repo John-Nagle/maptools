@@ -249,7 +249,7 @@ impl TerrainUploadHandler {
         }
         log::info!("Uploaded JSON:\n{}", s);
         //  Should be valid JSON
-        Ok(UploadedRegionInfo::parse(s)?)
+        UploadedRegionInfo::parse(s)
     }
 
     /// Handle request.
