@@ -91,6 +91,7 @@ impl TileAssetType {
 /// What the LSL tool uploads for each uploaded impostor asset.
 /// Intended for serde use.
 #[derive(Deserialize, Clone, Debug)]
+#[allow(dead_code)]
 pub struct AssetUpload {
     /// Asset name - the name used in SL/OS
     pub asset_name: String,
@@ -105,7 +106,7 @@ pub struct AssetUpload {
     pub grid: String,
     /// UUID of asset
     pub asset_uuid: Option<String>,
-    /// Elevation offset 
+    /// Elevation offset - created, but never read
     elevation_offset: f32,
     /// Scale
     scale: [f32;3],
