@@ -740,4 +740,9 @@ john@Nagle-LTS:/tmp$
     - There are many initial impostors with no UUID. Why?
       - There are tile_assets with no sculpt UUID. Why?
         - The whole AssetUploadArrayShort thing is wrong. Should be x, y, sx, sy, lod, hash, uuid.
+        
+2026-03-01
+   
+    Working for Celchu and vicinity.
+    - Sculpt sizes are off. Gaps at edges.
       
