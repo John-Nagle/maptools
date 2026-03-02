@@ -280,7 +280,8 @@ impl InitialImpostors {
     }
     
     /// Update texture UUIDs in JSON for one face
-    fn insert_texture_uuid_for_face(tile_asset_type: &TileAssetType, asset_hash: &str, asset_uuid: Uuid, 
+    /// Figures out type of asset from hash match, which is kind of strange.
+    fn insert_texture_uuid_for_face(_tile_asset_type: &TileAssetType, asset_hash: &str, asset_uuid: Uuid, 
         face: &mut RegionImpostorFaceData) -> Result<bool, Error> {
         let hash = asset_hash.to_string();
         Ok(if &face.base_texture_hash == asset_hash {

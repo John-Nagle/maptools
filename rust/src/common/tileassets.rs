@@ -12,7 +12,7 @@ use anyhow::{Error, anyhow};
 use chrono::{Utc, DateTime, NaiveDateTime};
 use crate::{RegionData, HeightField, RegionImpostorFaceData, hash_to_hex};
 use mysql::prelude::{Queryable};
-use mysql::{Pool, TxOpts, PooledConn, params, Error::MySqlError};
+use mysql::{PooledConn, params, Error::MySqlError};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -337,7 +337,7 @@ impl AssetUpload {
          let asset_uuids = conn.exec_map(
             SQL_GET_ASSET_UUID,
             params,
-            |(uuid) : (String)| {
+            |uuid : String| {
                 log::debug!("get_asset_uuid result: {:?}", uuid);
                 uuid
             })?;
