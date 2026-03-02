@@ -439,7 +439,7 @@ impl ColumnCursor {
     
     /// Finished with this LOD 0 column. Fill out to end.
     fn column_finished(&mut self) {
-        assert!(self.recent_column_info.region_type_info[0].len() > 0);
+        assert!(!self.recent_column_info.region_type_info[0].is_empty());
         let fill_last = self.recent_column_info.region_type_info[0].len() -1;
         log::debug!("Col finished LOD {} start, yix = {}: {:?}", self.lod, self.next_y_index, self.recent_column_info.region_type_info[0]);  // ***TEMP***
         if self.recent_column_info.region_type_info[0][fill_last] == RecentRegionType::Unknown {
@@ -524,7 +524,7 @@ pub fn homogeneous_group_size(group: &[RegionData]) -> Option<(u32, u32)> {
 
 
 /// Get dimensions of a group.
-pub fn get_group_bounds(group: &Vec<RegionData>) -> Result<((u32, u32), (u32, u32)), Error> {
+pub fn get_group_bounds(group: &[RegionData]) -> Result<((u32, u32), (u32, u32)), Error> {
     //  Error if empty group.
     if group.is_empty() {
         return Err(anyhow!("Empty viz group"));
