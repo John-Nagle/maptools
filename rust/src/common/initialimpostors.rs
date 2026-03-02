@@ -500,7 +500,8 @@ impl InitialImpostors {
     }
     
     /// Look up a missing UUID in tile_assets.
-    fn look_up_uuid(conn: &mut PooledConn, key: &UniqueImpostorKey, face_id: usize, asset_hash: &str, asset_type: &str) -> Result<Option<Uuid>, Error> {
+    /// Doesn't use face_id. Disambiguates based on asset_hash.
+    fn look_up_uuid(conn: &mut PooledConn, key: &UniqueImpostorKey, _face_id: usize, asset_hash: &str, asset_type: &str) -> Result<Option<Uuid>, Error> {
         const SQL_LOOK_UP_UUID: &str = r"SELECT asset_uuid FROM tile_assets 
             WHERE  grid = :grid
                 AND region_loc_x = :region_loc_x 

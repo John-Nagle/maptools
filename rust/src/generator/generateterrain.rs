@@ -193,12 +193,12 @@ impl FolderGenerator {
 struct TerrainGenerator {
     /// SQL connection
     conn: PooledConn,
-    /// Network connection pool
-    agent: Agent,
+    /// Network connection pool (Future)
+    _agent: Agent,
     /// Output directory
     folder_generator: FolderGenerator,
-    /// Asset server URL prefix
-    url_prefix_opt: Option<String>,
+    /// Asset server URL prefix (Future)
+    _url_prefix_opt: Option<String>,
     /// Are regions with only corners touching adjacent?
     /// Set to true for Open Simulator grids
     corners_touch_connects: bool,
@@ -215,7 +215,7 @@ impl TerrainGenerator {
     pub fn new(
         conn: PooledConn,
         outdir: PathBuf,
-        url_prefix_opt: Option<String>,
+        _url_prefix_opt: Option<String>,
         corners_touch_connects: bool,
         generate_mesh: bool,
     ) -> Self {
@@ -223,13 +223,13 @@ impl TerrainGenerator {
         let config = Agent::config_builder()
             .user_agent(TERRAIN_GENERATOR_USER_AGENT)
             .build();
-        let agent: Agent = config.into();
+        let _agent: Agent = config.into();
         let folder_generator = FolderGenerator::new(&outdir, FILES_PER_DIRECTORY);
         Self {
             conn,
-            agent,
+            _agent,
             folder_generator,
-            url_prefix_opt,
+            _url_prefix_opt,
             corners_touch_connects,
             generate_mesh,
             height_field_cache: HeightFieldCache::new(),
