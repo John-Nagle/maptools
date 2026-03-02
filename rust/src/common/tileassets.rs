@@ -274,11 +274,9 @@ impl AssetUpload {
         let result: Result<Option<usize>, _> = conn.exec_first(SQL_INSERT_TILE, &params);
         //  Check for duplicate type error as special case.
         if let Err(e) = result {
-            if let MySqlError(ref sqerr) = e {
-                if sqerr.code == ER_DUP_ENTRY {
-                    log::debug!("Insert rejected, duplicate.");
-                    return Ok(false);
-                }
+            if let MySqlError(ref sqerr) = e && sqerr.code == ER_DUP_ENTRY {
+                log::debug!("Insert rejected, duplicate.");
+                return Ok(false);
             }
             return Err(e.into())
         }
@@ -427,7 +425,7 @@ impl AssetUpload {
     pub fn update_tile(&mut self, conn: &mut PooledConn) -> Result<(), Error> {
         //  Update tile assets
         if let Some(asset_uuid_str) = &self.asset_uuid {
-            let uuid = Uuid::parse_str(&asset_uuid_str)?;
+            let uuid = Uuid::parse_str(asset_uuid_str)?;
             let inserted = self.insert_uuid(conn, None, uuid)?;
             if !inserted {
                 log::info!("Tile UUID unchanged for {:?}", self);

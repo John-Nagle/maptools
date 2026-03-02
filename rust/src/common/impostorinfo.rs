@@ -21,7 +21,6 @@
 //
 use anyhow::{anyhow, Error};
 use uuid::Uuid;
-use serde;
 use serde::{Deserialize, Serialize};
 
 /// Hash to hex. Hashes are currently 32 bits and expressed as 8 chars of hex for SQL purposes.

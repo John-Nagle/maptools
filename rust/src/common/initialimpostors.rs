@@ -47,16 +47,11 @@ pub struct UniqueImpostorKey {
     viz_group: u32,
 }
 
-/// The initial impostors.
+/// The initial impostors. Just a namespace, no data.
 pub struct InitialImpostors {
 }
 
 impl InitialImpostors {
-    /// Usual new
-    pub fn new() -> Self {
-        Self {
-        }
-    }
     
     /// Add one impostor (sculpt or mesh) to the table. UUIDs may be null.
     /// This is a pure insert into a table that starts empty. Duplicates should not happen.
@@ -237,7 +232,7 @@ impl InitialImpostors {
         let mut changed = false;
         let mut face_data: Vec<RegionImpostorFaceData> = serde_json::from_str(&faces_json_in)?;
         let uuid = if let Some(uuid_str) = &asset_upload.asset_uuid {
-            Uuid::parse_str(&uuid_str)? 
+            Uuid::parse_str(uuid_str)? 
         } else {
             //  Uploaded data must be bogus.
             return Err(anyhow!("Null UUID at insert-texture_uuid_for_tile: {:?}", asset_upload));
@@ -280,18 +275,18 @@ impl InitialImpostors {
     }
     
     /// Update texture UUIDs in JSON for one face
-    /// Figures out type of asset from hash match, which is kind of strange.
+    /// Figures out type of asset from hash match, which is kind of
     fn insert_texture_uuid_for_face(_tile_asset_type: &TileAssetType, asset_hash: &str, asset_uuid: Uuid, 
         face: &mut RegionImpostorFaceData) -> Result<bool, Error> {
         let hash = asset_hash.to_string();
-        Ok(if &face.base_texture_hash == asset_hash {
+        Ok(if face.base_texture_hash == asset_hash {
             face.base_texture_uuid = Some(asset_uuid);
             true
         } else {
             false
         }
         || 
-        if &face.emissive_texture_hash == &Some(hash) {
+        if face.emissive_texture_hash == Some(hash) {
             face.emissive_texture_uuid = Some(asset_uuid);
             true
         } else {
@@ -364,7 +359,7 @@ impl InitialImpostors {
                 //  Keep ones where there is a problem.
                 let face_data_result: Result<Vec<RegionImpostorFaceData>, _> = serde_json::from_str(&faces_json);
                 let keep = match &face_data_result {
-                    Ok(v) => v.iter().find(|face: &&RegionImpostorFaceData| is_missing_uuid(*face)).is_some(),
+                    Ok(v) => v.iter().find(|face: &&RegionImpostorFaceData| is_missing_uuid(face)).is_some(),
                     Err(_e) => true
                 };
                 if keep { 
@@ -379,7 +374,6 @@ impl InitialImpostors {
                     log::debug!("Missing texture UUID for {:?}, face_data: {:?}", tile_key, face_data_result);
                     tiles_missing_texture_uuids.push(tile_key);
                 }
-                ()
             })?;
         //  Perform repairs here.
         if !tiles_missing_texture_uuids.is_empty() {
@@ -447,7 +441,7 @@ impl InitialImpostors {
             let mut face_data: Vec<RegionImpostorFaceData> = serde_json::from_str(&faces_json)?;
             log::debug!("Faces before change: {:?}", face_data); // ***TEMP***
             for (face_id, face) in &mut face_data.iter_mut().enumerate() {
-                if let Some(new_face) = Self::fix_missing_texture_uuid_for_face(conn, key, &face, face_id)? {
+                if let Some(new_face) = Self::fix_missing_texture_uuid_for_face(conn, key, face, face_id)? {
                     *face = new_face;
                     changed = true;
                 }
@@ -485,21 +479,18 @@ impl InitialImpostors {
         let mut changed = false;
         let mut face = face.clone();
         //  Fix up base texture.
-        if face.base_texture_uuid.is_none() {
-            if let Some(uuid) = Self::look_up_uuid(conn, key, face_id, &face.base_texture_hash, "BaseTexture")? {
-                face.base_texture_uuid = Some(uuid);
-                changed = true;
-            }
+        if face.base_texture_uuid.is_none() &&
+        let Some(uuid) = Self::look_up_uuid(conn, key, face_id, &face.base_texture_hash, "BaseTexture")? {
+            face.base_texture_uuid = Some(uuid);
+            changed = true;
         }
         //  Fix up emissive texture if present.
-        if let Some(hash) = &face.emissive_texture_hash {
-            if face.emissive_texture_uuid.is_none() {
-                if let Some(uuid) = Self::look_up_uuid(conn, key, face_id, hash, "EmissiveTexture")? {
-                    face.emissive_texture_uuid = Some(uuid);
-                    changed = true;
-                }
-            }
-        };
+        if let Some(hash) = &face.emissive_texture_hash 
+            && face.emissive_texture_uuid.is_none() 
+            && let Some(uuid) = Self::look_up_uuid(conn, key, face_id, hash, "EmissiveTexture")? {
+                face.emissive_texture_uuid = Some(uuid);
+                changed = true;
+        }
         //  Do we have new face data?
         if changed {
             Ok(Some(face))
