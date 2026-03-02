@@ -73,8 +73,8 @@ impl TileAssetType {
         match self {
             Self::SculptTexture => "SculptTexture",
             Self::Mesh => "Mesh",
-            Self::BaseTexture(n) => "BaseTexture",
-            Self::EmissiveTexture(n) => "EmissiveTexture",
+            Self::BaseTexture(_) => "BaseTexture",
+            Self::EmissiveTexture(_) => "EmissiveTexture",
         }
     }
     
@@ -122,8 +122,6 @@ impl AssetUpload {
     /// New, from available data. No UUID yet.
     /// UUID to be filled in later in uploadimpostor after upload of asset to SL/OS server.
     pub fn new(tile_asset_type: TileAssetType, region_data: &RegionData, height_field: &HeightField, asset_hash: u32) -> Result<Self, Error> {
-        let x = region_data.region_loc_x;
-        let y = region_data.region_loc_y;
         let (zscale, elevation_offset) = height_field.get_scale_offset()?;
         let sx = region_data.region_size_x;
         let sy = region_data.region_size_y;
@@ -359,7 +357,7 @@ impl AssetUpload {
     //  Look up region name.
     //  Returns name of region if exact match. Otherwise searches for
     //  some name in a larger area containing the region of interest.
-    fn look_up_region_name(conn: &mut PooledConn, grid: &str, loc: [u32;2], size: [u32;2]) -> Result<Option<String>, Error> {
+    fn _look_up_region_name(conn: &mut PooledConn, grid: &str, loc: [u32;2], size: [u32;2]) -> Result<Option<String>, Error> {
         //  Look up some name in the rectangle of interest.
         //  For LOD 0, this gets the region of interest.
         //  For lower LODs, the corner might be a nameless water region, so we pick some region in the rectangle.
@@ -390,7 +388,7 @@ impl AssetUpload {
     }
     
     //  Get face information, which is texture UUIDs.
-    fn get_faces_json(&mut self, conn: &mut PooledConn) -> Result<serde_json::Value, Error> {
+    fn _get_faces_json(&mut self, conn: &mut PooledConn) -> Result<serde_json::Value, Error> {
         //  Get face texture data. One row for each face.
         const SQL_GET_TEXTURES: &str = r#"SELECT texture_index, asset_uuid, asset_hash, asset_type
             FROM tile_assets

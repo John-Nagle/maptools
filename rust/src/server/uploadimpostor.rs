@@ -9,7 +9,7 @@
 //!     August, 2025.
 //
 #![forbid(unsafe_code)]
-use anyhow::{Error, Context, anyhow};
+use anyhow::{Error, anyhow};
 use log::LevelFilter;
 use common::Credentials;
 use common::init_fcgi;
@@ -20,7 +20,7 @@ use std::collections::{HashMap};
 use std::io::Write;
 use common::{Authorizer, AuthorizeType};
 use common::InitialImpostors;
-use common::{AssetUpload, AssetUploadArrayShort, TileAssetType};
+use common::{AssetUpload, AssetUploadArrayShort};
 
 /// MySQL Credentials for uploading.
 /// This filename will be searched for in parent directories,

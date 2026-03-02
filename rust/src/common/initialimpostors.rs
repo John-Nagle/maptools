@@ -114,8 +114,8 @@ impl InitialImpostors {
         match asset_upload.tile_asset_type {
             TileAssetType::SculptTexture => Self::insert_sculpt_uuid(conn, asset_upload),
             TileAssetType::Mesh => Self::insert_mesh_uuid(conn, asset_upload),
-            TileAssetType::BaseTexture(n) => Self::insert_texture_uuid(conn, asset_upload),
-            TileAssetType::EmissiveTexture(n) => Self::insert_texture_uuid(conn, asset_upload),
+            TileAssetType::BaseTexture(_) => Self::insert_texture_uuid(conn, asset_upload),
+            TileAssetType::EmissiveTexture(_) => Self::insert_texture_uuid(conn, asset_upload),
         }
     }
     
@@ -310,8 +310,7 @@ impl InitialImpostors {
     /// Find impostors missing UUIDs. When there are none, intitial_impostors is in sync and can be deployed as region_impostors.
     pub fn find_missing_uuids(conn: &mut PooledConn, grid: &str) -> Result<Vec<UniqueImpostorKey>, Error> {
         const SQL_SELECT_MISSING_TILE: &str = r"SELECT region_loc_x, region_loc_y, name, 
-            impostor_lod, viz_group,
-            faces_json
+            impostor_lod, viz_group
             FROM initial_impostors             
             WHERE (grid = :grid) AND (
                 (mesh_hash IS NOT NULL AND mesh_uuid IS NULL) 
@@ -327,11 +326,9 @@ impl InitialImpostors {
             SQL_SELECT_MISSING_TILE,
             &select_params, 
             |(region_loc_x, region_loc_y, name, 
-            impostor_lod, viz_group,
-            faces_json):
+            impostor_lod, viz_group,):
             (u32, u32, String,
-            u8, u32,
-            String) | {
+            u8, u32) | {
                 let tile_key = UniqueImpostorKey {
                     grid: grid.to_string(),
                     region_loc_x,

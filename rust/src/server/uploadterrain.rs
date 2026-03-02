@@ -83,7 +83,7 @@ impl TerrainUploadHandler {
     fn do_sql_insert(
         &mut self,
         region_info: &UploadedRegionInfo,
-        params: &HashMap<String, String>,
+        _params: &HashMap<String, String>,
     ) -> Result<(), Error> {
         const SQL_INSERT: &str = r"INSERT INTO raw_terrain_heights (grid, region_loc_x, region_loc_y, samples_x, samples_y, region_size_x, region_size_y, name, scale, offset, elevs,  water_level, creator) 
             VALUES
@@ -117,7 +117,7 @@ impl TerrainUploadHandler {
     fn do_sql_full_update(
         &mut self,
         region_info: &UploadedRegionInfo,
-        params: &HashMap<String, String>,
+        _params: &HashMap<String, String>,
     ) -> Result<(), Error> {
         const SQL_FULL_UPDATE: &str = r"UPDATE raw_terrain_heights 
             SET samples_x = :samples_x, samples_y = :samples_y, scale = :scale, offset = :offset, elevs = :elevs, water_level = :water_level, creator = :creator,
@@ -171,7 +171,7 @@ impl TerrainUploadHandler {
     fn do_sql_confirmation_update(
         &mut self,
         region_info: &UploadedRegionInfo,
-        params: &HashMap<String, String>,
+        _params: &HashMap<String, String>,
     ) -> Result<(), Error> {
         const SQL_CONFIRMATION_UPDATE: &str = r"UPDATE raw_terrain_heights
             SET confirmation_time = NOW(), confirmer = :confirmer
