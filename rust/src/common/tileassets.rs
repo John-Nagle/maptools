@@ -301,6 +301,7 @@ impl AssetUpload {
             WHERE grid = :grid 
             AND asset_hash = :asset_hash
             AND region_loc_x = :region_loc_x 
+            AND region_loc_y = :region_loc_y 
             AND impostor_lod = :impostor_lod 
             AND texture_index = :texture_index 
             AND asset_type = :asset_type

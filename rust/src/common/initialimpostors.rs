@@ -145,7 +145,10 @@ impl InitialImpostors {
             "sculpt_hash" => asset_upload.asset_hash.clone(),
         };
         log::debug!("Inserting sculpt UUID into initial_impostors: {:?}", params);
-        let row_count: Option<usize> = conn.exec_first(SQL_UPDATE_SCULPT_UUID, &params)?;
+        let result = conn.exec_first(SQL_UPDATE_SCULPT_UUID, &params);
+        log::debug!("Inserting sculpt UUID into initial_impostors, SQL: {} result {:?}", SQL_UPDATE_SCULPT_UUID, result);
+        let row_count: Option<usize> = result?;
+        //////let row_count: Option<usize> = conn.exec_first(SQL_UPDATE_SCULPT_UUID, &params)?;
         log::debug!("Initial sculpt impostor UUID update succeeded. Rows: {:?}, params {:?}", row_count, params);
         Ok(row_count != Some(0))
     }
