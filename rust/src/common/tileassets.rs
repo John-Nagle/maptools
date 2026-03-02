@@ -173,7 +173,6 @@ impl AssetUpload {
         let sy = region.region_size_y;
         let sz = scale;
         let water_level = height_field.water_level;
-        //////Ok(format!("{}_{}_{}_{}_{}_{:.2}_{:.2}_{}_{}_{:.2}_0x{:016x}", prefix, x, y, sx, sy, sz, offset, lod, viz_group_id, water_level, hash))
         let s = format!("{}_{}_{}_{}_{}_{:.2}_{:.2}_{}_{}_{:.2}_{:08x}", prefix, x, y, sx, sy, sz, offset, lod, viz_group_id, water_level, hash);
         if s.len() > 63 {
             Err(anyhow!("Generated filename is too long: {}", s))
@@ -199,7 +198,6 @@ impl AssetUpload {
             scale: [fields[3].parse()?, fields[4].parse()?, fields[5].parse()?],
             elevation_offset: fields[6].parse()?,
             impostor_lod: fields[7].parse()?,
-            //////viz_group: fields[8].parse()?,
             water_height: fields[9].parse()?,
             asset_hash: fields[10].to_string(),
             asset_uuid: Some(Self::fix_uuid_string(asset_uuid)?),
@@ -240,8 +238,6 @@ impl AssetUpload {
                 :impostor_lod, :texture_index, :asset_hash, :asset_uuid,
                 :asset_name, :asset_type,
                 :creation_time)";
-            //////ON DUPLICATE KEY UPDATE
-            //////    asset_hash = :asset_hash, asset_uuid = :asset_uuid, creation_time = :creation_time;"
         let creation_time = if let Some(last_modified) = last_modified_opt {
             last_modified
         } else {
@@ -262,7 +258,6 @@ impl AssetUpload {
             "asset_hash" => self.asset_hash.clone(),
             "creation_time" => creation_time.naive_utc().to_string(),
         };
-        //////let creation_time_opt: Option<DateTime<Utc>> = conn.exec_first(SQL_GET_CREATION_TIME, params)?;
         log::debug!("Timestamp compare: last_modified: {:?}", last_modified_opt);
         if let Some(last_modified) = last_modified_opt {
             let naive_creation_time_opt: Option<NaiveDateTime> = conn.exec_first(SQL_GET_CREATION_TIME, &params)?;
@@ -360,52 +355,6 @@ impl AssetUpload {
         let uuid_str = &asset_uuids[0];
         Ok(Some(Uuid::parse_str(uuid_str)?))
     }
-/*    
-    /// Update terrain tile. A new terrain tile has been added, and needs to be added to the database. OLD.
-    fn update_tile(&self, conn: &mut PooledConn, texture_index: Option<u8>, asset_type: &str) -> Result<(), Error> {
-        //  Allowed types. Must match exactly.
-        assert!(asset_type == "BaseTexture" || asset_type == "EmissiveTexture" || asset_type == "SculptTexture" || asset_type == "Mesh");
-        assert!(if asset_type == "BaseTexture" || asset_type == "EmissiveTexture" { texture_index.is_some() } else { true });
-        //  Insert tile, or update hash and uuid if exists. 
-        const SQL_UPDATE_TILE: &str = r"INSERT INTO tile_assets
-                (grid, region_loc_x, region_loc_y, region_size_x, region_size_y,
-                impostor_lod, texture_index, asset_hash, asset_uuid,
-                asset_name, asset_type,
-                creation_time) 
-            VALUES 
-                (:grid, :region_loc_x, :region_loc_y, :region_size_x, :region_size_y,
-                :impostor_lod, :texture_index, :asset_hash, :asset_uuid,
-                :asset_name, :asset_type,
-                NOW()) 
-            ON DUPLICATE KEY UPDATE
-                asset_hash = :asset_hash, asset_uuid = :asset_uuid, creation_time = NOW()";
-        //  UNIQUE INDEX (grid, region_loc_x, region_loc_y, impostor_lod, viz_group, texture_index)
-        let asset_upload = self;
-        let params = params! {
-            "grid" => asset_upload.grid.to_lowercase(),
-            "asset_name" => asset_upload.asset_name.clone(),
-            "asset_type" => asset_type,
-            "region_loc_x" => asset_upload.region_loc[0],
-            "region_loc_y" => asset_upload.region_loc[1],
-            "region_size_x" => asset_upload.region_size[0],
-            "region_size_y" => asset_upload.region_size[1],
-            "impostor_lod" => asset_upload.impostor_lod,
-            //////"viz_group" => asset_upload.viz_group,
-            "texture_index" => texture_index,
-            "asset_uuid" => asset_upload.asset_uuid.clone(),
-            "asset_hash" => asset_upload.asset_hash.clone(),
-        };
-        log::debug!("SQL terrain tile update: {:?}", params);
-        conn.exec_drop(SQL_UPDATE_TILE, params)?;
-        log::debug!("SQL terrain tile update succeeded.");
-        Ok(())
-    }
-    
-    /// Update a tile. A new tile has been added, and needs to be added to the database.
-    pub fn update_texture_tile(&self, conn: &mut PooledConn, texture_index: u8, asset_type: &str) -> Result<(), Error> {
-        self.update_tile(conn, Some(texture_index), asset_type)
-    }
-*/
     
     //  Look up region name.
     //  Returns name of region if exact match. Otherwise searches for
@@ -474,49 +423,7 @@ impl AssetUpload {
         log::debug!("Textures for sculpt/mesh {:?}  {:?}", asset_upload.asset_name, texture_tuples);
         RegionImpostorFaceData::json_from_tuples(&texture_tuples)
     }
-/*    
-    /// Update terrain tile. A new terrain tile has been added, and needs to be added to the database.
-    /// ***WRONG*** for a mesh tile.
-    pub fn update_mesh_tile(&mut self, conn: &mut PooledConn) -> Result<(), Error> {
-        //  Most of the info we need is in asset_upload, but we also need:
-        //  - name
-        //  - face texture data.
-        log::debug!("Update mesh tile: {:?}", self);
-        todo!();    // no mesh tiles yet
-/*
-        let faces_json = self.get_faces_json(asset_upload)?;
-        let name_opt = self.look_up_region_name(&asset_upload.grid.to_lowercase(), asset_upload.region_loc, asset_upload.region_size, )?;
-        //  Name is only for debug and documentation
-        let name = if let Some(name) = name_opt { name } else { "(UNKNOWN)".to_string() };
-        //  Valid sculpt tile.  Update tile assets.
-        self.update_tile(asset_upload, None, "SculptTexture")?;        
-        let mesh_uuid = Some(asset_upload.asset_uuid.clone());
-        let sculpt_uuid = None;
-        asset_upload.update_impostor_info(self.conn, &name, mesh_uuid, sculpt_uuid, faces_json)
-*/
-    }
 
-    /// Update a sculpt tile.
-    /// ***NEEDS WORK***
-    /// Here we set the UUID in the tile info and the initial_impostors.
-    pub fn update_sculpt_tile_old(&mut self, conn: &mut PooledConn) -> Result<(), Error> {
-        //  Most of the info we need is in asset_upload, but we also need:
-        //  - name
-        //  - face texture data.
-        log::debug!("Update sculpt tile: {:?}", self);
-        let faces_json = self.get_faces_json(conn)?;
-        let name_opt = AssetUpload::look_up_region_name(conn, &self.grid.to_lowercase(), self.region_loc, self.region_size, )?;
-        //  Name is only for debug and documentation
-        let name = if let Some(name) = name_opt { name } else { "(UNKNOWN)".to_string() };
-        //  Valid sculpt tile.  Update tile assets.
-        self.update_tile(conn, None, "SculptTexture")
-/*     
-        let sculpt_uuid = Some(asset_upload.asset_uuid.clone());
-        let mesh_uuid = None;
-        self.update_impostor_info(conn, &name, mesh_uuid, sculpt_uuid, faces_json)
-*/
-    }
-*/   
     /// All the info is already present in self. This just adds the UUID.
     pub fn update_tile(&mut self, conn: &mut PooledConn) -> Result<(), Error> {
         //  Update tile assets

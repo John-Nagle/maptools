@@ -297,33 +297,7 @@ impl InitialImpostors {
             false
         }) 
     }
-/*
-        let mut changed = false;
-        let mut face = face.clone();
-        //  Fix up base texture.
-        if face.base_texture_uuid.is_none() {
-            if let Some(uuid) = Self::look_up_uuid(conn, key, face_id, &face.base_texture_hash, "BaseTexture")? {
-                face.base_texture_uuid = Some(uuid);
-                changed = true;
-            }
-        }
-        //  Fix up emissive texture if present.
-        if let Some(hash) = &face.emissive_texture_hash {
-            if face.emissive_texture_uuid.is_none() {
-                if let Some(uuid) = Self::look_up_uuid(conn, key, face_id, hash, "EmissiveTexture")? {
-                    face.emissive_texture_uuid = Some(uuid);
-                    changed = true;
-                }
-            }
-        };
-        //  Do we have new face data?
-        if changed {
-            Ok(Some(face))
-        } else {
-            Ok(None)
-        }
-*/    
-    
+
     /// Truncate the table for one grid This table is re-created on each run of generateterrain.
     pub fn clear_grid(conn: &mut PooledConn, grid: &str) -> Result<(), Error> {
         const SQL_DELETE: &str = r"DELETE FROM initial_impostors WHERE grid = :grid;";
