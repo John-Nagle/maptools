@@ -27,7 +27,7 @@ use mysql::prelude::{Queryable};
 use mysql::{params, PooledConn};
 use mysql::{Pool};
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use vizgroup::{CompletedGroups, VizGroups};
 use sculptmaker::{TerrainSculpt, TerrainSculptTexture};
 use regionorder::{TileLods, homogeneous_group_size};
@@ -165,9 +165,9 @@ struct FolderGenerator {
 
 impl FolderGenerator {
     /// Usual new
-    fn new(base_dir: &PathBuf, files_per_directory: usize) -> Self {
+    fn new(base_dir: &Path, files_per_directory: usize) -> Self {
         Self {
-            base_dir: base_dir.clone(),
+            base_dir: base_dir.to_path_buf(),
             files_per_directory,
             file_count: 0,
         }
@@ -283,10 +283,9 @@ impl TerrainGenerator {
             |(region_size_x, region_size_y, samples_x, samples_y, scale, offset, elevs, name, water_level)| {
                 let _name_v: String = name;
                 let _water_level_v: f32 = water_level;
-                let height_field = HeightField::new_from_elevs_blob(
+                HeightField::new_from_elevs_blob(
                     &elevs, samples_x, samples_y, region_size_x, region_size_y, scale, offset, water_level,
-                );
-                height_field
+                )
             },
         )?;
         if height_fields.is_empty() {
@@ -447,7 +446,7 @@ impl TerrainGenerator {
             emissive_texture_hash: None
         };      
         let impostor_data =  InitialImpostors::assemble_region_impostor_data(TileType::Sculpt, region, height_field, viz_group_id, &hash_to_hex(sculpt_hash),
-            sculpt_uuid_opt, &vec![face_0]);
+            sculpt_uuid_opt, &[face_0]);
         log::debug!("Region impostor data: {:?}", impostor_data);
         InitialImpostors::add_impostor(&mut self.conn, impostor_data)?;
         Ok(())

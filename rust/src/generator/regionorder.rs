@@ -33,7 +33,6 @@ const MAX_LOD: u8 = 16;
 /// need to be impostored in the order that will allow
 /// the lower LOD impostors to be constructed from recently
 /// constructes higher LOD impostors.
-
 pub struct TileLods {
     /// Cursors for each LOD
     cursors: Vec<ColumnCursor>,
@@ -85,7 +84,7 @@ impl TileLods {
         self.cursors[0].column_finished();
         //  Process lower LODs with current alignment.
         for lod in 1..self.cursors.len() {
-            let (prev, curr) = self.cursors.split_at_mut(lod as usize);
+            let (prev, curr) = self.cursors.split_at_mut(lod);
             assert!(!prev.is_empty());
             let prev = &prev[prev.len() - 1];
             let curr: &mut ColumnCursor = &mut curr[0];
@@ -485,8 +484,7 @@ impl ColumnCursor {
     }
     
     /// Is this region aligned in column with the region above?
-    /// If so, it is legitimate to update this LOD.
-    
+    /// If so, it is legitimate to update this LOD.    
     fn is_aligned(&self, prev: &RecentColumnInfo) -> bool {
         //  Appropriate test is curr.start == prev.start - prev.size
         //  This is written as curr.start + prev.size == prev.start to avoid unsigned underflow.
@@ -512,7 +510,7 @@ impl ColumnCursor {
 
 /// Is this group suitable for multiple-LOD processing?
 /// ***NEED CHECK THAT GROUP IS AT LEAST 2x2***
-pub fn homogeneous_group_size(group: &Vec<RegionData>) -> Option<(u32, u32)> {
+pub fn homogeneous_group_size(group: &[RegionData]) -> Option<(u32, u32)> {
     //  Return size of region if group is homogeneous. It always is in SL. For OS, we don't try to do multi-region impostors.
     if !group.is_empty() && group
         .iter()
@@ -628,7 +626,7 @@ pub fn get_enclosing_square(
         assert_eq!(new_ur_ix.1 - new_ll_ix.1, square_size);
         return Ok((lod, new_ll_ix, new_ur_ix))
     }
-    return Err(anyhow!("Can't enclose the bounds {:?} with an alighed square of {}", bounds_ix, MAX_LOD))
+    Err(anyhow!("Can't enclose the bounds {:?} with an alighed square of {}", bounds_ix, MAX_LOD))
 }
 
 

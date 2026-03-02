@@ -199,7 +199,7 @@ impl FcgiRecord {
             instream.read_exact(&mut content_bytes)?;
             log::debug!(
                 "Content: {:?}",
-                String::from_utf8_lossy(&content_bytes[0..content_bytes.len().min(200)].to_vec())
+                String::from_utf8_lossy(&content_bytes[0..content_bytes.len().min(200)])
             );
             let padding_length = header.padding_length;
             if padding_length > 0 {
@@ -429,12 +429,12 @@ impl Response {
         log::debug!(
             "Writing response record: {:?} Data: {:?}",
             header,
-            String::from_utf8_lossy(&b[0..b.len().min(200)].to_vec())
+            String::from_utf8_lossy(&b[0..b.len().min(200)])
         );
         //  Write header
         let _ = out.write(&header.to_bytes())?;
         //  Write data
-        if b.len() > 0 {
+        if !b.is_empty() {
             let _ = out.write(b)?;
         }
         //  Write padding
@@ -462,7 +462,7 @@ impl Response {
             out,
             request,
             FcgiRecType::Stdout,
-            &header_fields_group.as_bytes(),
+            header_fields_group.as_bytes(),
         )?;
         //  End of HTTP header record.
         Self::write_response_record(out, request, FcgiRecType::Stdout, "".as_bytes())?;
@@ -514,7 +514,7 @@ fn run_one<T: Handler>(
                 continue;
             }
             // We have enough records to handle the request.
-            handler.handler(out, &request, &env)?;
+            handler.handler(out, request, env)?;
             break;
         } else {
             return Ok(true); // normal EOF

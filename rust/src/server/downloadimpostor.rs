@@ -257,7 +257,7 @@ impl Handler for TerrainDownloadHandler {
                     return Err(anyhow!("No HTTP request method."));
                 }
                 //  Process. Error 500 if fail.
-                match self.process_request(&params) {
+                match self.process_request(params) {
                     Ok((status, msg)) => {
                         //  Success. Send a plain "OK"
                         let http_response = Response::http_response("application/json", status, "OK");

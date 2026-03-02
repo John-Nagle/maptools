@@ -173,7 +173,7 @@ impl TerrainSculptTexture {
     
     /// Get uniqueness hash
     pub fn get_hash(&self) -> Result<u32, Error> {
-        Ok(calc_rgbimage_hash(&self.image.as_ref().unwrap()))
+        Ok(calc_rgbimage_hash(self.image.as_ref().unwrap()))
     }
     
     /// Fetch terrain image.

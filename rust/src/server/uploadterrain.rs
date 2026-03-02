@@ -210,17 +210,16 @@ impl TerrainUploadHandler {
             |(region_size_x, region_size_y, samples_x, samples_y, scale, offset, elevs, name, water_level) : (u32, u32, u32, u32, f32, f32, Vec<u8>, String, f32)| {
                 //  Is the stored data identical to what we just read from the region?
                 log::trace!("Elevs:\n{:?} vs\n{:?}", elevs, new_elevs); // ***TEMP***
-                let is_same = 
-                    region_size_x == region_info.get_size()[0] && 
-                    region_size_y == region_info.get_size()[1] &&
-                    samples_x == samples[0] && 
-                    samples_y == samples[1] &&
-                    (scale - region_info.scale).abs() < Self::ELEV_ERROR_TOLERANCE  &&
-                    (offset - region_info.offset).abs() < Self::ELEV_ERROR_TOLERANCE &&
-                    Self::check_elev_err_within_tolerance(&elevs, &new_elevs, scale, offset, Self::ELEV_ERROR_TOLERANCE) &&
-                    name == region_info.name &&
-                    water_level == region_info.water_lev;                    
-                is_same
+                
+                region_size_x == region_info.get_size()[0] && 
+                region_size_y == region_info.get_size()[1] &&
+                samples_x == samples[0] && 
+                samples_y == samples[1] &&
+                (scale - region_info.scale).abs() < Self::ELEV_ERROR_TOLERANCE  &&
+                (offset - region_info.offset).abs() < Self::ELEV_ERROR_TOLERANCE &&
+                Self::check_elev_err_within_tolerance(&elevs, &new_elevs, scale, offset, Self::ELEV_ERROR_TOLERANCE) &&
+                name == region_info.name &&
+                water_level == region_info.water_lev                   
             },
         )?;
         //  Changed?
@@ -314,7 +313,7 @@ impl Handler for TerrainUploadHandler {
                 //  Authorize
                 self.owner_name = Some(Authorizer::authorize(AuthorizeType::UploadTerrain, env, params)?);
                 //  Process. Error 500 if fail.
-                match self.process_request(req, &params) {
+                match self.process_request(req, params) {
                     Ok((status, msg)) => {
                         //  Success. Send a plain "OK"
                         let http_response = Response::http_response("text/plain", status, "OK");

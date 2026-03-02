@@ -210,7 +210,7 @@ impl Handler for AssetUploadHandler {
                 let http_response = Response::http_response("text/plain", 500, "Error");
                 let s = format!("Problem processing request: {:?}", e);
                 let b = s.as_bytes();
-                Response::write_response(out, request, http_response.as_slice(), &b)?;
+                Response::write_response(out, request, http_response.as_slice(), b)?;
             }
         }
         Ok(())
