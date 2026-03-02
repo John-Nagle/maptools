@@ -110,7 +110,7 @@ impl InitialImpostors {
     //  Insert UUID into existing region impostors.
     //  Called from uploadimpostor.
     pub fn insert_uuid(conn: &mut PooledConn, asset_upload: &AssetUpload) -> Result<bool, Error> {
-        log::debug!("Beginning insert_uuid for {:?}", asset_upload);
+        log::debug!("Beginning insert_uuid into initial_impostors for {:?}", asset_upload);
         match asset_upload.tile_asset_type {
             TileAssetType::SculptTexture => Self::insert_sculpt_uuid(conn, asset_upload),
             TileAssetType::Mesh => Self::insert_mesh_uuid(conn, asset_upload),
@@ -122,9 +122,10 @@ impl InitialImpostors {
     //  Insert UUID into existing region impostors.
     //  Called from uploadimpostor.
     fn insert_sculpt_uuid(conn: &mut PooledConn, asset_upload: &AssetUpload) -> Result<bool, Error> {
+        log::debug!("Inserting sculpt UUID into initial_impostors: {:?}", asset_upload);
         assert!(asset_upload.asset_uuid.is_some());
         const SQL_UPDATE_SCULPT_UUID: &str = r"UPDATE initial_impostors 
-            SET sculpt_uuid = :sculpt_uuid,
+            SET sculpt_uuid = :sculpt_uuid
             WHERE grid = :grid
                 AND region_loc_x = :region_loc_x 
                 AND region_loc_y = :region_loc_y
@@ -143,6 +144,7 @@ impl InitialImpostors {
             "sculpt_uuid" => asset_upload.asset_uuid.clone(),
             "sculpt_hash" => asset_upload.asset_hash.clone(),
         };
+        log::debug!("Inserting sculpt UUID into initial_impostors: {:?}", params);
         let row_count: Option<usize> = conn.exec_first(SQL_UPDATE_SCULPT_UUID, &params)?;
         log::debug!("Initial sculpt impostor UUID update succeeded. Rows: {:?}, params {:?}", row_count, params);
         Ok(row_count != Some(0))
@@ -153,7 +155,7 @@ impl InitialImpostors {
     fn insert_mesh_uuid(conn: &mut PooledConn, asset_upload: &AssetUpload) -> Result<bool, Error> {
         assert!(asset_upload.asset_uuid.is_some());
         const SQL_UPDATE_MESH_UUID: &str = r"UPDATE initial_impostors 
-            SET mesh_uuid = :mesh_uuid,
+            SET mesh_uuid = :mesh_uuid
             WHERE grid = :grid
                 AND region_loc_x = :region_loc_x 
                 AND region_loc_y = :region_loc_y
@@ -172,6 +174,7 @@ impl InitialImpostors {
             "mesh_uuid" => asset_upload.asset_uuid.clone(),
             "mesh_hash" => asset_upload.asset_hash.clone(),
         };
+        log::debug!("Inserting mesh UUID into initial_impostors: {:?}", params);
         let row_count: Option<usize> = conn.exec_first(SQL_UPDATE_MESH_UUID, &params)?;
         log::debug!("Initial mesh impostor UUID update succeeded. Rows: {:?}, params {:?}", row_count, params);
         Ok(row_count != Some(0))

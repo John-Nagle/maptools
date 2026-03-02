@@ -423,7 +423,7 @@ impl AssetUploadHandler {
         //  An empty list means it's time to check to see if we're done and report errors.
         for asset_upload_short in &asset_info_short {
             let mut asset_upload = AssetUpload::new_from_asset_upload_short(asset_upload_short)?;
-            log::debug!("Uploading tile: {:?}", asset_upload);
+            log::debug!("Updating tile: {:?}", asset_upload);
             asset_upload.update_tile(&mut self.conn)?;
 /*
             match &asset_upload.tile_asset_type {
@@ -445,7 +445,7 @@ impl AssetUploadHandler {
                 }
             }
 */
-            log::debug!("Inserting UUID in impostors: {:?}", asset_upload); 
+            log::debug!("Inserting UUID in initial_impostors: {:?}", asset_upload); 
             //  Tile asset updated. Now update initial impostors.
             if !InitialImpostors::insert_uuid(&mut self.conn, &asset_upload)? {
                 //////.with_context(|| format!("Insert uuid failed for {:?}", asset_upload))? {
@@ -500,7 +500,6 @@ impl AssetUploadHandler {
         env: &HashMap<String, String> ,
     ) -> Result<(), Error> {
         //  Process params and authorization
-        log::info!("Request made: {:?} env {:?}", request, env);
         let params = request
             .params
             .as_ref()
