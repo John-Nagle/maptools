@@ -267,8 +267,8 @@ impl InitialImpostors {
                     update_params, faces_json_in, faces_json);          
             let row_count: Option<usize> = tx.exec_first(SQL_UPDATE_TEXTURE_UUIDS, &update_params)?;
             if row_count != Some(1) {
-                log::warn!("insert_texture_uuid_for_tile: update did not change JSON: params: {:?}, before: {}, after: {}",
-                    update_params, faces_json_in, faces_json);                    
+                log::warn!("insert_texture_uuid_for_tile: update did not change JSON: params: {:?}, row_count: {:?}, before: {}, after: {}",
+                    update_params, row_count, faces_json_in, faces_json);                    
             }          
         }
         Ok(changed)

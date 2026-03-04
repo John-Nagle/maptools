@@ -744,5 +744,20 @@ john@Nagle-LTS:/tmp$
 2026-03-01
    
     Working for Celchu and vicinity.
-    - Sculpt sizes are off. Gaps at edges.
-      
+    - Sculpt sizes are off. Gaps at edges. [FIXED?]
+    
+    UUID update not working:
+    04:06:59 [WARN] insert_texture_uuid_for_tile: update did not change JSON: params: Named({"viz_group": UInt(2), "region_size_x": UInt(256), "grid": Bytes("agni"), "region_size_y": UInt(256), "region_loc_y": UInt(306944), "impostor_lod": UInt(0), "region_loc_x": UInt(462592), "faces_json": Bytes("[{\"base_..")}), 
+        before: [{"base_texture_hash": "26511065", "base_texture_uuid": null, "emissive_texture_hash": null, "emissive_texture_uuid": null}], 
+        after: [{"base_texture_uuid":"cafe48f1-40a9-f8e3-5f2b-b61415a74014","emissive_texture_uuid":null,"base_texture_hash":"26511065","emissive_texture_hash":null}]
+        
+Should have updated UUID but did not:
+        
+        05:30:09 [DEBUG] (1) uploadimpostor: Updating tile: AssetUpload { asset_name: "RT0_462592_306688_256_256_3.55_31.44_0_0_34.50_75f86e9b", asset_hash: "75f86e9b", region_loc: [462592, 306688], region_size: [256, 256], grid: "agni", asset_uuid: Some("e7b8c9a9-4f38-d38a-2680-19b91711989f"), elevation_offset: 31.44, scale: [256.0, 256.0, 3.55], water_height: 34.5, impostor_lod: 0, tile_asset_type: BaseTexture(0) }
+05:30:09 [DEBUG] (1) common::tileassets: Insert UUID params: Named({"region_loc_y": UInt(306688), "impostor_lod": UInt(0), "asset_uuid": Bytes("e7b8c9a9.."), "region_loc_x": UInt(462592), "texture_index": Null, "asset_hash": Bytes("75f86e9b"), "grid": Bytes("agni"), "asset_type": Bytes("BaseText..")})
+05:30:09 [DEBUG] (1) common::tileassets: Tile asset UUID update succeeded. Rows: None, params Named({"asset_hash": Bytes("75f86e9b"), "asset_uuid": Bytes("e7b8c9a9.."), "region_loc_y": UInt(306688), "region_loc_x": UInt(462592), "impostor_lod": UInt(0), "asset_type": Bytes("BaseText.."), "grid": Bytes("agni"), "texture_index": Null})
+05:30:09 [INFO] Tile UUID unchanged for AssetUpload { asset_name: "RT0_462592_306688_256_256_3.55_31.44_0_0_34.50_75f86e9b", asset_hash: "75f86e9b", region_loc: [462592, 306688], region_size: [256, 256], grid: "agni", asset_uuid: Some("e7b8c9a9-4f38-d38a-2680-19b91711989f"), elevation_offset: 31.44, scale: [256.0, 256.0, 3.55], water_height: 34.5, impostor_lod: 0, tile_asset_type: BaseTexture(0) }
+05:30:09 [DEBUG] (1) uploadimpostor: Inserting UUID in initial_impostors: AssetUpload { asset_name: "RT0_462592_306688_256_256_3.55_31.44_0_0_34.50_75f86e9b", asset_hash: "75f86e9b", region_loc: [462592, 306688], region_size: [256, 256], grid: "agni", asset_uuid: Some("e7b8c9a9-4f38-d38a-2680-19b91711989f"), elevation_offset: 31.44, scale: [256.0, 256.0, 3.55], water_height: 34.5, impostor_lod: 0, tile_asset_type: BaseTexture(0) }
+
+No rows changed on UUID insert. Why?
+- Texture index NULL.

@@ -285,7 +285,7 @@ impl AssetUpload {
     
     /// Add the UUID to a previously inserted tile.
     /// Returns true if a UUID was inserted. Returns false if no match.
-    pub fn insert_uuid(&self, conn: &mut PooledConn, texture_index: Option<u8>) -> Result<bool, Error> {
+    pub fn insert_uuid(&self, conn: &mut PooledConn) -> Result<bool, Error> {
         assert!(self.asset_uuid.is_some());
         const SQL_UPDATE_UUID: &str = r"
             UPDATE tile_assets 
@@ -304,7 +304,7 @@ impl AssetUpload {
             "region_loc_x" => self.region_loc[0],
             "region_loc_y" => self.region_loc[1],
             "impostor_lod" => self.impostor_lod,
-            "texture_index" => texture_index,
+            "texture_index" => self.tile_asset_type.get_texture_index(),
             "asset_uuid" => self.asset_uuid.clone(),
             "asset_hash" => self.asset_hash.clone(),
         };
@@ -427,7 +427,7 @@ impl AssetUpload {
         if let Some(asset_uuid_str) = &self.asset_uuid {
             //  Syntax check UUID.
             let _uuid = Uuid::parse_str(asset_uuid_str)?;
-            let inserted = self.insert_uuid(conn, None)?;
+            let inserted = self.insert_uuid(conn)?;
             if !inserted {
                 log::info!("Tile UUID unchanged for {:?}", self);
             }
