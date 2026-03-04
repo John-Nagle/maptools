@@ -262,7 +262,14 @@ pub fn main() {
     logger();
     // Set a custom panic hook
     std::panic::set_hook(Box::new(|info| {
-        log::error!("PANIC: {:?}", info);
+        let msg = if let Some(s) = info.payload().downcast_ref::<&str>() {
+            s
+        } else if let Some(s) = info.payload().downcast_ref::<String>() {
+            s.as_str()
+        } else {
+            "Unable to decode panic msg"
+        };   
+        log::error!("PANIC: {:?}: {}", info, msg);
     }));
     match run_responder() {
         Ok(()) => {}

@@ -519,9 +519,12 @@ impl InitialImpostors {
         };
         //  Look up the tile. Hash is part of the key.
         log::debug!("Looking up tile UUID: {:?}", select_params);
-        let uuid_opt: Option<String> = conn.exec_first(SQL_LOOK_UP_UUID, select_params)?;
-        log::debug!("Looked up tile UUID: {:?}", uuid_opt);
-        Ok(if let Some(uuid_str) = uuid_opt {
+        let uuid_opt_opt: Option<Option<String>> = conn.exec_first(SQL_LOOK_UP_UUID, select_params)?;
+        //  Outer option is "did we find a row". 
+        //  Inner option is "was the column non-null"
+        log::debug!("Looked up tile UUID: {:?}", uuid_opt_opt);
+        Ok(if let Some(uuid_opt) = uuid_opt_opt
+        && let Some(uuid_str) = uuid_opt {
             Some(Uuid::parse_str(&uuid_str)?)
         } else {
             None
