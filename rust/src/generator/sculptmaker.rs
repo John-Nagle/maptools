@@ -58,9 +58,9 @@ impl TerrainSculpt {
                     //////let zscaled = (elevs[x][y] - minz) / (maxz - minz);
                     let zscaled = (elevs[x][y] - minz) / range;
                     assert!((0.0..=1.0).contains(&zscaled));
-                    let zpixel = ((zscaled * 256.0).floor() as i32).clamp(0, 255) as u8;
-                    let xpixel = ((x as f64 * 256.0) / elevs.len() as f64).round() as u8;
-                    let ypixel = ((y as f64 * 256.0) / elevs[0].len() as f64).round() as u8;
+                    let zpixel = ((zscaled * 255.0).floor() as i32).clamp(0, 255) as u8;
+                    let xpixel = ((x as f64 * 255.0) / elevs.len() as f64).round().clamp(0.0, 255.0) as u8;
+                    let ypixel = ((y as f64 * 255.0) / elevs[0].len() as f64).round().clamp(0.0, 255.0) as u8;
 
                     // Elevs is ordered with +Y as north, but sculpt images have to be flipped in Y
                     let flipped_y = elevs[0].len() - y - 1;
