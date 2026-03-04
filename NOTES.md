@@ -760,4 +760,20 @@ Should have updated UUID but did not:
 05:30:09 [DEBUG] (1) uploadimpostor: Inserting UUID in initial_impostors: AssetUpload { asset_name: "RT0_462592_306688_256_256_3.55_31.44_0_0_34.50_75f86e9b", asset_hash: "75f86e9b", region_loc: [462592, 306688], region_size: [256, 256], grid: "agni", asset_uuid: Some("e7b8c9a9-4f38-d38a-2680-19b91711989f"), elevation_offset: 31.44, scale: [256.0, 256.0, 3.55], water_height: 34.5, impostor_lod: 0, tile_asset_type: BaseTexture(0) }
 
 No rows changed on UUID insert. Why?
-- Texture index NULL.
+- Texture index NULL. Fixed that.
+
+Failed UUID lookup:
+
+7:01:02 [DEBUG] (1) common::initialimpostors: Looking up tile UUID: Named({"region_loc_y": UInt(279808), "grid": Bytes("agni"), "asset_hash": Bytes("e3b0651d"), "region_loc_x": UInt(290816), "asset_type": Bytes("BaseText.."), "impostor_lod": UInt(0)})
+07:01:02 [DEBUG] (1) common::initialimpostors: Looked up tile UUID: Some(None)
+- New File is in R00. But the database entry is older than the current entry, and the old entry has no UUID.
+  Hash of new file is 3feb4f53 No match.
+  
+  Insert of UUID did nothing:
+  
+  05:29:39 [DEBUG] (1) uploadimpostor: Updating tile: AssetUpload { asset_name: "RT0_290816_279808_256_256_54.47_36.46_0_0_20.00_3feb4f53", asset_hash: "3feb4f53", region_loc: [290816, 279808], region_size: [256, 256], grid: "agni", asset_uuid: Some("b0f188c1-ff53-8269-0050-b089f0c7323b"), elevation_offset: 36.46, scale: [256.0, 256.0, 54.47], water_height: 20.0, impostor_lod: 0, tile_asset_type: BaseTexture(0) }
+05:29:39 [DEBUG] (1) common::tileassets: Insert UUID params: Named({"asset_uuid": Bytes("b0f188c1.."), "asset_hash": Bytes("3feb4f53"), "region_loc_x": UInt(290816), "impostor_lod": UInt(0), "region_loc_y": UInt(279808), "grid": Bytes("agni"), "texture_index": Null, "asset_type": Bytes("BaseText..")})
+05:29:39 [DEBUG] (1) common::tileassets: Tile asset UUID update succeeded. Rows: None, params Named({"asset_hash": Bytes("3feb4f53"), "asset_type": Bytes("BaseText.."), "region_loc_y": UInt(279808), "grid": Bytes("agni"), "region_loc_x": UInt(290816), "texture_index": Null, "asset_uuid": Bytes("b0f188c1.."), "impostor_lod": UInt(0)})
+
+Oh, right, we fixed texture index null insertion, but did not rerun generate, where that fix did something.
+Fix tomorrow.
