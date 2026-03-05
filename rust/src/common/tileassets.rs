@@ -294,25 +294,29 @@ impl AssetUpload {
             AND asset_hash = :asset_hash
             AND region_loc_x = :region_loc_x 
             AND region_loc_y = :region_loc_y 
+            AND region_size_x = :region_size_x
+            AND region_size_y = :region_size_y
             AND impostor_lod = :impostor_lod 
-            AND texture_index = :texture_index 
-            AND asset_type = :asset_type
-            AND asset_uuid IS NULL";
+            AND (texture_index = :texture_index OR (texture_index IS NULL AND :texture_index IS NULL))
+            AND asset_type = :asset_type";
         let params = params! {
             "grid" => self.grid.to_lowercase(),
             "asset_type" => self.tile_asset_type.to_str().to_string(),
             "region_loc_x" => self.region_loc[0],
             "region_loc_y" => self.region_loc[1],
+            "region_size_x" => self.region_size[0],
+            "region_size_y" => self.region_size[1],
             "impostor_lod" => self.impostor_lod,
             "texture_index" => self.tile_asset_type.get_texture_index(),
             "asset_uuid" => self.asset_uuid.clone(),
             "asset_hash" => self.asset_hash.clone(),
         };
         log::debug!("Insert UUID params: {:?}", params);
-        let row_count: Option<usize> = conn.exec_first(SQL_UPDATE_UUID, &params)?;
+        let _sink: Option<usize> = conn.exec_first(SQL_UPDATE_UUID, &params)?;
+        let row_count = conn.affected_rows();
         //  ***NEED TO KNOW IF SUCCESS*** return true if insert changed a row.
         log::debug!("Tile asset UUID update succeeded. Rows: {:?}, params {:?}", row_count, params);
-        Ok(row_count == Some(1))
+        Ok(row_count != 0)
     }
     
     /// Get asset UUID from tile_assets if already available.

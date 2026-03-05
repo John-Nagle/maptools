@@ -777,3 +777,9 @@ Failed UUID lookup:
 
 Oh, right, we fixed texture index null insertion, but did not rerun generate, where that fix did something.
 Fix tomorrow.
+
+2026-03-04
+
+   No, it's not fixed.
+   - in SQL, NULL = NULL evaluates to UNKNOWN. [FIXED]
+   - Row count is obtained with another call on UPDATE. [FIXED]

@@ -141,11 +141,12 @@ impl InitialImpostors {
         };
         log::debug!("Inserting sculpt UUID into initial_impostors: {:?}", params);
         let result = conn.exec_first(SQL_UPDATE_SCULPT_UUID, &params);
-        log::debug!("Inserting sculpt UUID into initial_impostors, SQL: {} result {:?}", SQL_UPDATE_SCULPT_UUID, result);
-        let row_count: Option<usize> = result?;
+        log::debug!("Inserting sculpt UUID into initial_impostors, result {:?}", result);
+        let _sink: Option<usize> = result?;
         //////let row_count: Option<usize> = conn.exec_first(SQL_UPDATE_SCULPT_UUID, &params)?;
+        let row_count = conn.affected_rows();
         log::debug!("Initial sculpt impostor UUID update succeeded. Rows: {:?}, params {:?}", row_count, params);
-        Ok(row_count != Some(0))
+        Ok(row_count != 0)
     }
     
     //  Insert UUID into existing region impostors.
@@ -265,8 +266,9 @@ impl InitialImpostors {
             };
             log::debug!("insert_texture_uuid_for_tile: changing: params: {:?}, before: {}, after: {}",
                     update_params, faces_json_in, faces_json);          
-            let row_count: Option<usize> = tx.exec_first(SQL_UPDATE_TEXTURE_UUIDS, &update_params)?;
-            if row_count != Some(1) {
+            let _sink: Option<usize> = tx.exec_first(SQL_UPDATE_TEXTURE_UUIDS, &update_params)?;
+            let row_count = tx.affected_rows();
+            if row_count == 0 {
                 log::warn!("insert_texture_uuid_for_tile: update did not change JSON: params: {:?}, row_count: {:?}, before: {}, after: {}",
                     update_params, row_count, faces_json_in, faces_json);                    
             }          
