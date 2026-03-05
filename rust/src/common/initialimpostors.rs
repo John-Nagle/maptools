@@ -174,9 +174,10 @@ impl InitialImpostors {
             "mesh_hash" => asset_upload.asset_hash.clone(),
         };
         log::debug!("Inserting mesh UUID into initial_impostors: {:?}", params);
-        let row_count: Option<usize> = conn.exec_first(SQL_UPDATE_MESH_UUID, &params)?;
+        let _sink: Option<usize> = conn.exec_first(SQL_UPDATE_MESH_UUID, &params)?;
+        let row_count = conn.affected_rows();
         log::debug!("Initial mesh impostor UUID update succeeded. Rows: {:?}, params {:?}", row_count, params);
-        Ok(row_count != Some(0))
+        Ok(row_count != 0)
     }
     
     //  Insert UUID into existing region impostors.
