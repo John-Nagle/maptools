@@ -55,8 +55,8 @@ const _OWNER_NAME: &str = "HTTP_X_SECONDLIFE_OWNER_NAME";
 const TERRAIN_SCULPT_TEXTURE_SIZE: u32 = 256;
 /// User agent for talking to asset server
 const TERRAIN_GENERATOR_USER_AGENT: &str = "animats.info impostor asset system";
-/// Files per directory. A convenient size <= 100.
-const FILES_PER_DIRECTORY: usize = 100;
+/// Files per directory. A convenient size. Per prim limit is supposedly 10,000, but we might hit some viewer limit for cut and paste.
+const FILES_PER_DIRECTORY: usize = 1000;
 
 /// Debug logging
 fn logger() {

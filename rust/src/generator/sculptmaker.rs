@@ -59,16 +59,40 @@ impl TerrainSculpt {
                     let zscaled = (elevs[x][y] - minz) / range;
                     assert!((0.0..=1.0).contains(&zscaled));
                     let zpixel = ((zscaled * 255.0).floor() as i32).clamp(0, 255) as u8;
-                    let xpixel = ((x as f64 * 255.0) / elevs.len() as f64).round().clamp(0.0, 255.0) as u8;
-                    let ypixel = ((y as f64 * 255.0) / elevs[0].len() as f64).round().clamp(0.0, 255.0) as u8;
+                    let xpixel = ((x as f64 * 255.0) / (elevs.len() - 1) as f64).round().clamp(0.0, 255.0) as u8;
+                    let ypixel = ((y as f64 * 255.0) / (elevs[0].len() - 1) as f64).round().clamp(0.0, 255.0) as u8;
 
                     // Elevs is ordered with +Y as north, but sculpt images have to be flipped in Y
                     let flipped_y = elevs[0].len() - y - 1;
                     img.put_pixel(x as u32, flipped_y as u32, Rgb([xpixel, ypixel, zpixel]));
                 }
             }
+            //  Avoid edge effects at sculplt size reduction
+            Self::fix_sculpt_image_edges(&mut img);
             self.image = Some(img);
         }
+    }
+    
+    /// Fix sculpt image edges.
+    /// The outer edges must have uniform values for the two edge pixels.
+    /// Sculpts are reduced to 32x32 within viewers, and that reduction is somewhat strange.
+    pub fn fix_sculpt_image_edges(img: &mut RgbImage) {
+        //  Fix top row and bottom row, one row in from the edge.
+        //  Put pixel 0 into pixel 1.
+        //  If img is 64 high/wide, we want to get pixel 63 and put it in pixel 62.
+        assert!(img.width() > 2);
+        assert!(img.height() > 2);
+        for x in 0..img.width() {
+            img.put_pixel(x, 1, *img.get_pixel(x, 0));
+            img.put_pixel(x, img.height()-2, *img.get_pixel(x, img.height()-1)); 
+        }
+        //  Fix left edge and right edge. Make 1 in from edge match the edge.
+        for y in 0..img.height() {
+            img.put_pixel(y, 1, *img.get_pixel(y, 0));
+            img.put_pixel(y, img.width()-2, *img.get_pixel(y, img.width()-1)); 
+        }
+    
+    
     }
     
     /// Get uniqueness hash
