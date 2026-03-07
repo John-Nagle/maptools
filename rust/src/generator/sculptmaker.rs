@@ -4,7 +4,7 @@
 // Animats, October 2020
 // License: GPL
 
-use image::{Rgb, RgbImage, ImageReader, DynamicImage};
+use image::{Rgb, RgbImage, ImageReader, DynamicImage, imageops::{resize, replace, FilterType}};
 use std::cmp::{max};
 use std::hash::{Hash, Hasher, DefaultHasher};
 use std::f64;
@@ -21,7 +21,8 @@ fn calc_rgbimage_hash(img: &RgbImage) -> u32 {
     (((hash >> 32) & 0xffffffff) ^ (hash & 0xffffffff)) as u32
 }
 
-const SCULPTDIM: usize = 64; // Sculpt textures are always 64x64
+/// Sculpt textures are always 64x64, but we build them as 30x30 and add vertical edges, then double the size for legacy SL reasons.
+const SCULPTDIM: usize = 30; 
 
 #[derive(Debug)]
 pub struct TerrainSculpt {
@@ -67,12 +68,13 @@ impl TerrainSculpt {
                     img.put_pixel(x as u32, flipped_y as u32, Rgb([xpixel, ypixel, zpixel]));
                 }
             }
-            //  Avoid edge effects at sculplt size reduction
-            Self::fix_sculpt_image_edges(&mut img);
+            ////////  Avoid edge effects at sculplt size reduction
+            //////Self::fix_sculpt_image_edges(&mut img);
+            let img = Self::double_image_size(&Self::add_flat_sides(&img));
             self.image = Some(img);
         }
     }
-    
+/*    
     /// Fix sculpt image edges.
     /// The outer edges must have uniform values for the two edge pixels.
     /// Sculpts are reduced to 32x32 within viewers, and that reduction is somewhat strange.
@@ -91,8 +93,35 @@ impl TerrainSculpt {
             img.put_pixel(1, y, *img.get_pixel(0, y));
             img.put_pixel(img.width()-2, y, *img.get_pixel(img.width()-1, y)); 
         }
+    }
+*/
     
+    /// Double image size
+    fn double_image_size(img: &RgbImage) -> RgbImage {
+        //  Double image size, because our 32x32 needs to be a 64x64 for the sculpt system.
+        //  The sculpt system will turn it back into a 32x32. Yes, the way that works is silly.
+        resize(img, img.width()*2, img.height()*2, FilterType::Nearest)       
+    }
     
+    /// Add a row and column at the edge to bring the Z value down to 0 at the edge.
+    /// This gives the map tile flat vertical sides
+    fn add_flat_sides(old_img: &RgbImage) -> RgbImage {
+        //  Create copy with original image centered between extra rows and cols.
+        let mut img = RgbImage::new(old_img.width()+2, old_img.height()+2);
+        replace(&mut img, old_img, 1, 1);
+        //  Zero out the Z coordinate
+        let zero_z = |p: Rgb<u8>| Rgb([p[0], p[1], 0]);
+        //  Create the edge rows and columns
+        for x in 0..img.width() {
+            img.put_pixel(x, 0, zero_z(*img.get_pixel(x, 1)));
+            img.put_pixel(x, img.height()-1, zero_z(*img.get_pixel(x, img.height()-2))); 
+        }
+        //  Fix left edge and right edge. Make 1 in from edge match the edge.
+        for y in 0..img.height() {
+            img.put_pixel(0, y, zero_z(*img.get_pixel(1, y)));
+            img.put_pixel(img.width()-1, y, zero_z(*img.get_pixel(img.width()-2, y))); 
+        }
+        img
     }
     
     /// Get uniqueness hash
