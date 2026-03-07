@@ -21,8 +21,8 @@ fn calc_rgbimage_hash(img: &RgbImage) -> u32 {
     (((hash >> 32) & 0xffffffff) ^ (hash & 0xffffffff)) as u32
 }
 
-/// Sculpt textures are always 64x64, but we build them as 30x30 and add vertical edges, then double the size for legacy SL reasons.
-const SCULPTDIM: usize = 30; 
+/// Sculpt textures are always 64x64, but we build them as 32x32 then double the size for legacy SL reasons.
+const SCULPTDIM: usize = 32; 
 
 #[derive(Debug)]
 pub struct TerrainSculpt {
@@ -70,7 +70,7 @@ impl TerrainSculpt {
             }
             ////////  Avoid edge effects at sculplt size reduction
             //////Self::fix_sculpt_image_edges(&mut img);
-            let img = Self::double_image_size(&Self::add_flat_sides(&img));
+            let img = Self::double_image_size(&img);
             self.image = Some(img);
         }
     }
@@ -105,7 +105,8 @@ impl TerrainSculpt {
     
     /// Add a row and column at the edge to bring the Z value down to 0 at the edge.
     /// This gives the map tile flat vertical sides
-    fn add_flat_sides(old_img: &RgbImage) -> RgbImage {
+    /// NO GOOD - messes up UVs on sculpts that map standard SL map tiles.
+    fn _add_flat_sides(old_img: &RgbImage) -> RgbImage {
         //  Create copy with original image centered between extra rows and cols.
         let mut img = RgbImage::new(old_img.width()+2, old_img.height()+2);
         replace(&mut img, old_img, 1, 1);
