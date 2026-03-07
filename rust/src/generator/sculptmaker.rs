@@ -88,8 +88,8 @@ impl TerrainSculpt {
         }
         //  Fix left edge and right edge. Make 1 in from edge match the edge.
         for y in 0..img.height() {
-            img.put_pixel(y, 1, *img.get_pixel(y, 0));
-            img.put_pixel(y, img.width()-2, *img.get_pixel(y, img.width()-1)); 
+            img.put_pixel(1, y, *img.get_pixel(0, y));
+            img.put_pixel(img.width()-2, y, *img.get_pixel(img.width()-1, y)); 
         }
     
     
