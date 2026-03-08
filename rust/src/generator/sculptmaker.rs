@@ -4,7 +4,7 @@
 // Animats, October 2020
 // License: GPL
 
-use image::{Rgb, RgbImage, ImageReader, DynamicImage, imageops::{resize, replace, FilterType}};
+use image::{Rgb, RgbImage, ImageReader, DynamicImage, imageops::{replace, FilterType}};
 use std::cmp::{max};
 use std::hash::{Hash, Hasher, DefaultHasher};
 use std::f64;
@@ -70,7 +70,7 @@ impl TerrainSculpt {
             }
             ////////  Avoid edge effects at sculplt size reduction
             //////Self::fix_sculpt_image_edges(&mut img);
-            let img = Self::double_image_size(&img);
+            let img = Self::double_image_size(Self::add_flat_sides(&img));
             self.image = Some(img);
         }
     }
@@ -97,16 +97,18 @@ impl TerrainSculpt {
 */
     
     /// Double image size
-    fn double_image_size(img: &RgbImage) -> RgbImage {
+    fn double_image_size(img: RgbImage) -> RgbImage {
         //  Double image size, because our 32x32 needs to be a 64x64 for the sculpt system.
         //  The sculpt system will turn it back into a 32x32. Yes, the way that works is silly.
-        resize(img, img.width()*2, img.height()*2, FilterType::Nearest)       
+        let width = img.width()*2;
+        let height = img.height()*2;
+        //  This is resizing an elevation map, not an RGB image. Do not filter.
+        DynamicImage::resize_exact(&img.into(), width, height, FilterType::Nearest).into()       
     }
     
     /// Add a row and column at the edge to bring the Z value down to 0 at the edge.
     /// This gives the map tile flat vertical sides
-    /// NO GOOD - messes up UVs on sculpts that map standard SL map tiles.
-    fn _add_flat_sides(old_img: &RgbImage) -> RgbImage {
+    fn add_flat_sides(old_img: &RgbImage) -> RgbImage {
         //  Create copy with original image centered between extra rows and cols.
         let mut img = RgbImage::new(old_img.width()+2, old_img.height()+2);
         replace(&mut img, old_img, 1, 1);
@@ -220,6 +222,8 @@ impl TerrainSculptTexture {
         let (img, last_modified_str) = Self::fetch_terrain_image(URL_PREFIX, self.region_coords_x, self.region_coords_y, self.lod)?;
         let last_modified = DateTime::parse_from_rfc2822(&last_modified_str)?.with_timezone(&Utc);
         log::debug!("Image last modified at {:?}", last_modified);
+        const PERIMETER_PIXELS: u32 = 1;
+        let img = Self::add_perimeter_to_image(img, PERIMETER_PIXELS);
         self.image = Some(img.into());
         self.last_modified = Some(last_modified);
         Ok(())
@@ -228,6 +232,15 @@ impl TerrainSculptTexture {
     /// Get uniqueness hash
     pub fn get_hash(&self) -> Result<u32, Error> {
         Ok(calc_rgbimage_hash(self.image.as_ref().unwrap()))
+    }
+    
+    /// Shrink image by specified amount on each edge.
+    /// This has to match what we do to the sculpts, so that
+    /// the folded-down edges will work.
+    pub fn add_perimeter_to_image(mut img: DynamicImage, shrink_pixels: u32) -> DynamicImage {
+        let inner_img = DynamicImage::resize_exact(&img, img.width() - 2*shrink_pixels, img.height() - 2*shrink_pixels, FilterType::CatmullRom);
+        replace(&mut img, &inner_img, shrink_pixels.into(), shrink_pixels.into());
+        img
     }
     
     /// Fetch terrain image.
