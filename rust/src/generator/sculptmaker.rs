@@ -22,7 +22,7 @@ fn calc_rgbimage_hash(img: &RgbImage) -> u32 {
 }
 
 /// Sculpt textures are always 64x64, but we build them as 32x32 then double the size for legacy SL reasons.
-const SCULPTDIM: usize = 32; 
+const SCULPTDIM: usize = 30; 
 
 #[derive(Debug)]
 pub struct TerrainSculpt {
