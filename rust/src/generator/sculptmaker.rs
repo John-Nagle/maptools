@@ -222,7 +222,9 @@ impl TerrainSculptTexture {
         let (img, last_modified_str) = Self::fetch_terrain_image(URL_PREFIX, self.region_coords_x, self.region_coords_y, self.lod)?;
         let last_modified = DateTime::parse_from_rfc2822(&last_modified_str)?.with_timezone(&Utc);
         log::debug!("Image last modified at {:?}", last_modified);
-        const PERIMETER_PIXELS: u32 = 1;
+        //  *** WRONG *** Need to add in same proporion as sculpt image has extra pixels.
+        //  Or, 256/30*1 = 8.5?
+        const PERIMETER_PIXELS: u32 = 8;
         let img = Self::add_perimeter_to_image(img, PERIMETER_PIXELS);
         self.image = Some(img.into());
         self.last_modified = Some(last_modified);

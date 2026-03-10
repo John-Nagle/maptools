@@ -783,3 +783,12 @@ Fix tomorrow.
    No, it's not fixed.
    - in SQL, NULL = NULL evaluates to UNKNOWN. [FIXED]
    - Row count is obtained with another call on UPDATE. [FIXED]
+   
+2026-03-08
+
+   More problems.
+   - Sculpts need longer skirts.
+   - Changed sculpt generation but no new sculpts generated. Why?
+     - Because they were known asset from a previous run? Probably
+       - Need garbage collector.
+   - Texture is misaligned vs. sculpt UVs.
