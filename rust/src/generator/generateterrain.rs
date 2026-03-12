@@ -57,6 +57,8 @@ const TERRAIN_SCULPT_TEXTURE_SIZE: u32 = 256;
 const TERRAIN_GENERATOR_USER_AGENT: &str = "animats.info impostor asset system";
 /// Files per directory. A convenient size. Per prim limit is supposedly 10,000, but we hit some viewer limit for cut and paste.
 const FILES_PER_DIRECTORY: usize = 200;
+/// Force regen of all sculpts. Test use only.
+const FORCE_SCULPT_REGEN: bool = false;
 
 /// Debug logging
 fn logger() {
@@ -389,7 +391,7 @@ impl TerrainGenerator {
         //  Create an AssetUpload for the one texture.
         let sculpt_asset_upload = AssetUpload::new(TileAssetType::SculptTexture, region, height_field, sculpt_hash)?;    
         let sculpt_uuid_opt = sculpt_asset_upload.get_asset_uuid(&mut self.conn)?;
-        if let Some (uuid) = sculpt_uuid_opt {
+        if let Some (uuid) = sculpt_uuid_opt && !FORCE_SCULPT_REGEN {
             log::info!("Sculpt image asset already exists: {} UUID: {:?}", sculpt_asset_upload.asset_name, uuid);
             self.stats.assets_reused += 1;
         } else {

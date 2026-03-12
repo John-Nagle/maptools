@@ -792,3 +792,19 @@ Fix tomorrow.
      - Because they were known asset from a previous run? Probably
        - Need garbage collector.
    - Texture is misaligned vs. sculpt UVs.
+   
+2026-03-10
+
+   What's wrong here?
+   Image is 256x256.
+   Sculpt is 64x64, increased from 32x32.
+   At 32x32 scale, one extra pixel on each edge is used for the vertical side.
+   At 64x64 scale, two extra pixels on each edge.
+   So image needs to be reduced by a factor of 2/32, or 1/16, to fit the UVs of the sculpt.
+   For an image 256x256, 1/16th of that is 16 pixels total, or 8 pixels on each side.
+   
+   This is a failure in image hashing/dup check. The image being used for this sculpt isn't even the right size. 
+   But the hash matches after regenerating it. Huh?
+   04:58:40 [INFO] Sculpt image asset already exists: RS_290560_279552_256_256_34.32_45.06_0_0_20.00_1cccb6a3 UUID: 6bdc6f3f-930d-43f4-5acb-b6d7461e847b
+   This asset is bad. But re-generating it seems to produce the same hash. Asserts are checking the size of the new version. How?
+   This seems to be an old asset version which should have been replaced after the code that generates the sculpt was fixed. 

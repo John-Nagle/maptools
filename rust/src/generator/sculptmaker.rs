@@ -71,6 +71,8 @@ impl TerrainSculpt {
             ////////  Avoid edge effects at sculplt size reduction
             //////Self::fix_sculpt_image_edges(&mut img);
             let img = Self::double_image_size(Self::add_flat_sides(&img));
+            assert_eq!(img.width(), 64); // ***TEMP***
+            assert_eq!(img.height(), 64); // ***TEMP***
             self.image = Some(img);
         }
     }
@@ -223,6 +225,11 @@ impl TerrainSculptTexture {
         let last_modified = DateTime::parse_from_rfc2822(&last_modified_str)?.with_timezone(&Utc);
         log::debug!("Image last modified at {:?}", last_modified);
         //  *** WRONG *** Need to add in same proporion as sculpt image has extra pixels.
+        //  For SL, active area of UVs is 30/32 pixels.
+        //  So we need to reduce size by 30/32.
+        //  Reduced size is 256*(30/32), or 240 pixels.
+        //  So, need to remove 16 pixels, or 8 on each edge.
+        //  But that's wrong. Tried that.
         //  Or, 256/30*1 = 8.5?
         const PERIMETER_PIXELS: u32 = 8;
         let img = Self::add_perimeter_to_image(img, PERIMETER_PIXELS);
