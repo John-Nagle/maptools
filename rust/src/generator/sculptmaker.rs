@@ -246,8 +246,9 @@ impl TerrainSculptTexture {
     /// Shrink image by specified amount on each edge.
     /// This has to match what we do to the sculpts, so that
     /// the folded-down edges will work.
+    /// Why 3*shrink_pixels? Because 2 isn't enough.
     pub fn add_perimeter_to_image(mut img: DynamicImage, shrink_pixels: u32) -> DynamicImage {
-        let inner_img = DynamicImage::resize_exact(&img, img.width() - 2*shrink_pixels, img.height() - 2*shrink_pixels, FilterType::CatmullRom);
+        let inner_img = DynamicImage::resize_exact(&img, img.width() - 3*shrink_pixels, img.height() - 3*shrink_pixels, FilterType::CatmullRom);
         replace(&mut img, &inner_img, shrink_pixels.into(), shrink_pixels.into());
         img
     }

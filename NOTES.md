@@ -808,3 +808,10 @@ Fix tomorrow.
    04:58:40 [INFO] Sculpt image asset already exists: RS_290560_279552_256_256_34.32_45.06_0_0_20.00_1cccb6a3 UUID: 6bdc6f3f-930d-43f4-5acb-b6d7461e847b
    This asset is bad. But re-generating it seems to produce the same hash. Asserts are checking the size of the new version. How?
    This seems to be an old asset version which should have been replaced after the code that generates the sculpt was fixed. 
+   
+2026-03-12
+
+   There's some kind of off by one error with sculpt mapping for impostors.
+   - It's not in Sharpview. It can be reproduced by making sculpts in Firestorm.
+   - The scaled images with the outer 8 pixels (of 256) as the sides do not map
+     correctly to the sculpt texture UVs. Looks like an off by 1 error.
