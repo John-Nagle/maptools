@@ -255,7 +255,11 @@ impl TerrainSculptTexture {
     /// ***THIS IS STILL OFF***
     pub fn add_perimeter_to_image(mut img: DynamicImage, shrink_pixels: u32) -> DynamicImage {
         let inner_img = DynamicImage::resize_exact(&img, img.width() - 3*shrink_pixels, img.height() - 3*shrink_pixels, FilterType::CatmullRom);
-        replace(&mut img, &inner_img, shrink_pixels.into(), shrink_pixels.into());
+        //////replace(&mut img, &inner_img, shrink_pixels.into(), shrink_pixels.into());
+        //  Insert shrunk image, centered.
+        let width_offset = (img.width() - inner_img.width())/2;
+        let height_offset = (img.height() - inner_img.height())/2;
+        replace(&mut img, &inner_img, width_offset.into(), height_offset.into());
         img
     }
     

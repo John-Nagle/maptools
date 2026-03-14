@@ -31,7 +31,8 @@ use uuid::Uuid;
 use common::Credentials;
 use common::init_fcgi;
 use common::{Handler, Request, Response};
-use common::{RegionImpostorReply, RegionImpostorData};
+use common::{RegionImpostorData};
+use common::catch_panic;
 use mysql::prelude::{Queryable};
 use mysql::{Pool};
 use mysql::{PooledConn, params};
@@ -136,8 +137,10 @@ impl TerrainDownloadHandler {
             "grid = :grid"  
         };
         log::info!("Query: grid: {} coords {:?}  viz_group: {:?}, WHERE clause: {}", grid, coords_opt, viz_group_opt, where_clause);
-        const SELECT_PART: &str = "grid, region_loc_x, region_loc_y, name, region_size_x, region_size_y, scale_x, scale_y, scale_z, \
-        elevation_offset, impostor_lod, viz_group, mesh_uuid, sculpt_uuid, water_height, creator, creation_time, faces_json FROM region_impostors ";
+        const SELECT_PART: &str = r"grid, region_loc_x, region_loc_y, name, region_size_x, region_size_y, scale_x, scale_y, scale_z,
+        elevation_offset, impostor_lod, viz_group, 
+        mesh_hash, sculpt_hash,
+        mesh_uuid, sculpt_uuid, water_height, creator, creation_time, faces_json FROM region_impostors ";
         let priority = if where_clause.is_empty() { " LOW PRIORITY ". to_string() } else { "".to_string() };
         let stmt = format!("SELECT {}{} WHERE {} ORDER BY grid, region_loc_x, region_loc_y", SELECT_PART, priority, where_clause);
         Ok((stmt, grid.clone(), coords_opt, viz_group_opt))
@@ -155,6 +158,10 @@ impl TerrainDownloadHandler {
             } else {
                 None
             }
+        }
+        //  Make MySQL's type inference happy
+        fn convert_hash(s_opt: Option<String>) -> Option<String> {
+            s_opt
         }
         // Build SELECT statement and get params
         let (stmt, grid, coords_opt, viz_group_opt) = Self::build_sql_query(params)?;
@@ -174,7 +181,7 @@ impl TerrainDownloadHandler {
             let row = rs?;
             //  We have to do this the hard way because there are more than 12 columns being read.
             //  Faces is JSON as a string and must be parsed.
-            let faces_json: String = row.get_opt(17).ok_or_else(|| anyhow!("faces_json is null"))??;
+            let faces_json: String = row.get_opt(19).ok_or_else(|| anyhow!("faces_json is null"))??;
             let faces = serde_json::from_str(&faces_json)?;
             let rd = RegionImpostorData {
                 //  None of these null checks should fail, because those fields are non-null in the SQL table definition.
@@ -189,12 +196,11 @@ impl TerrainDownloadHandler {
                 elevation_offset: row.get_opt(9).ok_or_else(|| anyhow!("elevation_offset is null"))??,
                 impostor_lod: row.get_opt(10).ok_or_else(|| anyhow!("impostor_lod is null"))??,
                 viz_group: row.get_opt(11).ok_or_else(|| anyhow!("Viz_group is null"))??,
-                mesh_uuid: convert_uuid(row.get_opt(12).ok_or_else(|| anyhow!("mesh_uuid is invalid"))??,),
-                sculpt_uuid: convert_uuid(row.get_opt(13).ok_or_else(|| anyhow!("mesh_uuid is invalid"))??,),
-                water_height: row.get_opt(14).ok_or_else(|| anyhow!("water_height is null"))??,
-                //  Fields not used by the viewer
-                mesh_hash: None,
-                sculpt_hash: None,
+                mesh_hash: convert_hash(row.get_opt(12).ok_or_else(|| anyhow!("mesh_hash is invalid"))??,),
+                sculpt_hash: convert_hash(row.get_opt(13).ok_or_else(|| anyhow!("sculpt_hash is invalid"))??,),
+                mesh_uuid: convert_uuid(row.get_opt(14).ok_or_else(|| anyhow!("mesh_uuid is invalid"))??,),
+                sculpt_uuid: convert_uuid(row.get_opt(15).ok_or_else(|| anyhow!("sculpt_uuid is invalid"))??,),
+                water_height: row.get_opt(16).ok_or_else(|| anyhow!("water_height is null"))??,
                 faces,
             };
             log::debug!("{:?}",rd);
@@ -222,11 +228,7 @@ impl TerrainDownloadHandler {
             log::error!("Impostor download fetch errors: {:?}", errors);
         }
         //  Construct reply for REST query
-        let full_reply = RegionImpostorReply {
-            version: RegionImpostorReply::REGION_IMPOSTOR_INFO_VERSION,
-            impostors,
-            errors,            
-        };
+        let full_reply = impostors;    
         let json = serde_json::to_string_pretty(&full_reply)?;
         Ok((200, json))
     }
@@ -282,7 +284,6 @@ impl Handler for TerrainDownloadHandler {
                     format!("Incorrect request: {:?}", e).as_str(),
                 );
                 //  Return something useful.
-                //////let b = format!("Env: {:?}\nParams: {:?}\n", env, request.params).into_bytes();
                 let b = [];
                 Response::write_response(out, request, http_response.as_slice(), &b)?;
             }
@@ -324,7 +325,6 @@ pub fn run_responder() -> Result<(), Error> {
         .pass(creds.get("DB_PASS"))
         .db_name(creds.get("DB_NAME"));
     drop(creds);
-    //////log::info!("Opts: {:?}", opts);
     let pool = Pool::new(opts)?;
     log::info!("Connected to database.");
     let mut terrain_upload_handler = TerrainDownloadHandler::new(pool)?;
@@ -335,6 +335,7 @@ pub fn run_responder() -> Result<(), Error> {
 /// Main program
 pub fn main() {
     logger();
+    catch_panic();
     match run_responder() {
         Ok(()) => {}
         Err(e) => {

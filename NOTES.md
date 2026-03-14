@@ -818,4 +818,4 @@ Fix tomorrow.
      
 2026-03-13
    Better alignment but still not perfect. 
-   - Removed 3x shrink at end of block. 
+   - Offset in add_perimeter_to_image is wrong - not centered.

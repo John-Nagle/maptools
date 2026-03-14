@@ -8,6 +8,7 @@ mod initialimpostors;
 mod tileassets;
 mod testlogger;
 mod auth;
+mod panichook;
 
 pub use credentials::Credentials;
 pub use fcgisocketsetup::init_fcgi;
@@ -19,3 +20,4 @@ pub use initialimpostors::{InitialImpostors, TileType};
 pub use testlogger::{test_logger};
 pub use tileassets::{AssetUpload, AssetUploadShort, AssetUploadArrayShort, TileAssetType};
 pub use auth::{Authorizer, AuthorizeType};
+pub use panichook::{catch_panic};
