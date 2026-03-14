@@ -12,6 +12,9 @@ use anyhow::{anyhow, Error};
 use std::io::{Cursor};
 use chrono::{DateTime, Utc};
 
+/// Minimum side depth on sculpts to guarantee coverage at edges that don't match perfectly.
+const SIDE_DEPTH: f64 = 4.0;
+
 /// Calculate hash for duplicate check.
 fn calc_rgbimage_hash(img: &RgbImage) -> u32 {
     let mut hasher = DefaultHasher::new();
@@ -46,6 +49,8 @@ impl TerrainSculpt {
         if let Some(elevs) = &self.elevs {
             let maxz = elevs.iter().flatten().cloned().fold(f64::MIN, f64::max);
             let minz = elevs.iter().flatten().cloned().fold(f64::MAX, f64::min);
+            //  Add side extension so sculpts always have some side depth.
+            let minz = (minz - SIDE_DEPTH).max(0.0);
             self.zheight = Some(maxz - minz);
             self.zoffset = Some(minz);
 
@@ -247,6 +252,7 @@ impl TerrainSculptTexture {
     /// This has to match what we do to the sculpts, so that
     /// the folded-down edges will work.
     /// Why 3*shrink_pixels? Because 2 isn't enough.
+    /// ***THIS IS STILL OFF***
     pub fn add_perimeter_to_image(mut img: DynamicImage, shrink_pixels: u32) -> DynamicImage {
         let inner_img = DynamicImage::resize_exact(&img, img.width() - 3*shrink_pixels, img.height() - 3*shrink_pixels, FilterType::CatmullRom);
         replace(&mut img, &inner_img, shrink_pixels.into(), shrink_pixels.into());

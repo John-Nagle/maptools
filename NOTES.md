@@ -815,3 +815,7 @@ Fix tomorrow.
    - It's not in Sharpview. It can be reproduced by making sculpts in Firestorm.
    - The scaled images with the outer 8 pixels (of 256) as the sides do not map
      correctly to the sculpt texture UVs. Looks like an off by 1 error.
+     
+2026-03-13
+   Better alignment but still not perfect. 
+   - Removed 3x shrink at end of block. 
