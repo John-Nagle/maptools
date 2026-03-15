@@ -819,3 +819,11 @@ Fix tomorrow.
 2026-03-13
    Better alignment but still not perfect. 
    - Offset in add_perimeter_to_image is wrong - not centered.
+   
+2026-03-14
+   Now off by about half a road width.
+   Also, theres a new vertical problem. Sculpts are too high by a few meters.
+   - Scheme for adding longer skirts to sculpts produced misadjusted offset. Needs fix.
+   - Tried indenting the images by 8, 10, and 16 PERIMETER_PIXELS. 8 and 10 look about the same. 16 is bad on some edges. Back to 8.
+   - Looks good at 8. Some of the artifacts are in the original map tiles.
+   - Now just need to fix the Z axis problem. 
