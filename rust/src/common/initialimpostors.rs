@@ -19,7 +19,7 @@ use mysql::prelude::Queryable;
 use uuid::{Uuid};
 use mysql::{Transaction, TxOpts};
 use crate::{RegionData};
-use crate::{AssetUpload, TileAssetType};
+use crate::{AssetUpload, TileAssetType, TerrainGeometry};
 use crate::{RegionImpostorData, RegionImpostorFaceData, HeightField};
 use crate::{uuid_opt_to_string};
 
@@ -538,8 +538,9 @@ impl InitialImpostors {
     //  There's too much conversion between similar formats in this program.
     //  Some of that is from having to put coordinates into SQL columns.
     //  SQL has neither tuples nor arrays.
-    pub fn assemble_region_impostor_data(tile_type: TileType, region: &RegionData, height_field: &HeightField, viz_group: u32, 
+    pub fn assemble_region_impostor_data(terrain_geometry: &dyn TerrainGeometry, region: &RegionData, height_field: &HeightField, viz_group: u32, 
         asset_hash: &str, asset_uuid_opt: Option<Uuid>, face_data: &[RegionImpostorFaceData]) -> RegionImpostorData {
+        let tile_type = terrain_geometry.get_tile_type();
         let (sculpt_hash, sculpt_uuid, mesh_hash, mesh_uuid) = match tile_type {
             TileType::Sculpt => (Some(asset_hash), asset_uuid_opt, None, None),
             TileType::Mesh => (None, None, Some(asset_hash), asset_uuid_opt)

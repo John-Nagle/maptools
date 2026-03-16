@@ -827,3 +827,17 @@ Fix tomorrow.
    - Tried indenting the images by 8, 10, and 16 PERIMETER_PIXELS. 8 and 10 look about the same. 16 is bad on some edges. Back to 8.
    - Looks good at 8. Some of the artifacts are in the original map tiles.
    - Now just need to fix the Z axis problem. 
+     - Elevation offset in height field is from the actual input measurements.
+     - tile_assets only has elevation offset encoded in the name.
+       - Is that used?
+         - No. Get elevation_offset out of AssetUpload. Maybe out of name?
+     - elevation_offset in impostors needs to be adjusted for the skirts of the sculpt.
+       - Won't be the same as the one from the height field any more.
+     - When the sculpt is built, zmin is the bottom of the skirt.
+     - assemble_region_impostor_data needs the adjusted elevation_offset, not the one it gets from the height field.
+       - Need scale and offset from TerrainSculpt, not height field.
+         - TerrainSculpt ought to be a trait, so getting scale and offset is generic.
+       - Only thing needed from height field is water level.
+         - That needs to be somewhere else. Where?
+         - It's a legit part of height_field, because, for multi-region height fields, it needs to be the minimum.
+           - And terrain height needs to be raised to water level for multi-region height fields?

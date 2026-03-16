@@ -11,6 +11,7 @@ use std::f64;
 use anyhow::{anyhow, Error};
 use std::io::{Cursor};
 use chrono::{DateTime, Utc};
+use common::{TerrainGeometry, TileType};
 
 /// Minimum side depth on sculpts to guarantee coverage at edges that don't match perfectly.
 const SIDE_DEPTH: f64 = 4.0;
@@ -190,6 +191,13 @@ impl TerrainSculpt {
             }
         }
         self.elevs = Some(elevs);
+    }
+}
+
+impl TerrainGeometry for TerrainSculpt {
+    /// Get tile type for this variant.
+    fn get_tile_type(&self) -> TileType {
+       TileType::Sculpt
     }
 }
 

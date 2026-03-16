@@ -10,7 +10,7 @@
 //
 use anyhow::{Error, anyhow};
 use chrono::{Utc, DateTime, NaiveDateTime};
-use crate::{RegionData, HeightField, RegionImpostorFaceData, hash_to_hex};
+use crate::{RegionData, HeightField, RegionImpostorFaceData, TileType, hash_to_hex};
 use mysql::prelude::{Queryable};
 use mysql::{PooledConn, params, Error::MySqlError};
 use serde::{Deserialize, Serialize};
@@ -86,6 +86,12 @@ impl TileAssetType {
             Ok(prefix[2..3].parse()?)
         }
     }
+}
+
+/// Parent of TerrainSculpt and TerrainMesh
+pub trait TerrainGeometry {
+    /// Get the tile asset type. Must be overridden.
+    fn get_tile_type(&self) -> TileType;
 }
 
 /// What the LSL tool uploads for each uploaded impostor asset.

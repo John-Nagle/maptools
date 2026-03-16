@@ -19,7 +19,7 @@ mod sculptmaker;
 mod regionorder;
 mod vizgroup;
 use anyhow::{anyhow, Error};
-use common::{RegionData, HeightField, RegionImpostorFaceData, InitialImpostors, TileType};
+use common::{RegionData, HeightField, RegionImpostorFaceData, InitialImpostors};
 use envie::Envie;
 use getopts::Options;
 use log::LevelFilter;
@@ -395,7 +395,7 @@ impl TerrainGenerator {
             log::info!("Sculpt image asset already exists: {} UUID: {:?}", sculpt_asset_upload.asset_name, uuid);
             self.stats.assets_reused += 1;
         } else {
-            let sculpt_image = terrain_sculpt.image.unwrap();
+            let sculpt_image = terrain_sculpt.image.as_ref().unwrap();
             let mut sculpt_image_path = self.folder_generator.next_path()?;
             sculpt_image_path.push(sculpt_asset_upload.asset_name.to_owned() + ".png");
             sculpt_image.save(&sculpt_image_path)?;
@@ -447,7 +447,7 @@ impl TerrainGenerator {
             base_texture_hash: hash_to_hex(terrain_image_hash),
             emissive_texture_hash: None
         };      
-        let impostor_data =  InitialImpostors::assemble_region_impostor_data(TileType::Sculpt, region, height_field, viz_group_id, &hash_to_hex(sculpt_hash),
+        let impostor_data =  InitialImpostors::assemble_region_impostor_data(&terrain_sculpt, region, height_field, viz_group_id, &hash_to_hex(sculpt_hash),
             sculpt_uuid_opt, &[face_0]);
         log::debug!("Region impostor data: {:?}", impostor_data);
         InitialImpostors::add_impostor(&mut self.conn, impostor_data)?;
