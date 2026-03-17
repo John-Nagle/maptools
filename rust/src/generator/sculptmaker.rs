@@ -212,7 +212,15 @@ impl TerrainGeometry for TerrainSculpt {
     fn get_water_height(&self) -> f32 {
         self.water_height
     }
-
+    
+    /// Get adjusted (with skirt) scale and offset
+    fn get_adjusted_scale_offset(&self) -> Result<(f32, f32), Error> {
+        if let Some(zheight) = self.zheight && let Some(zoffset) = self.zoffset {
+            Ok((zheight as f32, zoffset as f32))
+        } else {
+            Err(anyhow!("No scale or offset"))
+        }
+    }
 }
 
 /// Make a texture for a terrain sculpt.

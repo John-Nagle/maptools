@@ -10,7 +10,7 @@
 //
 use anyhow::{Error, anyhow};
 use chrono::{Utc, DateTime, NaiveDateTime};
-use crate::{RegionData, HeightField, RegionImpostorFaceData, TileType, hash_to_hex};
+use crate::{RegionData, RegionImpostorFaceData, TileType, hash_to_hex};
 use mysql::prelude::{Queryable};
 use mysql::{PooledConn, params, Error::MySqlError};
 use serde::{Deserialize, Serialize};
@@ -94,6 +94,8 @@ pub trait TerrainGeometry {
     fn get_tile_type(&self) -> TileType;
     /// Get water height. Must be overridden
     fn get_water_height(&self) -> f32;
+    /// Get adjusted (with skirt) scale and offset
+    fn get_adjusted_scale_offset(&self) -> Result<(f32, f32), Error>;
 }
 
 /// What the LSL tool uploads for each uploaded impostor asset.
@@ -130,13 +132,13 @@ impl AssetUpload {
 
     /// New, from available data. No UUID yet.
     /// UUID to be filled in later in uploadimpostor after upload of asset to SL/OS server.
-    pub fn new(tile_asset_type: TileAssetType, region_data: &RegionData, height_field: &HeightField, asset_hash: u32) -> Result<Self, Error> {
-        let (zscale, elevation_offset) = height_field.get_scale_offset()?;
+    pub fn new(tile_asset_type: TileAssetType, region_data: &RegionData, terrain_geometry: &dyn TerrainGeometry, asset_hash: u32) -> Result<Self, Error> {
+        let (zscale, elevation_offset) = terrain_geometry.get_adjusted_scale_offset()?;
         let sx = region_data.region_size_x;
         let sy = region_data.region_size_y;
         let sz = zscale;
         let scale = [sx as f32, sy as f32, sz];
-        let water_height = height_field.water_height;
+        let water_height = terrain_geometry.get_water_height();
         
         let region_loc = [region_data.region_loc_x, region_data.region_loc_y];
         let region_size = [region_data.region_size_x, region_data.region_size_y];
@@ -144,7 +146,7 @@ impl AssetUpload {
         let impostor_lod = region_data.lod;
         let asset_uuid = None;
         //  Construct name that encodes the coords and hash. viz_group is no longer used.
-        let asset_name = Self::impostor_name(&tile_asset_type.to_prefix(), region_data, height_field, impostor_lod, 0, asset_hash)?;
+        let asset_name = Self::impostor_name(&tile_asset_type.to_prefix(), region_data, terrain_geometry, impostor_lod, 0, asset_hash)?;
         
         Ok(Self {
             asset_name,
@@ -168,18 +170,18 @@ impl AssetUpload {
     fn impostor_name(
         prefix: &str,
         region: &RegionData,
-        height_field: &HeightField,
+        terrain_geometry: &dyn TerrainGeometry,
         lod: u8,
         viz_group_id: u32,
         hash: u32,
     ) -> Result<String, Error> {
         let x = region.region_loc_x;
         let y = region.region_loc_y;
-        let (scale, offset) = height_field.get_scale_offset()?;
+        let (scale, offset) = terrain_geometry.get_adjusted_scale_offset()?;
         let sx = region.region_size_x;
         let sy = region.region_size_y;
         let sz = scale;
-        let water_height = height_field.water_height;
+        let water_height = terrain_geometry.get_water_height();
         let s = format!("{}_{}_{}_{}_{}_{:.2}_{:.2}_{}_{}_{:.2}_{:08x}", prefix, x, y, sx, sy, sz, offset, lod, viz_group_id, water_height, hash);
         if s.len() > 63 {
             Err(anyhow!("Generated filename is too long: {}", s))

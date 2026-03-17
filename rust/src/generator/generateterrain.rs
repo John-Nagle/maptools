@@ -389,7 +389,7 @@ impl TerrainGenerator {
         terrain_sculpt.makeimage();
         let sculpt_hash = terrain_sculpt.get_hash()?;
         //  Create an AssetUpload for the one texture.
-        let sculpt_asset_upload = AssetUpload::new(TileAssetType::SculptTexture, region, height_field, sculpt_hash)?;    
+        let sculpt_asset_upload = AssetUpload::new(TileAssetType::SculptTexture, region, &terrain_sculpt, sculpt_hash)?;    
         let sculpt_uuid_opt = sculpt_asset_upload.get_asset_uuid(&mut self.conn)?;
         if let Some (uuid) = sculpt_uuid_opt && !FORCE_SCULPT_REGEN {
             log::info!("Sculpt image asset already exists: {} UUID: {:?}", sculpt_asset_upload.asset_name, uuid);
@@ -416,7 +416,7 @@ impl TerrainGenerator {
         terrain_image.makeimage(TERRAIN_SCULPT_TEXTURE_SIZE)?;
         let terrain_image_hash = terrain_image.get_hash()?;
         //  Create an AssetUpload for the one texture.
-        let image_asset_upload = AssetUpload::new(TileAssetType::BaseTexture(0), region, height_field, terrain_image_hash)?;    
+        let image_asset_upload = AssetUpload::new(TileAssetType::BaseTexture(0), region, &terrain_sculpt, terrain_image_hash)?;    
         //  For sculpts, there's only one texture, the base texture, and only one face. Meshes are more complicated.
         let terrain_image_uuid_opt = image_asset_upload.get_asset_uuid(&mut self.conn)?;
         if let Some(uuid) = terrain_image_uuid_opt {
