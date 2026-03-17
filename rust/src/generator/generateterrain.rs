@@ -383,7 +383,7 @@ impl TerrainGenerator {
         log::info!("Generating sculpt for \"{}\": {}", region.name, height_field);
         // TerrainSculpt was translated from Python with an LLM. NEEDS WORK
         //  Do sculpt
-        let mut terrain_sculpt = TerrainSculpt::new(&region.name);
+        let mut terrain_sculpt = TerrainSculpt::new(height_field.water_height);
         let (scale, offset, elevs) = height_field.into_sculpt_array()?;
         terrain_sculpt.setelevs(elevs, scale as f64, offset as f64);
         terrain_sculpt.makeimage();

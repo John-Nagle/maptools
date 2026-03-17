@@ -841,3 +841,6 @@ Fix tomorrow.
          - That needs to be somewhere else. Where?
          - It's a legit part of height_field, because, for multi-region height fields, it needs to be the minimum.
            - And terrain height needs to be raised to water level for multi-region height fields?
+         - AssetUpload::new needs modified scale and offset, which height field does not have.
+           - It can't use TerrainGeometry because that's also used for non-terrain textures.
+           - Bleah. More plumbing trouble.

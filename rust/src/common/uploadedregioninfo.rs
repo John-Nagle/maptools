@@ -160,7 +160,7 @@ pub struct HeightField {
     /// size of region, Y
     pub size_y: u32,
     /// Water level for region. Here because of where the data comes from.
-    pub water_level: f32,
+    pub water_height: f32,
 }
 
 impl std::fmt::Display for HeightField {
@@ -189,7 +189,7 @@ impl HeightField {
         size_y: u32,
         scale: f32,
         offset: f32,
-        water_level: f32,
+        water_height: f32,
     ) -> Result<Self, Error> {
         log::debug!("New height field, scale {:5}, offset {:5}", scale, offset);
         if elevs.len() != (samples_x as usize) * (samples_y as usize) {
@@ -207,7 +207,7 @@ impl HeightField {
             heights,
             size_x,
             size_y,
-            water_level,
+            water_height,
         })
     }
 
@@ -218,7 +218,7 @@ impl HeightField {
         size_y: u32,
         scale: f32,
         offset: f32,
-        water_level: f32,
+        water_height: f32,
     ) -> Result<Self, Error> {
         if elevs.is_empty() {
             return Err(anyhow!("Elevs array is empty."));
@@ -235,7 +235,7 @@ impl HeightField {
             heights,
             size_x,
             size_y,
-            water_level,
+            water_height,
         })
     }
     
@@ -317,7 +317,7 @@ impl HeightField {
             Ok(Self {
                 size_x: non_empty.size_x * 2,
                 size_y: non_empty.size_y * 2,
-                water_level: non_empty.water_level,
+                water_height: non_empty.water_height,
                 heights,
             })
         } else {
@@ -377,7 +377,7 @@ impl HeightField {
         Self {
             size_x: self.size_x,
             size_y: self.size_y,
-            water_level: self.water_level,
+            water_height: self.water_height,
             heights,
         }
     }

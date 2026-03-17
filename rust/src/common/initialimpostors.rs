@@ -558,7 +558,7 @@ impl InitialImpostors {
             mesh_uuid,
             mesh_hash: mesh_hash.map(|s| s.to_string()),
             elevation_offset: offset,
-            water_height: Some(height_field.water_level),
+            water_height: Some(height_field.water_height),
             name: Some(region.name.clone()),
             grid: region.grid.clone(),
             faces: face_data.into(),

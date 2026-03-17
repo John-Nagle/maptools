@@ -92,6 +92,8 @@ impl TileAssetType {
 pub trait TerrainGeometry {
     /// Get the tile asset type. Must be overridden.
     fn get_tile_type(&self) -> TileType;
+    /// Get water height. Must be overridden
+    fn get_water_height(&self) -> f32;
 }
 
 /// What the LSL tool uploads for each uploaded impostor asset.
@@ -134,7 +136,7 @@ impl AssetUpload {
         let sy = region_data.region_size_y;
         let sz = zscale;
         let scale = [sx as f32, sy as f32, sz];
-        let water_height = height_field.water_level;
+        let water_height = height_field.water_height;
         
         let region_loc = [region_data.region_loc_x, region_data.region_loc_y];
         let region_size = [region_data.region_size_x, region_data.region_size_y];
@@ -177,8 +179,8 @@ impl AssetUpload {
         let sx = region.region_size_x;
         let sy = region.region_size_y;
         let sz = scale;
-        let water_level = height_field.water_level;
-        let s = format!("{}_{}_{}_{}_{}_{:.2}_{:.2}_{}_{}_{:.2}_{:08x}", prefix, x, y, sx, sy, sz, offset, lod, viz_group_id, water_level, hash);
+        let water_height = height_field.water_height;
+        let s = format!("{}_{}_{}_{}_{}_{:.2}_{:.2}_{}_{}_{:.2}_{:08x}", prefix, x, y, sx, sy, sz, offset, lod, viz_group_id, water_height, hash);
         if s.len() > 63 {
             Err(anyhow!("Generated filename is too long: {}", s))
         } else {

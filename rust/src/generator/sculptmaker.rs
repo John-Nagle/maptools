@@ -30,19 +30,27 @@ const SCULPTDIM: usize = 30;
 
 #[derive(Debug)]
 pub struct TerrainSculpt {
+    /// The image
     pub image: Option<RgbImage>,
+    /// The elevation data
     elevs: Option<Vec<Vec<f64>>>,
+    /// Z height, adjusted for skirt.
     zheight: Option<f64>,
+    /// Z offset, adjusted for skirt.
     zoffset: Option<f64>,
+    /// Water level.
+    water_height: f32,
 }
 
 impl TerrainSculpt {
-    pub fn new(_region: &str) -> Self {
+    //  Usual new. Most items filled in later.
+    pub fn new(water_height: f32) -> Self {
         TerrainSculpt {
             image: None,
             elevs: None,
             zheight: None,
             zoffset: None,
+            water_height
         }
     }
 
@@ -139,7 +147,7 @@ impl TerrainSculpt {
     pub fn get_hash(&self) -> Result<u32, Error> {
         Ok(calc_rgbimage_hash(self.image.as_ref().unwrap()))
     }
-
+    
     pub fn setelevs(&mut self, elevs: Vec<Vec<u8>>, inputscale: f64, inputoffset: f64) {
         if elevs.len() == SCULPTDIM && elevs[0].len() == SCULPTDIM {
             // Directly convert to f64
@@ -199,6 +207,12 @@ impl TerrainGeometry for TerrainSculpt {
     fn get_tile_type(&self) -> TileType {
        TileType::Sculpt
     }
+    
+    /// Get water height, which we put in here so we don't have to pass height field further down.
+    fn get_water_height(&self) -> f32 {
+        self.water_height
+    }
+
 }
 
 /// Make a texture for a terrain sculpt.
