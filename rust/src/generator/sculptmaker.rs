@@ -14,7 +14,7 @@ use chrono::{DateTime, Utc};
 use common::{TerrainGeometry, TileType};
 
 /// Minimum side depth on sculpts to guarantee coverage at edges that don't match perfectly.
-const SIDE_DEPTH: f64 = 4.0;
+const SKIRT_DEPTH: f64 = 4.0;
 
 /// Calculate hash for duplicate check.
 fn calc_rgbimage_hash(img: &RgbImage) -> u32 {
@@ -58,8 +58,12 @@ impl TerrainSculpt {
         if let Some(elevs) = &self.elevs {
             let maxz = elevs.iter().flatten().cloned().fold(f64::MIN, f64::max);
             let minz = elevs.iter().flatten().cloned().fold(f64::MAX, f64::min);
-            //  Add side extension so sculpts always have some side depth.
-            let minz = (minz - SIDE_DEPTH).max(0.0);
+            //  Add side extension so sculpts always have some side depth
+            //  to prevent see-through at joints.
+            //  Add this much skirt to each sculpt. Usually SKIRT_DEPTH.
+            let zskirt = minz.min(SKIRT_DEPTH);
+            //////let minz = (minz - SKIRT_DEPTH).max(0.0);
+            let maxz = maxz + zskirt;
             self.zheight = Some(maxz - minz);
             self.zoffset = Some(minz);
 
@@ -71,7 +75,7 @@ impl TerrainSculpt {
             for x in 0..elevs.len() {
                 for y in 0..elevs[0].len() {
                     //////let zscaled = (elevs[x][y] - minz) / (maxz - minz);
-                    let zscaled = (elevs[x][y] - minz) / range;
+                    let zscaled = (elevs[x][y] + zskirt - minz) / range;
                     assert!((0.0..=1.0).contains(&zscaled));
                     let zpixel = ((zscaled * 255.0).floor() as i32).clamp(0, 255) as u8;
                     let xpixel = ((x as f64 * 255.0) / (elevs.len() - 1) as f64).round().clamp(0.0, 255.0) as u8;
@@ -82,8 +86,7 @@ impl TerrainSculpt {
                     img.put_pixel(x as u32, flipped_y as u32, Rgb([xpixel, ypixel, zpixel]));
                 }
             }
-            ////////  Avoid edge effects at sculplt size reduction
-            //////Self::fix_sculpt_image_edges(&mut img);
+            //  Add the skirts to the sculpt. 
             let img = Self::double_image_size(Self::add_flat_sides(&img));
             assert_eq!(img.width(), 64); // ***TEMP***
             assert_eq!(img.height(), 64); // ***TEMP***

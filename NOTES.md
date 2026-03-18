@@ -844,3 +844,12 @@ Fix tomorrow.
          - AssetUpload::new needs modified scale and offset, which height field does not have.
            - It can't use TerrainGeometry because that's also used for non-terrain textures.
            - Bleah. More plumbing trouble.
+           
+2026-03-16
+     Fixed plumbing.
+     TerrainSculpt::makeimage is wrong.
+     Want to add skirt to each image.
+     Increase all Z values by SKIRT_HEIGHT
+     Increase zmax by SKIRT_HEIGHT
+     Keep same zmin?     
+     Decrease offset by SKIRT_HEIGHT
