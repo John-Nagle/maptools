@@ -63,7 +63,7 @@ impl TerrainSculpt {
             //  Add this much skirt to each sculpt. Usually SKIRT_DEPTH.
             let zskirt = minz.min(SKIRT_DEPTH);
             //////let minz = (minz - SKIRT_DEPTH).max(0.0);
-            let maxz = maxz + zskirt;
+            let minz = minz - zskirt;
             self.zheight = Some(maxz - minz);
             self.zoffset = Some(minz);
 
@@ -75,7 +75,7 @@ impl TerrainSculpt {
             for x in 0..elevs.len() {
                 for y in 0..elevs[0].len() {
                     //////let zscaled = (elevs[x][y] - minz) / (maxz - minz);
-                    let zscaled = (elevs[x][y] + zskirt - minz) / range;
+                    let zscaled = (elevs[x][y] - minz) / range;
                     assert!((0.0..=1.0).contains(&zscaled));
                     let zpixel = ((zscaled * 255.0).floor() as i32).clamp(0, 255) as u8;
                     let xpixel = ((x as f64 * 255.0) / (elevs.len() - 1) as f64).round().clamp(0.0, 255.0) as u8;
