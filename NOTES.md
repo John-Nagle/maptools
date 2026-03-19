@@ -853,3 +853,17 @@ Fix tomorrow.
      Increase zmax by SKIRT_HEIGHT
      Keep same zmin?     
      Decrease offset by SKIRT_HEIGHT
+     
+2026-03-17
+     
+     So how did we get these numbers:
+     05:46:12 [DEBUG] (1) common::uploadedregioninfo: New height field, scale 70.19521, offset 11.9384
+     - Those values came in at upload. 
+     05:46:12 [INFO] Generating sculpt for "Chalmun": HeightField samples (65, 65)  region (256, 256)
+     05:46:12 [DEBUG] (1) common::uploadedregioninfo: Height range:  11.9384 .. 81.85941
+     - This below comes from processing the 0..255 encoded height data. Low is legit, high is smaller than it should be.
+     - Off by 2.81 out of 70. That''s huge, even after going through the 256-value coding.
+     05:46:12 [DEBUG] (1) generateterrain::sculptmaker: Z bounds: 7.94 to 79.67
+     
+2026-03-17
+     New sculpts not being used because offset and scale are not part of hash. Fix.
