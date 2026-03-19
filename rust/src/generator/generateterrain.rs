@@ -447,7 +447,7 @@ impl TerrainGenerator {
             base_texture_hash: hash_to_hex(terrain_image_hash),
             emissive_texture_hash: None
         };      
-        let impostor_data =  InitialImpostors::assemble_region_impostor_data(&terrain_sculpt, region, height_field, viz_group_id, &hash_to_hex(sculpt_hash),
+        let impostor_data =  InitialImpostors::assemble_region_impostor_data(&terrain_sculpt, region, viz_group_id, &hash_to_hex(sculpt_hash),
             sculpt_uuid_opt, &[face_0]);
         log::debug!("Region impostor data: {:?}", impostor_data);
         InitialImpostors::add_impostor(&mut self.conn, impostor_data)?;

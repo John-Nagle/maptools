@@ -151,10 +151,7 @@ impl TerrainDownloadHandler {
         //  Convert UUIDs, return None if fail.
         fn convert_uuid(s_opt: Option<String>) -> Option<Uuid> {
             if let Some(s) = s_opt {
-                match Uuid::try_parse(&s) {
-                    Ok(u) => Some(u),
-                    Err(_) => None
-                }
+                Uuid::try_parse(&s).ok()
             } else {
                 None
             }
