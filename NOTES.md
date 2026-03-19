@@ -865,5 +865,9 @@ Fix tomorrow.
      - Off by 2.81 out of 70. That''s huge, even after going through the 256-value coding.
      05:46:12 [DEBUG] (1) generateterrain::sculptmaker: Z bounds: 7.94 to 79.67
      
-2026-03-17
-     New sculpts not being used because offset and scale are not part of hash. Fix.
+2026-03-18
+     New sculpts not being used because offset and scale are not part of hash. Fix. [DONE]
+     Vertical position is still wrong? What did I do wrong?
+     - pub fn assemble_region_impostor_data(terrain_geometry: &dyn TerrainGeometry, region: &RegionData, height_field: &HeightField, viz_group: u32, 
+        asset_hash: &str, asset_uuid_opt: Option<Uuid>, face_data: &[RegionImpostorFaceData]) -> RegionImpostorData {
+     is getting the range and offset from the height field, not the terrain geometry.

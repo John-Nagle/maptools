@@ -546,7 +546,7 @@ impl InitialImpostors {
             TileType::Mesh => (None, None, Some(asset_hash), asset_uuid_opt)
         };
         //  This is valid but inefficient.
-        let (scale, offset) = height_field.get_scale_offset().expect("Height field invalid, should be caught by caller.");
+        let (scale, offset) = terrain_geometry.get_adjusted_scale_offset().expect("Height field invalid, should be caught by caller.");
         RegionImpostorData {
             region_loc: [region.region_loc_x, region.region_loc_y],
             region_size: [region.region_size_x, region.region_size_y],     
