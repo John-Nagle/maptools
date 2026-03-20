@@ -181,6 +181,7 @@ impl HeightField {
     /// New from elevs blob, the form used in SQL. One big blob, a flattened 2D array.
     /// size_x and size_y are size of the region, not the elevs data.
     /// In the elevs blob, the Y subscript goes fastest.
+    #[allow(clippy::ptr_arg, clippy::too_many_arguments)]   // mysql type inference won't accept &[u8] here.
     pub fn new_from_elevs_blob(
         elevs: &Vec<u8>,
         samples_x: u32,
@@ -212,6 +213,7 @@ impl HeightField {
     }
 
     /// New from the 2D array of elevs we get from JSON - test only
+    #[allow(clippy::ptr_arg, clippy::too_many_arguments)]   // mysql type inference won't accept &[u8] here.
     pub fn new_from_unscaled_elevs(
         elevs: &Vec<Vec<u8>>,
         size_x: u32,

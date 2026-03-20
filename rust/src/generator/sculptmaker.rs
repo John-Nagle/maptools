@@ -174,7 +174,7 @@ impl TerrainSculpt {
         let mut newelevs: Vec<Vec<f64>> = vec![vec![0.0; SCULPTDIM]; SCULPTDIM];
         let orig_x = elevs.len();
         let orig_y = elevs[0].len();
-
+        #[allow(clippy::needless_range_loop)]
         for x in 0..SCULPTDIM {
             for y in 0..SCULPTDIM {
                 let xfract = ((x as f64) / SCULPTDIM as f64) * orig_x as f64;
@@ -202,6 +202,7 @@ impl TerrainSculpt {
     fn _pyramidtest(&mut self) {
         let mut elevs = vec![vec![0.0; SCULPTDIM]; SCULPTDIM];
         let halfway = (SCULPTDIM as f64) * 0.5;
+        #[allow(clippy::needless_range_loop)]
         for x in 0..SCULPTDIM {
             for y in 0..SCULPTDIM {
                 let z1 = halfway - ((halfway - x as f64).abs());
