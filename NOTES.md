@@ -871,3 +871,7 @@ Fix tomorrow.
      - pub fn assemble_region_impostor_data(terrain_geometry: &dyn TerrainGeometry, region: &RegionData, height_field: &HeightField, viz_group: u32, 
         asset_hash: &str, asset_uuid_opt: Option<Uuid>, face_data: &[RegionImpostorFaceData]) -> RegionImpostorData {
      is getting the range and offset from the height field, not the terrain geometry.
+     
+2026-03-20
+
+     Cleanup. Next big thing to write is a garbage collector for UUIDs.
