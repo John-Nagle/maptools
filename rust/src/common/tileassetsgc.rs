@@ -12,7 +12,7 @@
 use anyhow::{Error, anyhow};
 use crate::{RegionData, RegionImpostorFaceData, TileAssetType};
 use mysql::prelude::{Queryable};
-use mysql::{PooledConn, params, Error::MySqlError};
+use mysql::{PooledConn, Row, params, Transaction, TxOpts, Error::MySqlError};
 //////use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -32,6 +32,13 @@ struct UuidUsage {
     pub asset_uuid: Uuid
 }
 
+impl UuidUsage {
+    //  From MySQL row
+    fn from_row(row: Result<Row, mysql::Error>) -> Self {
+        todo!();
+    }
+}
+
 /// The garbage collector for unused tiles.
 pub struct TileGc {
     /// Which grid
@@ -40,7 +47,7 @@ pub struct TileGc {
 
 impl TileGc {
     ///  Usual new
-    pub fn new(conn: &mut PooledConn, grid: &str) -> TileGc {
+    pub fn new(grid: &str) -> TileGc {
         Self {
             grid: grid.to_string(),
         }
@@ -50,19 +57,22 @@ impl TileGc {
     /// We have to do this the hard way, looking at each faces_json string,
     /// because this has to work with MySQL 8.0, where JSON capabiilties barely exist.
     /// In a more modern SQL implementation, we could do this whole job within SQL.
-    fn get_uuids_in_use(&self, conn: &mut PooledConn) -> Result<Vec<UuidUsage>, Error> {
+    fn get_uuids_in_use(&self, tx: &mut Transaction) -> Result<Vec<UuidUsage>, Error> {
         const SELECT_UUIDS_SQL: &str = r"SELECT 
             region_loc_x, region_loc_y, region_size_x, region_size_y,
             sculpt_uuid, sculpt_hash, mesh_uuid, mesh_hash,
             faces_json        
         FROM region_impostors
             WHERE grid = :grid;";
- 
-        todo!();
+        let params = params!(
+            "grid" => self.grid.clone(),
+        );
+        let rows = tx.exec_iter(SELECT_UUIDS_SQL, params)?;
+        Ok(rows.map(UuidUsage::from_row).collect())
     }
     
     /// Build the temporary table of UUIDs in use.
-    fn build_temporary_table(&self, conn: &mut PooledConn, active_uuids: Vec<UuidUsage>) -> Result<(), Error> {
+    fn build_temporary_table(&self, tx: &mut Transaction) -> Result<(), Error> {
         const CREATE_INUSE_UUIDS_SQL: &str = r"CREATE TEMPORARY TABLE uuids_in_use (
             region_loc_x INT NOT NULL,
             region_loc_y INT NOT NULL,
@@ -76,11 +86,11 @@ impl TileGc {
             VALUES
             (:region_loc_x, :region_loc_y, :region_size_x, :region_size_y, :asset_type, :asset_uuid, :asset_hash)";
         //  Create the temporary table
-        conn.query_drop(CREATE_INUSE_UUIDS_SQL)?;
+        tx.query_drop(CREATE_INUSE_UUIDS_SQL)?;
         //  Get all the active UUIDs. In memory all at once, but under 1MB
-        let active_uuids = self.get_uuids_in_use(conn)?;
+        let active_uuids = self.get_uuids_in_use(tx)?;
         //  Put all the records in the temporary table.
-        conn.exec_batch(
+        tx.exec_batch(
             INSERT_INUSE_UUIDS_SQL,
             active_uuids.iter().map(|p| params! {
                 "region_loc_x" => p.region_loc[0],
@@ -97,11 +107,14 @@ impl TileGc {
     
     ///  Purge all unused tile assets
     fn purge_unused_tile_assets(&self, conn: &mut PooledConn) -> Result<(), Error> {
+        let mut tx = conn.start_transaction(TxOpts::default())?;
+        self.build_temporary_table(&mut tx)?;
         const DELETE_UNUSED_TILE_ASSETS: &str = r"DELETE FROM TILE ASSETS WHERE
                 ***NOT IN TEMPORARY TABLE***
         ";
         //  Create a temporary SQL table and insert all the UUIDs.
         //  This allows us to get MySQL to do the deletions.
+        tx.commit()?;
         todo!();
     }
 }
