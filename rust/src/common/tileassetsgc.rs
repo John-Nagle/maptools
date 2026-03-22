@@ -70,15 +70,11 @@ impl TileGc {
             "grid" => self.grid.clone(),
         );
         //  Do the select and collect up the results.
-        let result: Result<Vec<Vec<UuidUsage>>, _> = tx
+        let result: Result<Vec<Vec::<UuidUsage>>, _> = tx
         .exec_iter(SELECT_UUIDS_SQL, params)?
         .map(UuidUsage::from_row).into_iter()
-        .collect()?
-        .into_iter()
-        .flatten()
         .collect();
-        Ok(result)
-        //////Ok(result?.into_iter().flatten().collect())
+        Ok(result?.into_iter().flatten().collect())
     }
     
     /// Build the temporary table of UUIDs in use.
