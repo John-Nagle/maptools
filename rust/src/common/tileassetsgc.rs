@@ -34,7 +34,8 @@ struct UuidUsage {
 
 impl UuidUsage {
     //  From MySQL row
-    fn from_row(row: Result<Row, mysql::Error>) -> Self {
+    fn from_row(row: Result<Row, mysql::Error>) -> Result<Self, Error> {
+        //  ***NEED ERROR HANDLING*** must return a Result.
         todo!();
     }
 }
@@ -67,8 +68,11 @@ impl TileGc {
         let params = params!(
             "grid" => self.grid.clone(),
         );
-        let rows = tx.exec_iter(SELECT_UUIDS_SQL, params)?;
-        Ok(rows.map(UuidUsage::from_row).collect())
+        //  Do the select and collect up the results.
+        tx
+        .exec_iter(SELECT_UUIDS_SQL, params)?
+        .map(UuidUsage::from_row).into_iter()
+        .collect()
     }
     
     /// Build the temporary table of UUIDs in use.
