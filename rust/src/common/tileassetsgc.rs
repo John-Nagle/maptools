@@ -34,6 +34,7 @@ struct UuidUsage {
 
 impl UuidUsage {
     //  From MySQL row
+    //  ***NO, WON'T WORK, NEEDS TO BE ABLE TO RETURN MULTIPLE UuidUsage.***
     fn from_row(row: Result<Row, mysql::Error>) -> Result<Self, Error> {
         //  ***NEED ERROR HANDLING*** must return a Result.
         todo!();
