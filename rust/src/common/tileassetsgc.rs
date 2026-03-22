@@ -35,7 +35,7 @@ struct UuidUsage {
 impl UuidUsage {
     //  From MySQL row
     //  ***NO, WON'T WORK, NEEDS TO BE ABLE TO RETURN MULTIPLE UuidUsage.***
-    fn from_row(row: Result<Row, mysql::Error>) -> Result<Self, Error> {
+    fn from_row(row: Result<Row, mysql::Error>) -> Result<Vec<Self>, Error> {
         //  ***NEED ERROR HANDLING*** must return a Result.
         todo!();
     }
@@ -70,10 +70,11 @@ impl TileGc {
             "grid" => self.grid.clone(),
         );
         //  Do the select and collect up the results.
-        tx
+        let result: Result<Vec<Vec<UuidUsage>>, _> = tx
         .exec_iter(SELECT_UUIDS_SQL, params)?
         .map(UuidUsage::from_row).into_iter()
-        .collect()
+        .collect();
+        Ok(result?.into_iter().flatten().collect())
     }
     
     /// Build the temporary table of UUIDs in use.
