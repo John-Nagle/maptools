@@ -10,9 +10,9 @@
 //!     April, 2026.
 //
 use anyhow::{Error, anyhow};
-use crate::{RegionData, RegionImpostorFaceData, TileAssetType};
+use crate::{RegionImpostorFaceData, TileAssetType};
 use mysql::prelude::{Queryable};
-use mysql::{PooledConn, Row, params, Transaction, TxOpts, Error::MySqlError};
+use mysql::{PooledConn, Row, params, Transaction, TxOpts};
 //////use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -33,13 +33,68 @@ struct UuidUsage {
 }
 
 impl UuidUsage {
-    //  From MySQL row
-    //  ***NO, WON'T WORK, NEEDS TO BE ABLE TO RETURN MULTIPLE UuidUsage.***
-    fn from_row(row: Result<Row, mysql::Error>) -> Result<Vec<Self>, Error> {
-        //  ***NEED ERROR HANDLING*** must return a Result.
-        todo!();
+    ///  From MySQL row
+    ///  Row format is:
+    ///     region_loc_x, region_loc_y, region_size_x, region_size_y,
+    ///     sculpt_uuid, sculpt_hash, mesh_uuid, mesh_hash,
+    ///     faces_json        
+    fn from_row(row_result: Result<Row, mysql::Error>) -> Result<Vec<Self>, Error> {
+        let row: Row = row_result?;
+        //  Decompose SQL result
+        let region_loc: [u32;2] = [row.get_opt(0).ok_or_else(|| anyhow!("loc_x is null"))??, row.get_opt(1).ok_or_else(|| anyhow!("loc_y is null"))??];
+        let region_size: [u32;2] = [row.get_opt(2).ok_or_else(|| anyhow!("size_x is null"))??, row.get_opt(3).ok_or_else(|| anyhow!("size_y is null"))??];
+        let sculpt_uuid = convert_uuid(row.get_opt(4).ok_or_else(|| anyhow!("sculpt_uuid is invalid"))??,);
+        let sculpt_hash = convert_hash(row.get_opt(5).ok_or_else(|| anyhow!("sculpt_hash is invalid"))??,);
+        let mesh_uuid = convert_uuid(row.get_opt(6).ok_or_else(|| anyhow!("mesh_uuid is invalid"))??,);
+        let mesh_hash = convert_hash(row.get_opt(7).ok_or_else(|| anyhow!("mesh_hash is invalid"))??,);
+        let faces_json: String = row.get_opt(8).ok_or_else(|| anyhow!("faces_json is null"))??;
+        let faces: Vec<RegionImpostorFaceData> = serde_json::from_str(&faces_json)?;
+        let mut results = Vec::new();
+        let mut add_uuid = |asset_type, asset_uuid, asset_hash_opt| {
+            if let Some(asset_hash) = asset_hash_opt {
+                results.push(UuidUsage {
+                    asset_type,
+                    asset_uuid,
+                    asset_hash,
+                    region_loc,
+                    region_size,
+                })
+            };                
+        };
+        if let Some(sculpt_uuid) = sculpt_uuid {
+            add_uuid(TileAssetType::SculptTexture, sculpt_uuid, sculpt_hash);
+        }
+        if let Some(mesh_uuid) = mesh_uuid {
+            add_uuid(TileAssetType::Mesh, mesh_uuid, mesh_hash);
+        }
+        for (n, face) in faces.into_iter().enumerate() {
+            if let Some(base_texture_uuid) = face.base_texture_uuid {
+                add_uuid(TileAssetType::BaseTexture(n as u8), base_texture_uuid, Some(face.base_texture_hash));
+            }
+            if let Some(emissive_texture_uuid) = face.emissive_texture_uuid {
+                add_uuid(TileAssetType::EmissiveTexture(n as u8), emissive_texture_uuid, face.emissive_texture_hash);
+            }
+        }
+        Ok(results)
     }
 }
+
+fn convert_uuid(s_opt: Option<String>) -> Option<Uuid> {
+    if let Some(s) = s_opt {
+        match Uuid::try_parse(&s) {
+            Ok(u) => Some(u),
+            Err(_) => None
+        }
+    } else {
+        None
+    }
+}
+
+//  Make MySQL's type inference happy
+fn convert_hash(s_opt: Option<String>) -> Option<String> {
+    s_opt
+}
+
 
 /// The garbage collector for unused tiles.
 pub struct TileGc {
