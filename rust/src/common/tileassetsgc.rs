@@ -188,8 +188,8 @@ fn test_gc_locally() {
     use mysql::{PooledConn, Pool};
     //  Use built-in credentials file.
     //  Not portable.
-    //////const CREDSFILE: &str = "~/projects/maptools/keys/read_credentials.txt";
-    const CREDSFILE: &str = "../keys/read_credentials.txt";
+    //////const CREDSFILE: &str = "~/projects/maptools/keys/generate_credentials.txt";
+    const CREDSFILE: &str = "../keys/generate_credentials.txt";
     println!("CREDSFILE: {} relative to {:?}", CREDSFILE, std::env::current_dir().unwrap());
     let credsfile = std::fs::canonicalize(CREDSFILE).expect("CREDSFILE path not valid");
     const GRID: &str = "agni";
