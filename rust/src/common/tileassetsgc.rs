@@ -181,15 +181,19 @@ impl TileGc {
 }
 
 #[test]
+/// Basic local test.
+/// Requires direct but read only access to the database.
 fn test_gc_locally() {
     use envie::{Envie};
     use mysql::{PooledConn, Pool};
     //  Use built-in credentials file.
     //  Not portable.
-    const CREDSFILE: &str = "../../../keys/read_credentials.txt";
+    //////const CREDSFILE: &str = "~/projects/maptools/keys/read_credentials.txt";
+    const CREDSFILE: &str = "../keys/read_credentials.txt";
+    println!("CREDSFILE: {} relative to {:?}", CREDSFILE, std::env::current_dir().unwrap());
+    let credsfile = std::fs::canonicalize(CREDSFILE).expect("CREDSFILE path not valid");
     const GRID: &str = "agni";
-    let credsfile = CREDSFILE;
-    let creds = Envie::load_with_path(&credsfile).expect("Unable to open credentials file");
+    let creds = Envie::load_with_path(&credsfile.to_str().unwrap()).expect("Unable to open credentials file");
     let portnum =  3306;
     let opts = mysql::OptsBuilder::new()
         //  Dreamhost is still using old authentication
