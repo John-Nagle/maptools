@@ -463,7 +463,7 @@ fn test_combine() {
         Some(HeightField {
             size_x: 5,
             size_y: 5,
-            water_level: 20.0,
+            water_height: 20.0,
             heights: a
             }
         )
