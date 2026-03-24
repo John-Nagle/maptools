@@ -146,10 +146,11 @@ impl TileGc {
             (region_loc_x, region_loc_y, region_size_x, region_size_y, asset_type, asset_uuid, asset_hash)
             VALUES
             (:region_loc_x, :region_loc_y, :region_size_x, :region_size_y, :asset_type, :asset_uuid, :asset_hash)";
-        //  Create the temporary table
-        tx.query_drop(CREATE_INUSE_UUIDS_SQL)?;
         //  Get all the active UUIDs. In memory all at once, but under 1MB
         let active_uuids = self.get_uuids_in_use(tx)?;
+        log::info!("{} active UUIDs", active_uuids.len());
+         //  Create the temporary table
+        tx.query_drop(CREATE_INUSE_UUIDS_SQL)?;
         //  Put all the records in the temporary table.
         tx.exec_batch(
             INSERT_INUSE_UUIDS_SQL,
@@ -186,6 +187,10 @@ impl TileGc {
 fn test_gc_locally() {
     use envie::{Envie};
     use mysql::{PooledConn, Pool};
+    let _ = simplelog::CombinedLogger::init(
+        vec![
+            simplelog::TermLogger::new(simplelog::LevelFilter::Debug, simplelog::Config::default(), simplelog::TerminalMode::Stdout, simplelog::ColorChoice::Auto),]
+    );
     //  Use built-in credentials file.
     //  Not portable.
     //////const CREDSFILE: &str = "~/projects/maptools/keys/generate_credentials.txt";
