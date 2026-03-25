@@ -172,15 +172,35 @@ impl TileGc {
     
     ///  Purge all unused tile assets
     fn purge_unused_tile_assets(&self, conn: &mut PooledConn) -> Result<(), Error> {
+        //  Set to false for testing.
+        const COMMIT_DELETIONS: bool = false;
         let mut tx = conn.start_transaction(TxOpts::default())?;
         self.build_temporary_table(&mut tx)?;
-        const DELETE_UNUSED_TILE_ASSETS: &str = r"DELETE FROM TILE ASSETS WHERE
-                ***NOT IN TEMPORARY TABLE***
-        ";
+        const DELETE_UNUSED_TILE_ASSETS: &str = r"DELETE
+            FROM tile_assets t1
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM uuids_in_use t2
+                WHERE t2.region_loc_x = t1.region_loc_x
+                    AND t2.region_loc_y = t1.region_loc_y
+                    AND t2.region_size_x = t1.region_size_x
+                    AND t2.region_size_y = t1.region_size_y
+                    AND t2.asset_uuid = t1.asset_uuid
+                    AND t2.asset_hash = t1.asset_hash
+                    AND t1.grid = :grid
+                )";
         //  Create a temporary SQL table and insert all the UUIDs.
         //  This allows us to get MySQL to do the deletions.
-        tx.commit()?;
-        todo!();
+        let params = params!("grid" => self.grid.clone());
+        log::debug!("Deleting unused tile assets.");
+        tx.exec_drop(DELETE_UNUSED_TILE_ASSETS, params)?;
+        log::debug!("Deleted {} unused tile assets.", tx.affected_rows());
+        if COMMIT_DELETIONS {
+            tx.commit()?;
+        } else {
+            tx.rollback()?; 
+        }
+        Ok(())
     }
 }
 
