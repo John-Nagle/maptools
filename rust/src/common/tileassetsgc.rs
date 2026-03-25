@@ -210,9 +210,12 @@ fn test_gc_locally() {
                     AND t1.grid = :grid
                 )";
          let params = params!("grid" => gc.grid.clone());
-         let result = tx
+         log::debug!("Generating deletion list");
+         let result: Vec<_> = tx
         .exec_iter(SELECT_UNUSED_TILE_ASSETS, params)?
-        .map(|row| log::debug!("Delete: {:?}", row));
+        .map(|row| log::debug!("Delete: {:?}", row))
+        .collect();
+        log::debug!("Generated deletion list, {} items to delete.", result.len());
         Ok(())
     }
     //  Use built-in credentials file.
