@@ -194,6 +194,27 @@ fn test_gc_locally() {
         vec![
             simplelog::TermLogger::new(simplelog::LevelFilter::Debug, simplelog::Config::default(), simplelog::TerminalMode::Stdout, simplelog::ColorChoice::Auto),]
     );
+    
+    fn purge_test(gc: &TileGc, tx: &mut Transaction) -> Result<(), Error> {
+        const SELECT_UNUSED_TILE_ASSETS: &str = r"SELECT *
+            FROM tile_assets t1
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM uuids_in_use t2
+                WHERE t2.region_loc_x = t1.region_loc_x
+                    AND t2.region_loc_y = t1.region_loc_y
+                    AND t2.region_size_x = t1.region_size_x
+                    AND t2.region_size_y = t1.region_size_y
+                    AND t2.asset_uuid = t1.asset_uuid
+                    AND t2.asset_hash = t1.asset_hash
+                    AND t1.grid = :grid
+                )";
+         let params = params!("grid" => gc.grid.clone());
+         let result = tx
+        .exec_iter(SELECT_UNUSED_TILE_ASSETS, params)?
+        .map(|row| log::debug!("Delete: {:?}", row));
+        Ok(())
+    }
     //  Use built-in credentials file.
     //  Not portable.
     //////const CREDSFILE: &str = "~/projects/maptools/keys/generate_credentials.txt";
@@ -218,4 +239,5 @@ fn test_gc_locally() {
     let gc = TileGc::new(GRID);
     let mut tx = conn.start_transaction(TxOpts::default()).expect("Cannot start transaction");
     let _ = gc.build_temporary_table(&mut tx).expect("Build temporary table failed");
+    purge_test(&gc, &mut tx).expect("Deletion check failed");
 }
