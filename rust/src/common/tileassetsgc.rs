@@ -19,6 +19,7 @@ use uuid::Uuid;
 /// One usage of a UUID in region_impostors.
 /// This should be small, because we read in
 /// all the assets for one grid.
+#[derive(Debug)]
 struct UuidUsage {
     /// What asset is being used for
     pub asset_type: TileAssetType,
@@ -148,7 +149,7 @@ impl TileGc {
             (:region_loc_x, :region_loc_y, :region_size_x, :region_size_y, :asset_type, :asset_uuid, :asset_hash)";
         //  Get all the active UUIDs. In memory all at once, but under 1MB
         let active_uuids = self.get_uuids_in_use(tx)?;
-        log::info!("{} active UUIDs", active_uuids.len());
+        log::info!("{} active UUIDs: {:?}", active_uuids.len(), &active_uuids[0..5.min(active_uuids.len())]);
          //  Create the temporary table
         tx.query_drop(CREATE_INUSE_UUIDS_SQL)?;
         log::info!("Temporary table created.");
