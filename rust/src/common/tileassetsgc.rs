@@ -151,6 +151,7 @@ impl TileGc {
         log::info!("{} active UUIDs", active_uuids.len());
          //  Create the temporary table
         tx.query_drop(CREATE_INUSE_UUIDS_SQL)?;
+        log::info!("Temporary table created.");
         //  Put all the records in the temporary table.
         tx.exec_batch(
             INSERT_INUSE_UUIDS_SQL,
@@ -164,6 +165,7 @@ impl TileGc {
                 "asset_type" => p.asset_type.to_str().to_string(),
             })
         )?;
+        log::info!("Temporary table filled.");
         Ok(())
     }
     
