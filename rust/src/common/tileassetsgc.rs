@@ -171,7 +171,6 @@ impl TileGc {
     
     ///  Purge all unused tile assets
     pub fn purge_unused_tile_assets(&self, tx: &mut Transaction) -> Result<(), Error> {
-        //  Set to false for testing.
         self.build_temporary_table(tx)?;
         const DELETE_UNUSED_TILE_ASSETS: &str = r"DELETE
             FROM tile_assets t1
@@ -225,7 +224,7 @@ fn test_gc_locally() {
          log::debug!("Generating deletion list");
          let result: Vec<_> = tx
         .exec_iter(SELECT_UNUSED_TILE_ASSETS, params)?
-        .map(|row| log::debug!("Delete: {:?}", row))
+        .map(|row| log::trace!("Delete: {:?}", row))
         .collect();
         log::debug!("Generated deletion list, {} items to delete.", result.len());
         Ok(())
