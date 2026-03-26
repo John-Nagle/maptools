@@ -7,13 +7,12 @@
 //!
 //!     License: LGPL.
 //!     Animats
-//!     April, 2026.
+//!     March, 2026.
 //
 use anyhow::{Error, anyhow};
 use crate::{RegionImpostorFaceData, TileAssetType};
 use mysql::prelude::{Queryable};
-use mysql::{PooledConn, Row, params, Transaction, TxOpts};
-//////use serde::{Deserialize, Serialize};
+use mysql::{Row, params, Transaction};
 use uuid::Uuid;
 
 /// One usage of a UUID in region_impostors.
@@ -171,11 +170,9 @@ impl TileGc {
     }
     
     ///  Purge all unused tile assets
-    fn purge_unused_tile_assets(&self, conn: &mut PooledConn) -> Result<(), Error> {
+    pub fn purge_unused_tile_assets(&self, tx: &mut Transaction) -> Result<(), Error> {
         //  Set to false for testing.
-        const COMMIT_DELETIONS: bool = false;
-        let mut tx = conn.start_transaction(TxOpts::default())?;
-        self.build_temporary_table(&mut tx)?;
+        self.build_temporary_table(tx)?;
         const DELETE_UNUSED_TILE_ASSETS: &str = r"DELETE
             FROM tile_assets t1
             WHERE NOT EXISTS (
@@ -195,11 +192,6 @@ impl TileGc {
         log::debug!("Deleting unused tile assets.");
         tx.exec_drop(DELETE_UNUSED_TILE_ASSETS, params)?;
         log::debug!("Deleted {} unused tile assets.", tx.affected_rows());
-        if COMMIT_DELETIONS {
-            tx.commit()?;
-        } else {
-            tx.rollback()?; 
-        }
         Ok(())
     }
 }
@@ -209,7 +201,7 @@ impl TileGc {
 /// Requires direct but read only access to the database.
 fn test_gc_locally() {
     use envie::{Envie};
-    use mysql::{PooledConn, Pool};
+    use mysql::{TxOpts, Pool};
     let _ = simplelog::CombinedLogger::init(
         vec![
             simplelog::TermLogger::new(simplelog::LevelFilter::Debug, simplelog::Config::default(), simplelog::TerminalMode::Stdout, simplelog::ColorChoice::Auto),]

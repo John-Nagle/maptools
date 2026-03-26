@@ -21,6 +21,7 @@ use std::io::Write;
 use common::{Authorizer, AuthorizeType};
 use common::InitialImpostors;
 use common::{AssetUpload, AssetUploadArrayShort};
+use common::TileGc;
 
 /// MySQL Credentials for uploading.
 /// This filename will be searched for in parent directories,
@@ -144,7 +145,11 @@ impl AssetUploadHandler {
         tx.exec_drop(SQL_DELETE_GRID, &params)?;
         log::debug!("Inserting new.");
         tx.exec_drop(SQL_COPY_GRID, &params)?;
-        log::debug!("Deploy complete.");
+        //  Garbage collect
+        log::info!("Garbage collecting tile_asset entries.");
+        let gc = TileGc::new(grid);
+        gc.purge_unused_tile_assets(&mut tx)?;
+        log::info!("Deploy complete.");
         Ok(tx.commit()?)
     }
     
