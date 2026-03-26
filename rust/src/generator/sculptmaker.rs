@@ -363,6 +363,6 @@ fn read_terrain_texture() {
     );
 
     const URL_PREFIX: &str = "https://secondlife-maps-cdn.akamaized.net/map-";
-    let img = TerrainSculptTexture::fetch_terrain_image(URL_PREFIX, 1024*256, 1024*256, 0).expect("Terrain fetch failed");
+    let img = TerrainSculptTexture::fetch_terrain_image(URL_PREFIX, 1000*256, 1000*256, 0).expect("Terrain fetch failed");
     img.0.save("/tmp/testimg.jpg").expect("test image write failed");
 }
