@@ -135,8 +135,8 @@ impl TileGc {
     /// Build temporary table rows
     fn build_temporary_table_chunks(&self, tx: &mut Transaction) -> Result<(), Error> {
        const INSERT_INUSE_UUID_ROWS: &str = r"INSERT INTO uuids_in_use
-            (region_loc_x, region_loc_y, region_size_x, region_size_y, asset_type, asset_uuid, asset_hash)
-            VALUES ";
+            (region_loc_x, region_loc_y, region_size_x, region_size_y, asset_type, asset_uuid, asset_hash) VALUES
+            ";
         const NAMED_PARAMETERS: [&str;7] = ["region_loc_x", "region_loc_y", "region_size_x", "region_size_y", "asset_type", "asset_uuid", "asset_hash"];
         let named_parameters: Vec<_> = NAMED_PARAMETERS.iter().map(|p| p.to_string().into_bytes()).collect();
         const CHUNK_SIZE: usize = 100;
@@ -162,7 +162,7 @@ impl TileGc {
             }
             //  All escaping was done above.
             //  Make final VALUES clause
-            let sql = format!("{} ({})", INSERT_INUSE_UUID_ROWS, value_strings.join(",\n"));
+            let sql = format!("{} {}", INSERT_INUSE_UUID_ROWS, value_strings.join(",\n"));
             log::debug!("Query: {}", sql);    // ***TEMP***
             //////todo!();
             
