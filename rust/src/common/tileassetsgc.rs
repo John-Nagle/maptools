@@ -166,7 +166,7 @@ impl TileGc {
             //  All escaping was done above.
             //  Make final SQL statement by concatenating query and values.
             let sql = INSERT_INUSE_UUID_ROWS.to_string() + value_strings.join(",\n").as_str();
-            log::debug!("Query: {}", sql);    // ***TEMP***
+            log::trace!("Query: {}", sql);    // ***TEMP***
             //  Actually do the insert of one chunk.            
             tx.query_drop(sql)?;           
         }
@@ -181,8 +181,9 @@ impl TileGc {
             region_size_x INT NOT NULL,
             region_size_y INT NOT NULL,
             asset_type VARCHAR(20) NOT NULL,
-            asset_uuid CHAR(36) DEFAULT NULL,
-            asset_hash CHAR(8) NOT NULL)";
+            asset_uuid CHAR(36) NOT NULL,
+            asset_hash CHAR(8) NOT NULL,
+            INDEX (asset_hash))";
         //  Create the temporary table
         tx.query_drop(CREATE_INUSE_UUIDS_SQL)?;
         log::info!("Temporary table created.");
