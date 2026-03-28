@@ -1,8 +1,6 @@
 //! FCGI echo server.
 //! For test use.
-use std::collections::HashMap;
 use std::io::Write;
-//////use std::io::BufReader;
 use anyhow::Error;
 use log::LevelFilter;
 use common::init_fcgi;
@@ -36,7 +34,7 @@ impl Handler for EchoHandler {
         &mut self,
         out: &mut dyn Write,
         request: &Request,
-        env: &HashMap<String, String>,
+        env: &std::env::Vars,
     ) -> Result<(), Error> {
         // Dummy up a response
         self.cnt += 1;

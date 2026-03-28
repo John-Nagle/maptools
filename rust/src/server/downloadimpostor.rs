@@ -85,7 +85,7 @@ impl TerrainDownloadHandler {
     /// There's no content, so this does nothing.
     fn parse_request(
         b: &[u8],
-        _env: &HashMap<String, String>,
+        _env: &std::env::Vars,
     ) -> Result<(), Error> {
         //  Should be UTF-8. Check.
         let s = core::str::from_utf8(b)?;
@@ -236,7 +236,7 @@ impl Handler for TerrainDownloadHandler {
         &mut self,
         out: &mut dyn Write,
         request: &Request,
-        env: &HashMap<String, String>,
+        env: &std::env::Vars,
     ) -> Result<(), Error> {
         //  We have a request. It's just a GET; no uploaded data.
         //  Parse. Error 400 with message if fail.

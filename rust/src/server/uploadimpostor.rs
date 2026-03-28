@@ -71,7 +71,7 @@ impl AssetUploadHandler {
     /// Parse a request
     fn parse_request(
         b: &[u8],
-        _env: &HashMap<String, String>,
+        _env: &std::env::Vars,
     ) -> Result<AssetUploadArrayShort, Error> {
         //  Should be UTF-8. Check.
         let s = core::str::from_utf8(b)?;
@@ -158,7 +158,7 @@ impl AssetUploadHandler {
         &mut self,
         _out: &mut dyn Write,
         request: &Request,
-        env: &HashMap<String, String> ,
+        env: &std::env::Vars,
     ) -> Result<(), Error> {
         //  Process params and authorization
         let params = request
@@ -199,7 +199,7 @@ impl Handler for AssetUploadHandler {
         &mut self,
         out: &mut dyn Write,
         request: &Request,
-        env: &HashMap<String, String>,
+        env: &std::env::Vars,
     ) -> Result<(), Error> {
         //  Process params and authorization
         log::info!("============ New request made ==================");

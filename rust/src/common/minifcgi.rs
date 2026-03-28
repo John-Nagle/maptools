@@ -57,7 +57,7 @@ pub trait Handler {
         &mut self,
         out: &mut dyn Write,
         request: &Request,
-        env: &HashMap<String, String>,
+        env: &std::env::Vars,
     ) -> Result<(), Error>;
 }
 
@@ -506,7 +506,7 @@ fn run_one<T: Handler>(
     out: &mut dyn Write,
     request: &mut Request,
     handler: &mut T,
-    env: &HashMap<String, String>,
+    env: &std::env::Vars,
 ) -> Result<bool, Error> {
     loop {
         if let Some(rec) = FcgiRecord::new_from_stream(instream)? {
@@ -529,10 +529,11 @@ pub fn run<T: Handler>(
     out: &mut dyn Write,
     handler: &mut T,
 ) -> Result<(), Error> {
-    let env = std::env::vars().map(|(k, v)| (k, v)).collect();
+    #[allow(clippy::map_identity)] // Clippy is wrong; this is not an identity. It's a necessary conversion.
+    //////let env = std::env::vars().map(|(k, v)| (k, v)).collect();
     let mut request = Request::new();
     loop {
-        match run_one(instream, out, &mut request, handler, &env) {
+        match run_one(instream, out, &mut request, handler, &std::env::vars()) {
             Ok(done) => {
                 if done {
                     //  Normal end of this task.
@@ -576,7 +577,7 @@ fn basic_io() {
             &mut self,
             out: &mut dyn Write,
             request: &Request,
-            env: &HashMap<String, String>,
+            env: &std::env::Vars,
         ) -> Result<(), Error> {
             // Dummy up a response
             self.cnt += 1;

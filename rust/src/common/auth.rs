@@ -43,7 +43,7 @@ pub struct Authorizer {
 impl Authorizer {
     /// External caller requests permission to do something.
     /// ***NEEDS ACTUAL AUTHORIZATION CHECKING***
-    pub fn authorize(_auth_type: AuthorizeType, _env: &HashMap<String, String>, params: &HashMap<String, String>) -> Result<String, Error> {
+    pub fn authorize(_auth_type: AuthorizeType, _env: &std::env::Vars, params: &HashMap<String, String>) -> Result<String, Error> {
         if let Some(owner_name) =  OWNER_NAME_PARAMS.iter().find_map(|&s| params.get(s)) {
             log::info!("Request is from an object owned by {}", owner_name);
             Ok(owner_name.trim().to_string())   

@@ -239,7 +239,7 @@ impl TerrainUploadHandler {
     /// Parse a request
     fn parse_request(
         b: &[u8],
-        _env: &HashMap<String, String>,
+        _env: &std::env::Vars,
     ) -> Result<UploadedRegionInfo, Error> {
         //  Should be UTF-8. Check.
         let s = core::str::from_utf8(b)?;
@@ -291,7 +291,7 @@ impl Handler for TerrainUploadHandler {
         &mut self,
         out: &mut dyn Write,
         request: &Request,
-        env: &HashMap<String, String>,
+        env: &std::env::Vars,
     ) -> Result<(), Error> {
         //  We have a request. It's supposed to be in JSON.
         //  Parse. Error 400 with message if fail.
