@@ -4,9 +4,10 @@
 //! At this point, the asset exists on the SL/OS asset store.
 //! A script running in an SL/OS viewer calls this service to tell it about new assets.
 //!
-//!     License: LGPL.
-//!     Animats
-//!     August, 2025.
+//! License: LGPL.
+//!
+//! Animats
+//! August, 2025.
 //
 use anyhow::{Error, anyhow};
 use chrono::{Utc, DateTime, NaiveDateTime};
