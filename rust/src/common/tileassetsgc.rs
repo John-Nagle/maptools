@@ -139,7 +139,8 @@ impl TileGc {
             ";
         const NAMED_PARAMETERS: [&str;7] = ["region_loc_x", "region_loc_y", "region_size_x", "region_size_y", "asset_type", "asset_uuid", "asset_hash"];
         let named_parameters: Vec<_> = NAMED_PARAMETERS.iter().map(|p| p.to_string().into_bytes()).collect();
-        const CHUNK_SIZE: usize = 100;
+        //  Not too big; query size is limited to 32767 (?) bytes.
+        const CHUNK_SIZE: usize = 200;
         let active_uuids = self.get_uuids_in_use(tx)?;
         log::info!("{} active UUIDs: {:?}", active_uuids.len(), &active_uuids[0..3.min(active_uuids.len())]);
         for active_uuid_chunk in active_uuids.chunks(CHUNK_SIZE) {
@@ -156,16 +157,17 @@ impl TileGc {
                     "asset_hash" => p.asset_hash.clone(),                    
                 };
                 //  Make one row.
-                let row_string: String = row_params.into_values(Some(&named_parameters))?.into_iter().map(|v: mysql::Value| v.as_sql(false)).collect::<Vec<_>>().join(",");
-                //////log::debug!("Row string: {}", row_string);
-                value_strings.push(format!("({})", row_string));
+                let row_string: String = row_params.into_values(Some(&named_parameters))?
+                    .into_iter()
+                    .map(|v: mysql::Value| v.as_sql(false))
+                    .collect::<Vec<_>>().join(",");
+                 value_strings.push(format!("({})", row_string));
             }
             //  All escaping was done above.
-            //  Make final VALUES clause
-            let sql = format!("{} {}", INSERT_INUSE_UUID_ROWS, value_strings.join(",\n"));
+            //  Make final SQL statement by concatenating query and values.
+            let sql = INSERT_INUSE_UUID_ROWS.to_string() + value_strings.join(",\n").as_str();
             log::debug!("Query: {}", sql);    // ***TEMP***
-            //////todo!();
-            
+            //  Actually do the insert of one chunk.            
             tx.query_drop(sql)?;           
         }
         Ok(())   
@@ -181,34 +183,10 @@ impl TileGc {
             asset_type VARCHAR(20) NOT NULL,
             asset_uuid CHAR(36) DEFAULT NULL,
             asset_hash CHAR(8) NOT NULL)";
-        const INSERT_INUSE_UUIDS_SQL: &str = r"INSERT INTO uuids_in_use
-            (region_loc_x, region_loc_y, region_size_x, region_size_y, asset_type, asset_uuid, asset_hash)
-            VALUES
-            (:region_loc_x, :region_loc_y, :region_size_x, :region_size_y, :asset_type, :asset_uuid, :asset_hash)";
-        //  Get all the active UUIDs. In memory all at once, but under 1MB
-        //////let active_uuids = self.get_uuids_in_use(tx)?;
-        //////log::info!("{} active UUIDs: {:?}", active_uuids.len(), &active_uuids[0..5.min(active_uuids.len())]);
-         //  Create the temporary table
+        //  Create the temporary table
         tx.query_drop(CREATE_INUSE_UUIDS_SQL)?;
         log::info!("Temporary table created.");
         self.build_temporary_table_chunks(tx)?;
-/*
-        //  Put all the records in the temporary table.
-        tx.exec_batch(
-            INSERT_INUSE_UUIDS_SQL,
-            active_uuids.iter().map(|p| {
-                log::debug!("Inserting {:?}", p.region_loc);    // ***TEMP***
-                params! {
-                "region_loc_x" => p.region_loc[0],
-                "region_loc_y" => p.region_loc[1],
-                "region_size_x" => p.region_size[0],
-                "region_size_y" => p.region_size[1],
-                "asset_uuid" => p.asset_uuid.to_string(),
-                "asset_hash" => p.asset_hash.clone(),
-                "asset_type" => p.asset_type.to_str().to_string(),
-            }})
-        )?;
-*/
         log::info!("Temporary table filled.");
         Ok(())
     }
