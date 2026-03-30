@@ -298,8 +298,8 @@ impl HeightField {
             let cnt_y = non_empty.heights.num_rows() * 2 - 1;           
             let mut heights = Array2D::filled_with(0.0, cnt_x, cnt_y);
             //  Compute water height of output. This is the min of the water heights going in.
-            for i in 0..4 {
-                if let Some(from_height_field) = &h[i] {
+            for hi in &h {
+                if let Some(from_height_field) = hi {
                     water_height = water_height.min(from_height_field.water_height);
                 }
             }
