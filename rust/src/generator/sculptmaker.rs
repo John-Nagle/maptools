@@ -155,6 +155,7 @@ impl TerrainSculpt {
         let into_mm =|m_opt: Option<f64>| if let Some(m) = m_opt  {   (m*1000.0).round() as i64 } else { 0 };
         into_mm(self.zheight).hash(&mut hasher);
         into_mm(self.zoffset).hash(&mut hasher);
+        into_mm(Some(self.water_height as f64)).hash(&mut hasher);
         let hash: u64 = hasher.finish();
         //  We only want a 32-bit hash, because we have a length problem.
         Ok((((hash >> 32) & 0xffffffff) ^ (hash & 0xffffffff)) as u32)

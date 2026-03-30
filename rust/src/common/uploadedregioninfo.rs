@@ -291,16 +291,29 @@ impl HeightField {
         const INSERT_OFFSETS: [(usize, usize);4] = [(0,0), (1,0), (0,1), (1,1)];
         if let Some(non_empty) = h.iter().find(|v| v.is_some()) {
             let non_empty = non_empty.as_ref().unwrap();
+            let mut water_height = non_empty.water_height;
             //  Output array, which is 2x as big, -1.
             //  ***CHECK ROWS/COLS***
             let cnt_x = non_empty.heights.num_columns() * 2 - 1;
             let cnt_y = non_empty.heights.num_rows() * 2 - 1;           
             let mut heights = Array2D::filled_with(0.0, cnt_x, cnt_y);
+            //  Compute water height of output. This is the min of the water heights going in.
+            for i in 0..4 {
+                if let Some(from_height_field) = &h[i] {
+                    water_height = water_height.min(from_height_field.water_height);
+                }
+            }
             //  Closure to copy an input array into an area of the output array.
-            let mut set_quadrant = |xstart: usize, ystart: usize, v: &Array2D<f32>| {
+            //  If the final water height is lower than the incoming water height for a quadrant,
+            //  raise the terrain to the incoming water height. The terrain already shows
+            //  as water in the images.
+            let mut set_quadrant = |xstart: usize, ystart: usize, v: &Array2D<f32>, water_height: f32| {
+                const WATER_HEIGHT_BIAS: f32 = 0.25;    // water is lowered slightly to avoid texture fighting.
+                let adjusted_water_height = (water_height - WATER_HEIGHT_BIAS).max(0.0);
                 for x in 0..v.num_columns() {
                     for y in 0..v.num_rows() {
-                        heights.set(x + xstart, y + ystart, *v.get(x, y).unwrap()).unwrap();
+                        let new_height: f32 = (v.get(x, y)).unwrap().max(adjusted_water_height);
+                        heights.set(x + xstart, y + ystart, new_height).unwrap();
                     }
                 }
             };
@@ -313,13 +326,27 @@ impl HeightField {
                 let xstart = if xstart == 0 {0} else { non_empty.heights.num_columns() - 1 };
                 let ystart = if ystart == 0 {0} else { non_empty.heights.num_rows() - 1 };
                 if let Some(from_height_field) = &h[i] {
-                    set_quadrant(xstart, ystart, &from_height_field.heights);
+                    set_quadrant(xstart, ystart, &from_height_field.heights, from_height_field.water_height);
                 }
             }
+/*
+            //  Raise land height to at least water height.
+            //  We don't 
+            const 
+            let adjusted_water_height = water_height.max(water_height - 0.5, 0.1));
+            for x in 0..heights.num_columns() {
+                    for y in 0..heights.num_rows() {
+                        heights.set(x, y, get(x,y).unwrap().max(adjusted_water_height)).unwrap();
+                    }
+                }
+            };
+*/
+
+            
             Ok(Self {
                 size_x: non_empty.size_x * 2,
                 size_y: non_empty.size_y * 2,
-                water_height: non_empty.water_height,
+                water_height,
                 heights,
             })
         } else {
