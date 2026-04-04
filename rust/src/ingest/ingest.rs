@@ -13,11 +13,12 @@ use log::logger;
 use envie::Envie;
 use anyhow::{ Error, anyhow };
 use getopts::Options;
+use ureq::Agent;
 
 mod fetchbonniebots;
 
 /// Do the work.
-fn run(_pool: Pool) -> Result<(), Error> {
+fn run(_pool: Pool, agent: Agent) -> Result<(), Error> {
     Ok(())
 }
 
@@ -28,7 +29,7 @@ fn print_usage(program: &str, opts: Options) {
 }
 
 /// Set up options, credentials, and database connection.
-fn setup() -> Result<Pool, Error> {
+fn setup() -> Result<(Pool, Agent), Error> {
     //  Usual options processing
     let args: Vec<String> = std::env::args().collect();
     let program = args[0].clone();
@@ -93,8 +94,12 @@ fn setup() -> Result<Pool, Error> {
         println!("Connected to database.");
     }
     log::info!("Connected to database.");
+    //  HTTP Agent
+    let config = Agent::config_builder()       
+        .build();
+    let agent: Agent = config.into();
     //  Setup complete. Return what's needed to run.
-    Ok(pool)
+    Ok((pool, agent))
 }
 
 /// Main program.
@@ -102,7 +107,7 @@ fn setup() -> Result<Pool, Error> {
 fn main() {
     logger();
     match setup() {
-        Ok(pool) => match run(pool) {
+        Ok((pool, agent)) => match run(pool, agent) {
             Ok(_) => {}
             Err(e) => {
                 panic!("Failed: {:?}", e);
