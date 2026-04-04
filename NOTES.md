@@ -875,3 +875,7 @@ Fix tomorrow.
 2026-03-20
 
      Cleanup. Next big thing to write is a garbage collector for UUIDs.
+     
+2026-03-31
+
+     Garbage collector finished, more cleanup. Need a full test run.
