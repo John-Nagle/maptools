@@ -22,7 +22,7 @@ const TERRAIN_DATA_SIZE: usize = 256*256;
 /// User agent for talking to asset server
 const USER_AGENT: &str = "animats.info impostor asset system";
 /// Fetch elevation data from Bonniebots. 256x256.
-pub fn fetch_elevs(agent: &mut Agent, region_num_x: u32, region_num_y: u32) -> Result<Option<[f32;TERRAIN_DATA_SIZE]>, Error> {
+pub fn fetch_elevs(agent: &mut Agent, region_num_x: u32, region_num_y: u32) -> Result<Option<Vec<f32>>, Error> {
     // Build URL
     let url = format!("https://www.bonniebots.com/static-api/terrain/{}-{}.bin", region_num_x, region_num_y);        
     match ureq::get(&url).call() {
@@ -35,7 +35,7 @@ pub fn fetch_elevs(agent: &mut Agent, region_num_x: u32, region_num_y: u32) -> R
             } else {
                 let elevs: Vec<_> = content.chunks(FLOAT_SIZE).map(|c: &[u8]| f32::from_le_bytes(c.try_into().unwrap())).collect();
                 log::debug!("Elevs: {:?}", &elevs[0..4]);  // ***TEMP***
-                Ok(None)    // ***TEMP***
+                Ok(elevs)    // ***TEMP***
             }
         }
         Err(ureq::Error::StatusCode(code)) => {
