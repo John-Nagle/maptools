@@ -35,7 +35,7 @@ pub fn fetch_elevs(agent: &mut Agent, region_num_x: u32, region_num_y: u32) -> R
             } else {
                 let elevs: Vec<_> = content.chunks(FLOAT_SIZE).map(|c: &[u8]| f32::from_le_bytes(c.try_into().unwrap())).collect();
                 log::debug!("Elevs: {:?}", &elevs[0..4]);  // ***TEMP***
-                Ok(elevs)    // ***TEMP***
+                Ok(Some(elevs))    // ***TEMP***
             }
         }
         Err(ureq::Error::StatusCode(code)) => {
