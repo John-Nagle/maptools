@@ -79,9 +79,24 @@ pub fn find_element_by_id<'a>(nodes: &'a Vec<Node>, id_key: &str) -> Option<&'a 
 
 /// Info BonnieBots can provide for one region, from the region list.
 pub struct BonnieBotsRegion {
+    /// Name of region
+    region_name: String,
+    /// Region location number X (regions, not meters)
+    region_x: u32,
+    /// Y
+    region_y: u32,
 }
 
-/// Fetch region list from BonnieBots
+impl BonnieBotsRegion {
+    pub fn from_json(regions: json::JsonValue) -> Result<Vec<BonnieBotsRegion>, Error> {
+        todo!();
+    }
+
+}
+
+/// Fetch region list from BonnieBots.
+/// This assumes a very specific page layout at BonnieBots.
+/// An API would be better.
 pub fn fetch_region_list_json(agent: &mut Agent) -> Result<json::JsonValue, Error> {
     const BONNIEBOTSREGIONURL: &str = "https://www.bonniebots.com/region";
     let url = BONNIEBOTSREGIONURL;
@@ -97,7 +112,13 @@ pub fn fetch_region_list_json(agent: &mut Agent) -> Result<json::JsonValue, Erro
                 if let Node::Element(elt) = next_data_nodes {
                     if let Node::Text(json_str) = &elt.children[0] {
                         log::debug!("Found JSON: {}", json_str);
-                        Ok(json::parse(json_str)?)
+                        let parsed_json = json::parse(json_str)?;
+                        //   "props": {
+                        //      "pageProps": {
+                        //          "happeningStaticProps": {
+                        //              "regions": [
+                        let regions = &parsed_json["props"]["pageProps"]["happeningStaticProps"]["regions"];
+                        Ok(regions.clone())                        
                     } else {
                         Err(anyhow!("Did not find JSON in NEXT_DATA: {:?}", next_data))
                     }
@@ -140,5 +161,5 @@ fn test_fetchregions() {
         .build();
     let mut agent: Agent = config.into();
     let regions = fetch_region_list_json(&mut agent).expect("Fetch regions from BonnieBots failed.");
-    log::debug!("JSON: {:#}", regions)
+    log::debug!("JSON: {} regions: {:#}", regions.len(), regions)
  }
