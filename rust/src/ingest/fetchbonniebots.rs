@@ -16,8 +16,9 @@
 //!
 ///
 use ureq::Agent;
-use html_parser::{Dom, Node, Element};
+use html_parser::{Dom, Node};
 use anyhow::{ Error, anyhow };
+use std::io::Read;
 
 /// Size of region elev data, SL only.
 const TERRAIN_DATA_SIZE: usize = 256*256;
@@ -103,7 +104,12 @@ pub fn fetch_region_list_json(agent: &mut Agent) -> Result<json::JsonValue, Erro
     const NEXT_DATA: &str = "__NEXT_DATA__";
     match ureq::get(url).call() {
         Ok(mut response) => {
-            let content = response.body_mut().read_to_string()?;
+            //////let content = response.body_mut().read_to_string()?;
+            let mut reader = response.body_mut().as_reader();
+            let mut body = Vec::new();
+            reader.read_to_end(&mut body)?; // Ensures all data is read
+            let content = String::from_utf8(body)?;            
+            
             log::debug!("Length of content: {}", content.len());
             let dom = Dom::parse(&content)?;
             let next_data = find_element_by_id(&dom.children, NEXT_DATA);
