@@ -82,7 +82,7 @@ pub struct BonnieBotsRegion {
 }
 
 /// Fetch region list from BonnieBots
-pub fn fetch_region_list(agent: &mut Agent) -> Result<Vec<BonnieBotsRegion>, Error> {
+pub fn fetch_region_list_json(agent: &mut Agent) -> Result<json::JsonValue, Error> {
     const BONNIEBOTSREGIONURL: &str = "https://www.bonniebots.com/region";
     let url = BONNIEBOTSREGIONURL;
     const NEXT_DATA: &str = "__NEXT_DATA__";
@@ -97,7 +97,7 @@ pub fn fetch_region_list(agent: &mut Agent) -> Result<Vec<BonnieBotsRegion>, Err
                 if let Node::Element(elt) = next_data_nodes {
                     if let Node::Text(json_str) = &elt.children[0] {
                         log::debug!("Found JSON: {}", json_str);
-                        Ok(Vec::new())
+                        Ok(json::parse(json_str)?)
                     } else {
                         Err(anyhow!("Did not find JSON in NEXT_DATA: {:?}", next_data))
                     }
@@ -139,5 +139,6 @@ fn test_fetchregions() {
     let config = Agent::config_builder()       
         .build();
     let mut agent: Agent = config.into();
-    let regions = fetch_region_list(&mut agent).expect("Fetch regions from BonnieBots failed.");
+    let regions = fetch_region_list_json(&mut agent).expect("Fetch regions from BonnieBots failed.");
+    log::debug!("JSON: {:#}", regions)
  }
