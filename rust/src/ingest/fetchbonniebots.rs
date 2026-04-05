@@ -99,10 +99,14 @@ impl BonnieBotsRegion {
 /// This assumes a very specific page layout at BonnieBots.
 /// An API would be better.
 pub fn fetch_region_list_json(agent: &mut Agent) -> Result<json::JsonValue, Error> {
-    const BONNIEBOTSREGIONURL: &str = "https://www.bonniebots.com/region";
+    const BONNIEBOTSREGIONURL: &str = "https://www.bonniebots.com/regions";
     let url = BONNIEBOTSREGIONURL;
     const NEXT_DATA: &str = "__NEXT_DATA__";
-    match ureq::get(url).call() {
+    match agent.get(url)
+        //////.header("user-agent", "curl/7.81.0")
+        //////.header("accept", "*/*")
+        //////.header("accept-encoding", "identity")
+        .call() {
         Ok(mut response) => {
             //////let content = response.body_mut().read_to_string()?;
             let mut reader = response.body_mut().as_reader();
@@ -110,20 +114,22 @@ pub fn fetch_region_list_json(agent: &mut Agent) -> Result<json::JsonValue, Erro
             reader.read_to_end(&mut body)?; // Ensures all data is read
             let content = String::from_utf8(body)?;            
             
-            log::debug!("Length of content: {}", content.len());
+            log::debug!("Length of region list content: {}", content.len());
+            let tail = if content.len() > 100 { content.len() - 100 } else { 0 };
+            log::debug!("Tail of content: {}", &content[tail..]);
             let dom = Dom::parse(&content)?;
             let next_data = find_element_by_id(&dom.children, NEXT_DATA);
-            log::debug!("Found element: {:?}", next_data);    // ***TEMP***
+            //////log::debug!("Found element: {:?}", next_data);    // ***TEMP***
             if let Some(next_data_nodes) = next_data {
                 if let Node::Element(elt) = next_data_nodes {
                     if let Node::Text(json_str) = &elt.children[0] {
-                        log::debug!("Found JSON: {}", json_str);
+                        log::debug!("Found JSON: {:.200}", json_str);
                         let parsed_json = json::parse(json_str)?;
                         //   "props": {
                         //      "pageProps": {
-                        //          "happeningStaticProps": {
-                        //              "regions": [
-                        let regions = &parsed_json["props"]["pageProps"]["happeningStaticProps"]["regions"];
+                        //          "regionListStaticProps": {
+                        //              "data": [
+                        let regions = &parsed_json["props"]["pageProps"]["regionListStaticProps"]["data"];
                         Ok(regions.clone())                        
                     } else {
                         Err(anyhow!("Did not find JSON in NEXT_DATA: {:?}", next_data))
