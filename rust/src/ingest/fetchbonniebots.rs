@@ -79,6 +79,7 @@ pub fn find_element_by_id<'a>(nodes: &'a Vec<Node>, id_key: &str) -> Option<&'a 
 }
 
 /// Info BonnieBots can provide for one region, from the region list.
+#[derive(Debug, Clone)]
 pub struct BonnieBotsRegion {
     /// Name of region
     region_name: String,
@@ -89,8 +90,30 @@ pub struct BonnieBotsRegion {
 }
 
 impl BonnieBotsRegion {
-    pub fn from_json(regions: json::JsonValue) -> Result<Vec<BonnieBotsRegion>, Error> {
-        todo!();
+    //  Usual new
+    pub fn new(region_name: &json::JsonValue, region_x: &json::JsonValue, region_y: &json::JsonValue) -> Option<Self> {
+        Some(Self {
+            region_name: region_name.as_str()?.to_string(),
+            region_x: region_x.as_u32()?,
+            region_y: region_y.as_u32()?,
+        })
+    }
+
+    //   Build from BonnieBots JSON data
+    pub fn from_json(regions: &json::JsonValue) -> Result<Vec<BonnieBotsRegion>, Error> {
+        let mut region_records = Vec::new();
+        if let json::JsonValue::Array(regions_array) = regions {
+            for region in regions_array {
+                //  Region data is an array
+                let region_name = &region[0];
+                let region_x = &region[6];
+                let region_y = &region[7];
+                region_records.push(Self::new(region_name, region_x, region_y).ok_or_else(|| anyhow!("Bad JSON region value: {:?}", region))?);                
+            };
+        } else {
+            return Err(anyhow!("Did not find array in regions JSON from Bonniebots."));
+        }
+        Ok(region_records)
     }
 
 }
@@ -104,8 +127,6 @@ pub fn fetch_region_list_json(agent: &mut Agent) -> Result<json::JsonValue, Erro
     const NEXT_DATA: &str = "__NEXT_DATA__";
     match agent.get(url)
         //////.header("user-agent", "curl/7.81.0")
-        //////.header("accept", "*/*")
-        //////.header("accept-encoding", "identity")
         .call() {
         Ok(mut response) => {
             //////let content = response.body_mut().read_to_string()?;
@@ -173,5 +194,6 @@ fn test_fetchregions() {
         .build();
     let mut agent: Agent = config.into();
     let regions = fetch_region_list_json(&mut agent).expect("Fetch regions from BonnieBots failed.");
-    log::debug!("JSON: {} regions: {:#}", regions.len(), regions)
+    let region_list = BonnieBotsRegion::from_json(&regions).expect("Conversion from BonnieBots JSON failed.");
+    log::debug!("JSON: {} regions: {:?}", regions.len(), region_list)
  }
