@@ -15,7 +15,8 @@
 //!     April, 2026.
 //!
 ///
-    use ureq::Agent;
+use ureq::Agent;
+use html_parser::{Dom};
 use anyhow::{ Error, anyhow };
 /// Size of region elev data, SL only.
 const TERRAIN_DATA_SIZE: usize = 256*256;
@@ -48,7 +49,35 @@ pub fn fetch_elevs(agent: &mut Agent, region_num_x: u32, region_num_y: u32) -> R
         Err(e) => Err(e.into())
     }
 }
+
+/// Info BonnieBots can provide for one region, from the region list.
+pub struct BonnieBotsRegion {
+}
+
+/// Fetch region list from BonnieBots
+pub fn fetch_region_list(agent: &mut Agent) -> Result<Vec<BonnieBotsRegion>, Error> {
+    const BONNIEBOTSREGIONURL: &str = "https://www.bonniebots.com/region";
+    let url = BONNIEBOTSREGIONURL;
+    match ureq::get(url).call() {
+        Ok(mut response) => {
+            let content = response.body_mut().read_to_string()?;
+            log::debug!("Length of content: {}", content.len());
+            let dom = Dom::parse(&content)?;
+            for child in dom.children {
+                log::debug!("Child: {:?}", child);    // ***TEMP***
+            }
+            Ok(Vec::new())
+        }
+        Err(ureq::Error::StatusCode(code)) => {
+            // the server returned an unexpected status
+            Err(anyhow!("HTTP error {} reading {}", code, url))
+        }
+        Err(e) => Err(e.into())
+    }
+}
+
 #[test]
+/// Fetch all elevations for a single region.
 fn test_fetchelevs() {
     //  All errors to console
     use common::test_logger;
@@ -57,5 +86,18 @@ fn test_fetchelevs() {
     let config = Agent::config_builder()       
         .build();
     let mut agent: Agent = config.into();
-    let elevs = fetch_elevs(&mut agent, 1000, 1000).expect("Fetch from BonnieBots failed.");
+    let elevs = fetch_elevs(&mut agent, 1000, 1000).expect("Fetch elevations from BonnieBots failed.");
+ }
+ 
+#[test]
+/// Fetch all regions
+fn test_fetchregions() {
+    //  All errors to console
+    use common::test_logger;
+    test_logger();
+    //  HTTP Agent
+    let config = Agent::config_builder()       
+        .build();
+    let mut agent: Agent = config.into();
+    let regions = fetch_region_list(&mut agent).expect("Fetch regions from BonnieBots failed.");
  }

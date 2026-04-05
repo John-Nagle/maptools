@@ -92,6 +92,9 @@ querystring = "1"
 ureq = "3"
 http = "1"
 
+#   For parsing Bonniebots
+html_parser = "0.7"
+
 num = "0.4"
 num-traits = "0.2"
 num-derive = "0.4"
