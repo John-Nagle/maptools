@@ -195,5 +195,8 @@ fn test_fetchregions() {
     let mut agent: Agent = config.into();
     let regions = fetch_region_list_json(&mut agent).expect("Fetch regions from BonnieBots failed.");
     let region_list = BonnieBotsRegion::from_json(&regions).expect("Conversion from BonnieBots JSON failed.");
-    log::debug!("JSON: {} regions: {:?}", regions.len(), region_list)
+    log::debug!("JSON: {} regions.", regions.len());
+    for region_item in &region_list[.. 20.min(region_list.len())] {
+        log::debug!("    {:?}", region_item)
+    }
  }
