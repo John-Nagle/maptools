@@ -91,9 +91,22 @@ pub fn fetch_region_list(agent: &mut Agent) -> Result<Vec<BonnieBotsRegion>, Err
             let content = response.body_mut().read_to_string()?;
             log::debug!("Length of content: {}", content.len());
             let dom = Dom::parse(&content)?;
-            let found = find_element_by_id(&dom.children, NEXT_DATA);
-            log::debug!("Found element: {:?}", found);    // ***TEMP***
-            Ok(Vec::new())
+            let next_data = find_element_by_id(&dom.children, NEXT_DATA);
+            log::debug!("Found element: {:?}", next_data);    // ***TEMP***
+            if let Some(next_data_nodes) = next_data {
+                if let Node::Element(elt) = next_data_nodes {
+                    if let Node::Text(json_str) = &elt.children[0] {
+                        log::debug!("Found JSON: {}", json_str);
+                        Ok(Vec::new())
+                    } else {
+                        Err(anyhow!("Did not find JSON in NEXT_DATA: {:?}", next_data))
+                    }
+                } else {
+                    Err(anyhow!("Did not find element in NEXT_DATA: {:?}", next_data))
+                }
+            } else {     
+                Err(anyhow!("Did not find {} ID in {}", NEXT_DATA, url))
+            }
         }
         Err(ureq::Error::StatusCode(code)) => {
             // the server returned an unexpected status
