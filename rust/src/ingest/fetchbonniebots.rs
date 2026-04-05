@@ -28,7 +28,7 @@ const USER_AGENT: &str = "animats.info impostor asset system";
 pub fn fetch_elevs(agent: &mut Agent, region_num_x: u32, region_num_y: u32) -> Result<Option<Vec<f32>>, Error> {
     // Build URL
     let url = format!("https://www.bonniebots.com/static-api/terrain/{}-{}.bin", region_num_x, region_num_y);        
-    match ureq::get(&url).call() {
+    match agent.get(&url).call() {
         Ok(mut response) => {
             let content = response.body_mut().read_to_vec()?;
             log::debug!("Length of content: {}", content.len());
@@ -197,6 +197,10 @@ fn test_fetchregions() {
     let region_list = BonnieBotsRegion::from_json(&regions).expect("Conversion from BonnieBots JSON failed.");
     log::debug!("JSON: {} regions.", regions.len());
     for region_item in &region_list[.. 20.min(region_list.len())] {
-        log::debug!("    {:?}", region_item)
+        log::debug!("    {:?}", region_item);
+        let elevs = fetch_elevs(&mut agent, region_item.region_x, region_item.region_y).expect("Fetch elevations from BonnieBots failed.");
+        if elevs.is_none() {
+            log::error!("Failed to get region elevs for {:?}", region_item);
+        }
     }
  }
