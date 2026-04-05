@@ -16,8 +16,9 @@
 //!
 ///
 use ureq::Agent;
-use html_parser::{Dom};
+use html_parser::{Dom, Node, Element};
 use anyhow::{ Error, anyhow };
+
 /// Size of region elev data, SL only.
 const TERRAIN_DATA_SIZE: usize = 256*256;
 /// User agent for talking to asset server
@@ -50,6 +51,32 @@ pub fn fetch_elevs(agent: &mut Agent, region_num_x: u32, region_num_y: u32) -> R
     }
 }
 
+/// Find element by ID. First find only.
+pub fn find_element_by_id<'a>(nodes: &'a Vec<Node>, id_key: &str) -> Option<&'a Node> {
+    //  One would think this boilerplate would be part of html_parser.
+    //  But it's easier to write this than bring in some huge crate that does too much.
+    for node in nodes {
+        match node {
+            Node::Element(e) => {
+                if let Some(id) = &e.id {
+                    if id == id_key {
+                        //  Find
+                        return Some(node)
+                    }
+                }
+                //  Recurse
+                if let Some(found) = find_element_by_id(&e.children, id_key) {
+                    return Some(found)
+                }
+            }
+            Node::Text(_s) => {}
+            Node::Comment(_c) => {}
+        } 
+    }
+    //  No find
+    None
+}
+
 /// Info BonnieBots can provide for one region, from the region list.
 pub struct BonnieBotsRegion {
 }
@@ -58,14 +85,14 @@ pub struct BonnieBotsRegion {
 pub fn fetch_region_list(agent: &mut Agent) -> Result<Vec<BonnieBotsRegion>, Error> {
     const BONNIEBOTSREGIONURL: &str = "https://www.bonniebots.com/region";
     let url = BONNIEBOTSREGIONURL;
+    const NEXT_DATA: &str = "__NEXT_DATA__";
     match ureq::get(url).call() {
         Ok(mut response) => {
             let content = response.body_mut().read_to_string()?;
             log::debug!("Length of content: {}", content.len());
             let dom = Dom::parse(&content)?;
-            for child in dom.children {
-                log::debug!("Child: {:?}", child);    // ***TEMP***
-            }
+            let found = find_element_by_id(&dom.children, NEXT_DATA);
+            log::debug!("Found element: {:?}", found);    // ***TEMP***
             Ok(Vec::new())
         }
         Err(ureq::Error::StatusCode(code)) => {
