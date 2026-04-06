@@ -52,15 +52,17 @@ pub fn fetch_elevs(
                     .chunks(FLOAT_SIZE)
                     .map(|c: &[u8]| f32::from_le_bytes(c.try_into().unwrap()))
                     .collect();
+                log::info!("HTTP success reading elev data from {}", url);
                 log::debug!("Elevs: {:?}", &elevs[0..4]); // ***TEMP***
                 Ok(Some(elevs)) // ***TEMP***
             }
         }
         Err(ureq::Error::StatusCode(code)) => {
             // the server returned an unexpected status
+            log::error!("HTTP fail, code {}, reading elev data from {}", code, url);
             match code {
                 404 => Ok(None),
-                _ => Err(anyhow!("HTTP error {} reading {}", code, url)),
+                _ => Err(anyhow!("HTTP error {} reading elev data from {}", code, url)),
             }
         }
         Err(e) => Err(e.into()),
@@ -230,12 +232,12 @@ fn test_fetchregions() {
     let region_list =
         BonnieBotsRegion::from_json(&regions).expect("Conversion from BonnieBots JSON failed.");
     log::debug!("JSON: {} regions.", regions.len());
-    for region_item in &region_list[..20.min(region_list.len())] {
+    for region_item in &region_list[..100.min(region_list.len())] {
         log::debug!("    {:?}", region_item);
         let elevs = fetch_elevs(&mut agent, region_item.region_x, region_item.region_y)
             .expect("Fetch elevations from BonnieBots failed.");
         if elevs.is_none() {
-            log::error!("Failed to get region elevs for {:?}", region_item);
+            log::error!("No region data avaiable reading elev data from {:?}", region_item);
         }
     }
 }
