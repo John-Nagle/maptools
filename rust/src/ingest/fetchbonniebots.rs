@@ -17,8 +17,9 @@
 use anyhow::{anyhow, Error};
 use html_parser::{Dom, Node};
 use std::io::Read;
-///
+use serde::{Deserialize};
 use ureq::Agent;
+use uuid::Uuid;
 
 /// Size of region elev data, SL only.
 const TERRAIN_DATA_SIZE: usize = 256 * 256;
@@ -95,9 +96,62 @@ pub fn find_element_by_id<'a>(nodes: &'a Vec<Node>, id_key: &str) -> Option<&'a 
     None
 }
 
-/// Info BonnieBots can provide for one region, from the region list.
-#[derive(Debug, Clone)]
+/// 
+
+/// More detailed info for a BonnieBots region.
+/// Only the fields we are interested in.
+#[derive(Deserialize, Debug, Clone)]
 pub struct BonnieBotsRegion {
+    /// Region name
+    region_name: String,
+    /// UUID of region
+    region_map_image: Uuid,
+    ///  Region loc, in region counts, not meters.
+    region_x: u32,
+    ///  Region loc, in region counts, not meters.
+    region_y: u32,
+    /// Water height in mm.
+    water_height_mm: Option<u32>,
+}
+
+impl BonnieBotsRegion {
+    /// Fetch for a given region
+    pub fn fetch(agent: &mut Agent, basic: &BonnieBotsBasicRegion) -> Result<Option<Self>, Error> {
+        let url = format!(
+            "https://www.bonniebots.com/static-api/regions/{}/{}/index.json",
+        basic.region_x, basic.region_y
+        );
+         match agent
+            .get(&url)
+            //////.header("user-agent", "curl/7.81.0")
+            .call()
+        {
+            Ok(mut response) => {
+                let json_str =  response.body_mut().read_to_string()?;
+                log::info!("BB region JSON: {:?}", json_str);
+                let region: Self = serde_json::from_str(&json_str)?;
+                log::info!("BB region info: {:?}", region);
+                Ok(Some(region))
+             }
+            Err(ureq::Error::StatusCode(code)) => {
+                // the server returned an unexpected status
+                log::error!("HTTP fail, code {}, reading region info from {}", code, url);
+                match code {
+                    //  No find is not an error, just a hole in the map.
+                    404 => Ok(None),
+                    _ => Err(anyhow!("HTTP error {} reading region data from {}", code, url)),
+                }
+            }
+            Err(e) => Err(e.into()),
+        }
+    }
+
+}
+
+/// Info BonnieBots can provide for one region, from the region list of all regions.
+/// This is short and basic.
+#[derive(Debug, Clone)]
+pub struct BonnieBotsBasicRegion {
     /// Name of region
     region_name: String,
     /// Region location number X (regions, not meters)
@@ -106,7 +160,7 @@ pub struct BonnieBotsRegion {
     region_y: u32,
 }
 
-impl BonnieBotsRegion {
+impl BonnieBotsBasicRegion {
     //  Usual new
     pub fn new(
         region_name: &json::JsonValue,
@@ -121,7 +175,7 @@ impl BonnieBotsRegion {
     }
 
     //   Build from BonnieBots JSON data
-    pub fn from_json(regions: &json::JsonValue) -> Result<Vec<BonnieBotsRegion>, Error> {
+    pub fn from_json(regions: &json::JsonValue) -> Result<Vec<BonnieBotsBasicRegion>, Error> {
         let mut region_records = Vec::new();
         if let json::JsonValue::Array(regions_array) = regions {
             for region in regions_array {
@@ -146,8 +200,8 @@ impl BonnieBotsRegion {
     /// This assumes a very specific page layout at BonnieBots.
     /// An API would be better.
     pub fn fetch_region_list_json(agent: &mut Agent) -> Result<json::JsonValue, Error> {
-        const BONNIEBOTSREGIONURL: &str = "https://www.bonniebots.com/regions";
-        let url = BONNIEBOTSREGIONURL;
+        const BONNIE_BOTS_BASIC_REGION_URL: &str = "https://www.bonniebots.com/regions";
+        let url = BONNIE_BOTS_BASIC_REGION_URL;
         const NEXT_DATA: &str = "__NEXT_DATA__";
         match agent
             .get(url)
@@ -227,10 +281,10 @@ fn test_fetchregions() {
     //  HTTP Agent
     let config = Agent::config_builder().build();
     let mut agent: Agent = config.into();
-    let regions = BonnieBotsRegion::fetch_region_list_json(&mut agent)
+    let regions = BonnieBotsBasicRegion::fetch_region_list_json(&mut agent)
         .expect("Fetch regions from BonnieBots failed.");
     let region_list =
-        BonnieBotsRegion::from_json(&regions).expect("Conversion from BonnieBots JSON failed.");
+        BonnieBotsBasicRegion::from_json(&regions).expect("Conversion from BonnieBots JSON failed.");
     log::debug!("JSON: {} regions.", regions.len());
     for region_item in &region_list[..100.min(region_list.len())] {
         log::debug!("    {:?}", region_item);
@@ -239,5 +293,7 @@ fn test_fetchregions() {
         if elevs.is_none() {
             log::error!("No region data avaiable reading elev data from {:?}", region_item);
         }
+        let region_info = BonnieBotsRegion::fetch(&mut agent, region_item).expect("Region data fetch failed");
+        log::debug!("Region info: {:?}", region_info);
     }
 }
