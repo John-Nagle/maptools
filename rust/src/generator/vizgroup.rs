@@ -130,7 +130,7 @@ impl LiveBlock {
         let a1 = a0 + self.region_data.region_size_y + tolerance;
         let b0 = b.region_data.region_loc_y;
         let b1 = b0 + b.region_data.region_size_y + tolerance;
-        let overlap = a0 < b1 && a1 >= b0;
+        let overlap = a0 < b1 && a1 > b0;
         log::trace!(
             "XY-adjacent test: overlap: ({}, {}) vs ({}, {}) overlap: {}",
             a0,

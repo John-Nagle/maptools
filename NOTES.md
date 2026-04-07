@@ -879,3 +879,12 @@ Fix tomorrow.
 2026-03-31
 
      Garbage collector finished, more cleanup. Need a full test run.
+     
+2026-04-06
+
+     Integrated BonnieBots data and am testing vizgroups. Mostly
+     correct, except for "Soryn" region.
+     
+     04:24:23 ^[[0m^[[36m[DEBUG] ^[[0m(2) generateterrain::vizgroup: Blocks with different viz groups touch: "Soryn" (177152, 315648) and "Noble Dreams" (177408, 315904)
+     04:24:23 ^[[0m^[[36m[DEBUG] ^[[0m(2) generateterrain::vizgroup: Merged: 2 live blocks weak, 2 regions
+

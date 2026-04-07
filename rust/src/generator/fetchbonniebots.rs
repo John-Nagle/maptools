@@ -323,6 +323,11 @@ fn test_fetchregions() {
             continue
         }
         log::info!("Reachable group, {} regions, first region: {:?}", viz_group.len(), viz_group[0].name);
+/*
+        for n in 0..viz_group.len().min(5) {
+            log::debug!("  {}", viz_group[n]);
+        }
+*/
     }
 /*
     
