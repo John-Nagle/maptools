@@ -20,6 +20,7 @@ use std::io::Read;
 use serde::{Deserialize};
 use ureq::Agent;
 use uuid::Uuid;
+use common::{RegionData, HeightField};
 
 /// Size of region elev data, SL only.
 const TERRAIN_DATA_SIZE: usize = 256 * 256;
@@ -161,7 +162,10 @@ pub struct BonnieBotsBasicRegion {
 }
 
 impl BonnieBotsBasicRegion {
-    //  Usual new
+    /// Region size for BonnieBots, which does SL agni grid only.
+    const SL_REGION_SIZE: u32 = 256;
+    const SL_GRID: &str = "agni";
+    ///  Usual new
     pub fn new(
         region_name: &json::JsonValue,
         region_x: &json::JsonValue,
@@ -173,8 +177,28 @@ impl BonnieBotsBasicRegion {
             region_y: region_y.as_u32()?,
         })
     }
+    
+    /// Into RegionData
+    pub fn new_region_data(
+        region_name: &json::JsonValue,
+        region_x: &json::JsonValue,
+        region_y: &json::JsonValue,
+        ) -> Result<RegionData, Error> {
+            let name = region_name.as_str().ok_or_else(|| anyhow!("No region name"))?.trim().to_string();
+            let region_loc_x = region_x.as_u32().ok_or_else(|| anyhow!("No region size X"))? * Self::SL_REGION_SIZE;
+            let region_loc_y = region_y.as_u32().ok_or_else(|| anyhow!("No region size X"))? * Self::SL_REGION_SIZE;
+            Ok(RegionData {
+                name,
+                region_loc_x,
+                region_loc_y,
+                region_size_x: Self::SL_REGION_SIZE,
+                region_size_y: Self::SL_REGION_SIZE,
+                lod: 0,
+                grid: Self::SL_GRID.to_string()
+            })
+    }
 
-    //   Build from BonnieBots JSON data
+    ///   Build from BonnieBots JSON data
     pub fn from_json(regions: &json::JsonValue) -> Result<Vec<BonnieBotsBasicRegion>, Error> {
         let mut region_records = Vec::new();
         if let json::JsonValue::Array(regions_array) = regions {
