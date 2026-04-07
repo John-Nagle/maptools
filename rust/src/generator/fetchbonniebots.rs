@@ -283,16 +283,38 @@ fn test_fetchelevs() {
 fn test_fetchregions() {
     //  All errors to console
     use common::test_logger;
+    use crate::VizGroups;
     test_logger();
     //  HTTP Agent
     let config = Agent::config_builder().build();
     let mut agent: Agent = config.into();
     let regions = BonnieBotsBasicRegion::fetch_region_list_json(&mut agent)
         .expect("Fetch regions from BonnieBots failed.");
-    let region_list =
+    let mut region_list =
         BonnieBotsBasicRegion::from_json(&regions).expect("Conversion from BonnieBots JSON failed.");
     log::debug!("JSON: {} regions.", regions.len());
-    for region_item in &region_list[..100.min(region_list.len())] {
+    //  Get the visgroups data.
+    log::info!("Vizgroups build start"); // ***TEMP***
+    //  Sort by region_data by x, y, grid
+    region_list.sort_by(|a, b| (&b.name, b.region_loc_x, b.region_loc_y).cmp(&(&a.name, a.region_loc_x, a.region_loc_y)));
+    let mut vizgroups = VizGroups::new(false);
+    let mut grids = Vec::new();
+    for region_data in &region_list {
+        if let Some(completed_groups) = vizgroups.add_region_data(region_data.clone()) {
+            grids.push(completed_groups);
+        }
+        grids.push(vizgroups.end_grid());
+    }
+    log::info!("Vizgroups build end"); 
+    for grid in &grids {
+        for completed_groups in grid {
+            log::debug!("Completed groups: {:?}", completed_groups);
+        }
+    }
+    
+
+    //  Dump some region elevs.
+    for region_item in &region_list[..5.min(region_list.len())] {
         log::debug!("    {:?}", region_item);
         let elevs = fetch_elevs(&mut agent, region_item.region_loc_x / SL_REGION_SIZE, region_item.region_loc_y / SL_REGION_SIZE)
             .expect("Fetch elevations from BonnieBots failed.");
