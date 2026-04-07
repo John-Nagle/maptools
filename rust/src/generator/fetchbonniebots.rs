@@ -296,23 +296,46 @@ fn test_fetchregions() {
     //  Get the visgroups data.
     log::info!("Vizgroups build start"); // ***TEMP***
     //  Sort by region_data by x, y, grid
-    region_list.sort_by(|b, a| (&b.grid, b.region_loc_x, b.region_loc_y).cmp(&(&a.grid, a.region_loc_x, a.region_loc_y)));
-    let mut vizgroups = VizGroups::new(false);
+    region_list.sort_by(|a, b| (&a.grid, a.region_loc_x, a.region_loc_y).cmp(&(&b.grid, b.region_loc_x, b.region_loc_y)));
+    let mut viz_groups = VizGroups::new(false);
+/*
+    //  "grids" is a misnomer here. It's a vec of completed groups.
     let mut grids = Vec::new();
     for region_data in &region_list {
-        if let Some(completed_groups) = vizgroups.add_region_data(region_data.clone()) {
+        if let Some(completed_groups) = viz_groups.add_region_data(region_data.clone()) {
+            log::debug!("PUSH completed group");
             grids.push(completed_groups);
         }
     }
-    grids.push(vizgroups.end_grid());
-    log::info!("Vizgroups build end"); 
-    for grid in &grids {
-        for completed_groups in grid {
-            log::debug!("Completed groups: {:?}", completed_groups);
-        }
+    grids.push(viz_groups.end_grid());
+*/    
+    for item in region_list {
+        let grid_break = viz_groups.add_region_data(item);
+        //  This example is all one grid, so there's no control break.
+        assert_eq!(grid_break, None);
     }
+    let mut results = viz_groups.end_grid();
+    //  Display results
+    log::info!("Result: Viz groups: {}", results.len());
+    results.sort_by(|a, b| b.len().partial_cmp(&a.len()).unwrap());
+    for viz_group in results.iter() {
+        if viz_group.len() <= 1 {
+            continue
+        }
+        log::info!("Reachable group, {} regions, first region: {:?}", viz_group.len(), viz_group[0].name);
+    }
+/*
     
-
+    
+    log::info!("{} regions, {} viz groups.", region_list.len(), grids.len());
+    //  Sort by length of vizgroup
+    for viz_group_set in &mut grids {
+        viz_group_set.sort_by(|a, b| b.len().partial_cmp(&a.len()).unwrap());
+        log::info!("Viz group, {} regions: {:?}", viz_group_set.len(), "reg");
+    }
+*/
+    log::info!("Vizgroups build end"); 
+/*    
     //  Dump some region elevs.
     for region_item in &region_list[..5.min(region_list.len())] {
         log::debug!("    {:?}", region_item);
@@ -324,4 +347,5 @@ fn test_fetchregions() {
         let region_info = BonnieBotsRegion::fetch(&mut agent, region_item).expect("Region data fetch failed");
         log::debug!("Region info: {:?}", region_info);
     }
+*/
 }
