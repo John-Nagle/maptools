@@ -26,6 +26,11 @@ use common::{RegionData, HeightField};
 const TERRAIN_DATA_SIZE: usize = 256 * 256;
 /// User agent for talking to asset server
 const USER_AGENT: &str = "animats.info impostor asset system";
+/// Region size, Second Life only.
+const SL_REGION_SIZE: u32 = 256;
+/// Grid name, the only one supported
+const SL_GRID: &str = "agni";
+
 /// Fetch elevation data from Bonniebots. 256x256.
 pub fn fetch_elevs(
     agent: &mut Agent,
@@ -117,10 +122,10 @@ pub struct BonnieBotsRegion {
 
 impl BonnieBotsRegion {
     /// Fetch for a given region
-    pub fn fetch(agent: &mut Agent, basic: &BonnieBotsBasicRegion) -> Result<Option<Self>, Error> {
+    pub fn fetch(agent: &mut Agent, region_data: &RegionData) -> Result<Option<Self>, Error> {
         let url = format!(
             "https://www.bonniebots.com/static-api/regions/{}/{}/index.json",
-        basic.region_x, basic.region_y
+        region_data.region_loc_x / SL_REGION_SIZE, region_data.region_loc_y / SL_REGION_SIZE
         );
          match agent
             .get(&url)
@@ -151,32 +156,10 @@ impl BonnieBotsRegion {
 
 /// Info BonnieBots can provide for one region, from the region list of all regions.
 /// This is short and basic.
-#[derive(Debug, Clone)]
 pub struct BonnieBotsBasicRegion {
-    /// Name of region
-    region_name: String,
-    /// Region location number X (regions, not meters)
-    region_x: u32,
-    /// Y
-    region_y: u32,
 }
 
 impl BonnieBotsBasicRegion {
-    /// Region size for BonnieBots, which does SL agni grid only.
-    const SL_REGION_SIZE: u32 = 256;
-    const SL_GRID: &str = "agni";
-    ///  Usual new
-    pub fn new(
-        region_name: &json::JsonValue,
-        region_x: &json::JsonValue,
-        region_y: &json::JsonValue,
-    ) -> Option<Self> {
-        Some(Self {
-            region_name: region_name.as_str()?.to_string(),
-            region_x: region_x.as_u32()?,
-            region_y: region_y.as_u32()?,
-        })
-    }
     
     /// Into RegionData
     pub fn new_region_data(
@@ -185,16 +168,16 @@ impl BonnieBotsBasicRegion {
         region_y: &json::JsonValue,
         ) -> Result<RegionData, Error> {
             let name = region_name.as_str().ok_or_else(|| anyhow!("No region name"))?.trim().to_string();
-            let region_loc_x = region_x.as_u32().ok_or_else(|| anyhow!("No region size X"))? * Self::SL_REGION_SIZE;
-            let region_loc_y = region_y.as_u32().ok_or_else(|| anyhow!("No region size X"))? * Self::SL_REGION_SIZE;
+            let region_loc_x = region_x.as_u32().ok_or_else(|| anyhow!("No region size X"))? * SL_REGION_SIZE;
+            let region_loc_y = region_y.as_u32().ok_or_else(|| anyhow!("No region size X"))? * SL_REGION_SIZE;
             Ok(RegionData {
                 name,
                 region_loc_x,
                 region_loc_y,
-                region_size_x: Self::SL_REGION_SIZE,
-                region_size_y: Self::SL_REGION_SIZE,
+                region_size_x: SL_REGION_SIZE,
+                region_size_y: SL_REGION_SIZE,
                 lod: 0,
-                grid: Self::SL_GRID.to_string()
+                grid: SL_GRID.to_string()
             })
     }
 
@@ -208,7 +191,7 @@ impl BonnieBotsBasicRegion {
                 let region_x = &region[6];
                 let region_y = &region[7];
                 region_records.push(
-                    Self::new_region_data(region_name, region_x, region_y)?)
+                    Self::new_region_data(region_name, region_x, region_y)?
                 );
             }
         } else {
@@ -311,7 +294,7 @@ fn test_fetchregions() {
     log::debug!("JSON: {} regions.", regions.len());
     for region_item in &region_list[..100.min(region_list.len())] {
         log::debug!("    {:?}", region_item);
-        let elevs = fetch_elevs(&mut agent, region_item.region_x, region_item.region_y)
+        let elevs = fetch_elevs(&mut agent, region_item.region_loc_x / SL_REGION_SIZE, region_item.region_loc_y / SL_REGION_SIZE)
             .expect("Fetch elevations from BonnieBots failed.");
         if elevs.is_none() {
             log::error!("No region data avaiable reading elev data from {:?}", region_item);
