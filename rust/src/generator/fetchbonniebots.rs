@@ -199,7 +199,7 @@ impl BonnieBotsBasicRegion {
     }
 
     ///   Build from BonnieBots JSON data
-    pub fn from_json(regions: &json::JsonValue) -> Result<Vec<BonnieBotsBasicRegion>, Error> {
+    pub fn from_json(regions: &json::JsonValue) -> Result<Vec<RegionData>, Error> {
         let mut region_records = Vec::new();
         if let json::JsonValue::Array(regions_array) = regions {
             for region in regions_array {
@@ -208,8 +208,7 @@ impl BonnieBotsBasicRegion {
                 let region_x = &region[6];
                 let region_y = &region[7];
                 region_records.push(
-                    Self::new(region_name, region_x, region_y)
-                        .ok_or_else(|| anyhow!("Bad JSON region value: {:?}", region))?,
+                    Self::new_region_data(region_name, region_x, region_y)?)
                 );
             }
         } else {
