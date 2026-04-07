@@ -296,15 +296,15 @@ fn test_fetchregions() {
     //  Get the visgroups data.
     log::info!("Vizgroups build start"); // ***TEMP***
     //  Sort by region_data by x, y, grid
-    region_list.sort_by(|a, b| (&b.name, b.region_loc_x, b.region_loc_y).cmp(&(&a.name, a.region_loc_x, a.region_loc_y)));
+    region_list.sort_by(|b, a| (&b.grid, b.region_loc_x, b.region_loc_y).cmp(&(&a.grid, a.region_loc_x, a.region_loc_y)));
     let mut vizgroups = VizGroups::new(false);
     let mut grids = Vec::new();
     for region_data in &region_list {
         if let Some(completed_groups) = vizgroups.add_region_data(region_data.clone()) {
             grids.push(completed_groups);
         }
-        grids.push(vizgroups.end_grid());
     }
+    grids.push(vizgroups.end_grid());
     log::info!("Vizgroups build end"); 
     for grid in &grids {
         for completed_groups in grid {
