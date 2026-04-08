@@ -56,10 +56,11 @@ impl<T: PartialEq+PartialOrd+Debug+std::str::FromStr> Rect<T> {
     
     /// Parse (x0,y0)-(x1,y1) forms.
     pub fn parse(s: &str) -> Result<Self, Error> where <T as FromStr>::Err: std::fmt::Debug {
-        //////let re = Regex::new(r"(?m)^([^:]+):([0-9]+):(.+)$").unwrap();
-        let re = Regex::new(r"\(([0-9]+)\,([0-9]+)\)\-\(([0-9]+)\,([0-9]+)\)").unwrap();
+        //  Parses (12,34)-(56.78) with whitespace.
+        let re = Regex::new(r"\s*\((\s*[0-9]+)\s*\,\s*([0-9]+)\s*\)\s*\-\s*\(([0-9]+)\s*\,\s*([0-9]+)\s*\)\s*").expect("Regex compile failed");
         let vals = re.captures(s).ok_or_else(|| anyhow!("Cannot parse rectangle bounds (n,n)-(n,n) from \"{}\"", s))?;
         println!("Vals: {:?}", vals);
+        //  Unwrap is safe here because we just parsed digits with the regex.
         let llx: T = vals[1].parse().unwrap();
         let lly: T = vals[2].parse().unwrap();
         let urx: T = vals[3].parse().unwrap();
@@ -91,7 +92,10 @@ fn test_rect() {
     assert!(r1.overlaps(&r2));
     println!("r2: {}", r2);
     
-    let s = "(21,20)-(29,30)";
-    let parsed = Rect::<u32>:: parse(s).expect("Parse failed");
-    assert_eq!(parsed, r2);
+    let s0 = "(21,20)-(29,30)";
+    let s1 = " (21 , 20 ) - ( 29 , 30 ) ";
+    let parsed0 = Rect::<u32>:: parse(s0).expect("Parse s0 failed");
+    let parsed1 = Rect::<u32>:: parse(s1).expect("Parse s1 failed");
+    assert_eq!(parsed0, r2);
+    assert_eq!(parsed1, r2);
 }
