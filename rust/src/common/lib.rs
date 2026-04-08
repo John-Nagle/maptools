@@ -10,6 +10,7 @@ mod testlogger;
 mod auth;
 mod panichook;
 mod tileassetsgc;
+mod rect;
 
 pub use credentials::Credentials;
 pub use fcgisocketsetup::init_fcgi;
@@ -23,3 +24,4 @@ pub use tileassets::{AssetUpload, AssetUploadShort, AssetUploadArrayShort, TileA
 pub use auth::{Authorizer, AuthorizeType};
 pub use panichook::{catch_panic};
 pub use tileassetsgc::{TileGc};
+pub use rect::{Rect, RectU32};
