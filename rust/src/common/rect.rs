@@ -42,6 +42,14 @@ impl<T: PartialEq+PartialOrd> Rect<T> {
     }
 }
 
+// Implement Display for Rect
+impl<T: std::fmt::Display+std::cmp::PartialOrd> std::fmt::Display for Rect<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Write the formatted string into the formatter
+        write!(f, "({}, {})-({}, {})", self.ll[0], self.ll[1], self.ur[0], self.ur[1])
+    }
+}
+
 /// Useful Rect
 pub type RectU32 = Rect::<u32>;
 
@@ -55,4 +63,5 @@ fn test_rect() {
     assert!(r0.touches(&r1));
     assert!(!r0.overlaps(&r1));
     assert!(r1.overlaps(&r2));
+    println!("r2: {}", r2);
 }
