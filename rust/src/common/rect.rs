@@ -91,9 +91,8 @@ fn test_rect() {
     assert!(!r0.overlaps(&r1));
     assert!(r1.overlaps(&r2));
     println!("r2: {}", r2);
-    
+    //  Test with and without whitespace.
     let s0 = "(21,20)-(29,30)";
-    let s1 = " (21 , 20 ) - ( 29 , 30 ) ";
     let s1 = " ( 21 , 20 ) - ( 29 , 30 ) ";
     let parsed0 = Rect::<u32>:: parse(s0).expect("Parse s0 failed");
     let parsed1 = Rect::<u32>:: parse(s1).expect("Parse s1 failed");
