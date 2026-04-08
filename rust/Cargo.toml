@@ -72,6 +72,7 @@ chrono = "0.4"
 envie = "0.2"
 getopts = "0.2"
 image = "0.25"
+regex = "1"
 
 outer_cgi = "0.3.1"
 sha2 = "0.10"
