@@ -15,9 +15,9 @@ use anyhow::{Error, anyhow};
 #[derive(Debug, Clone, PartialEq)]
 pub struct Rect<T: PartialEq+PartialOrd+Debug+std::str::FromStr> {
     //  Lower left
-    ll: [T;2],
+    pub ll: [T;2],
     //  Upper right
-    ur: [T;2],
+    pub ur: [T;2],
 }
 
 impl<T: PartialEq+PartialOrd+Debug+std::str::FromStr> Rect<T> {
@@ -67,6 +67,15 @@ impl<T: PartialEq+PartialOrd+Debug+std::str::FromStr> Rect<T> {
         let ury: T = vals[4].parse().unwrap();
         Self::try_new([llx, lly], [urx, ury])
     }
+/*    
+    /// Scale up by scale factor
+    pub fn scale_by(&self, scale: u32) -> Self {
+        Self {
+            ll: [self.ll[0]*scale, self.ll[1]*scale],
+            ur: [self.ur[0]*scale, self.ur[1]*scale],
+        }
+    }
+*/
 }
 
 // Implement Display for Rect

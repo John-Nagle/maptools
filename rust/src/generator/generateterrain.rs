@@ -577,11 +577,27 @@ impl RunOpts {
             None
         };
         const SL_REGION_SIZE: u32 = 256;  // ***MOVE**
-        let clip_rectangles: Vec<RectU32> = matches
+        //  Clipping to part of the grid. 
+        //  Mostly for test purposes.
+        //  In units of meters
+        let mut clip_rectangles: Vec<RectU32> = matches
             .opt_strs("clipm")
             .iter()
             .map(|c: &String| RectU32::parse(&c)).collect::<Result<Vec<RectU32>, Error>>()?;
-            //////.extend(matches.opt_strs("clipm").map(|c| RectU32::parse()).collect()?)?);
+        //  In units of regions
+
+        let clips_regions: Vec<RectU32> = matches
+            .opt_strs("clip")
+            .iter()
+            .map(|c: &String| RectU32::parse(&c)).collect::<Result<Vec<RectU32>, Error>>()?;
+        //  Scale to meters
+        let clips_regions_m: Vec<RectU32> = 
+            clips_regions
+            .iter()
+            .map(|c: &RectU32 | RectU32::new([c.ll[0]*SL_REGION_SIZE, c.ll[1]*SL_REGION_SIZE], [c.ur[0]*SL_REGION_SIZE, c.ur[1]*SL_REGION_SIZE]))
+            .collect();
+            //  Combine
+            clip_rectangles.extend(clips_regions_m);    
         
         Ok(Self {
             outpath_opt,
