@@ -199,7 +199,7 @@ struct TerrainGenerator {
     /// Network connection pool (Future)
     _agent: Agent,
     /// Output directory
-    folder_generator: FolderGenerator,
+    folder_generator_opt: Option<FolderGenerator>,
     /// Asset server URL prefix (Future)
     _url_prefix_opt: Option<String>,
     /// Are regions with only corners touching adjacent?
@@ -217,7 +217,7 @@ impl TerrainGenerator {
     /// Usual new.
     pub fn new(
         conn: PooledConn,
-        outdir: PathBuf,
+        outdir_opt: Option<PathBuf>,
         _url_prefix_opt: Option<String>,
         corners_touch_connects: bool,
         generate_mesh: bool,
@@ -227,11 +227,15 @@ impl TerrainGenerator {
             .user_agent(TERRAIN_GENERATOR_USER_AGENT)
             .build();
         let _agent: Agent = config.into();
-        let folder_generator = FolderGenerator::new(&outdir, FILES_PER_DIRECTORY);
+        let folder_generator_opt = if let Some(outdir) = outdir_opt {
+            Some(FolderGenerator::new(&outdir, FILES_PER_DIRECTORY))
+        } else {
+            None
+        };
         Self {
             conn,
             _agent,
-            folder_generator,
+            folder_generator_opt,
             _url_prefix_opt,
             corners_touch_connects,
             generate_mesh,
@@ -358,6 +362,10 @@ impl TerrainGenerator {
         height_field: &HeightField,
         viz_group_id: u32,
     ) -> Result<(), Error> {
+        if self.folder_generator_opt.is_none() {
+            //  Test mode, not outputting anything
+            return Ok(())
+         }
         if self.generate_mesh {
             self.build_impostor_mesh(
                 region,
@@ -397,7 +405,7 @@ impl TerrainGenerator {
             self.stats.assets_reused += 1;
         } else {
             let sculpt_image = terrain_sculpt.image.as_ref().unwrap();
-            let mut sculpt_image_path = self.folder_generator.next_path()?;
+            let mut sculpt_image_path = self.folder_generator_opt.as_mut().unwrap().next_path()?;
             sculpt_image_path.push(sculpt_asset_upload.asset_name.to_owned() + ".png");
             sculpt_image.save(&sculpt_image_path)?;
             log::info!("Sculpt image file saved: \"{}\"", sculpt_image_path.display());
@@ -424,7 +432,7 @@ impl TerrainGenerator {
             log::info!("Terrain image asset already exists, reusing: {} UUID: {:?}", &image_asset_upload.asset_name, uuid);
             self.stats.assets_reused += 1;
         } else {
-            let mut terrain_image_path = self.folder_generator.next_path()?;
+            let mut terrain_image_path = self.folder_generator_opt.as_mut().unwrap().next_path()?;
             terrain_image_path.push(image_asset_upload.asset_name.to_owned() + ".png");
             let terrain_image_img = terrain_image.image.unwrap();
             terrain_image_img.save(&terrain_image_path)?;
@@ -522,7 +530,7 @@ impl TerrainGenerator {
 }
 
 /// Actually do the work
-fn run(pool: Pool, outdir: PathBuf, grid: String, url_prefix_opt: Option<String>, generate_mesh: bool) -> Result<(), Error> {
+fn run(pool: Pool, outdir: Option<PathBuf>, grid: String, url_prefix_opt: Option<String>, generate_mesh: bool) -> Result<(), Error> {
     let corners_touch_connects = false; // for now, SL only.
     let conn = pool.get_conn()?;
     let mut terrain_generator =
@@ -552,7 +560,7 @@ fn print_usage(program: &str, opts: Options) {
 }
 
 /// Set up options, credentials, and database connection.
-fn setup() -> Result<(Pool, PathBuf, String, Option<String>, bool), Error> {
+fn setup() -> Result<(Pool, Option<PathBuf>, String, Option<String>, bool), Error> {
     //  Usual options processing
     let args: Vec<String> = std::env::args().collect();
     let program = args[0].clone();
@@ -568,6 +576,9 @@ fn setup() -> Result<(Pool, PathBuf, String, Option<String>, bool), Error> {
     opts.optflag("m", "mesh", "Generate glTF mesh, not sculpt image");
     opts.optopt("g", "grid", "Only output for this grid", "NAME");
     opts.optopt("p", "prefix", "Asset server URL prefix for validating assets", "NAME");
+    opts.optmulti("c", "clip", "Clip rectangle in regions for area to impostor", "(n,n)-(n,n)");
+    opts.optmulti("", "clipm", "Clip rectangle in meters for area to impostor", "(n,n)-(n,n)");
+    opts.optflag("b", "bonniebots", "Use Bonniebots data, not manually tested regions.");
     opts.optflag("h", "help", "Print this help menu.");
     opts.optflag("v", "verbose", "Verbose mode.");
     let matches = match opts.parse(&args[1..]) {
@@ -580,21 +591,27 @@ fn setup() -> Result<(Pool, PathBuf, String, Option<String>, bool), Error> {
         print_usage(&program, opts);
         panic!("Help requested, will not run.");
     }
-    let outdir = matches.opt_str("o");
     let credsfile = matches.opt_str("c");
     let verbose = matches.opt_present("v");
     let grid = matches.opt_str("g");
     let url_prefix_opt = matches.opt_str("p");
     let generate_mesh = matches.opt_present("m");
-    if outdir.is_none() || credsfile.is_none() || grid.is_none() {
+    let bonnie_bots_mode = matches.opt_present("b");
+    if credsfile.is_none() || grid.is_none() {
         print_usage(&program, opts);
         return Err(anyhow!("Required command line options missing"));
     }
     let credsfile = credsfile.unwrap();
-    let outdir = PathBuf::from(&outdir.unwrap());
     let grid = grid.unwrap().trim().to_lowercase();
-    // Create the output directory, empty.
-    std::fs::create_dir_all(&outdir)?;
+    let outdir_opt = if let Some(outdir) = matches.opt_str("o") {
+     // Create the output directory, empty.
+        let outdir = PathBuf::from(&outdir);
+        std::fs::create_dir_all(&outdir)?;
+        Some(outdir)
+    } else {
+        println!("No output directory, this is a test run and will not write to the database.");
+        None
+    };
     // Connect to the database
     let creds = match Envie::load_with_path(&credsfile) {
         Ok(creds) => creds,
@@ -630,7 +647,7 @@ fn setup() -> Result<(Pool, PathBuf, String, Option<String>, bool), Error> {
     }
     log::info!("Connected to database.");
     //  Setup complete. Return what's needed to run.
-    Ok((pool, outdir, grid, url_prefix_opt, generate_mesh))
+    Ok((pool, outdir_opt, grid, url_prefix_opt, generate_mesh))
 }
 
 /// Main program.
