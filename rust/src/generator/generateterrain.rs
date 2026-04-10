@@ -256,6 +256,7 @@ impl TerrainGenerator {
         log::info!("Build start"); // ***TEMP***
                                    //  The loop here is sequential data processing with control breaks when an index field changes.
         const SQL_SELECT: &str = r"SELECT grid, region_loc_x, region_loc_y, region_size_x, region_size_y, name FROM raw_terrain_heights WHERE LOWER(grid) = :grid ORDER BY grid, region_loc_x, region_loc_y ";
+        let run_opts = &self.run_opts;
         let _all_regions = self.conn.exec_map(
             SQL_SELECT,
             params! { grid },
@@ -269,8 +270,12 @@ impl TerrainGenerator {
                     name,
                     lod: 0,
                 };
-                if let Some(completed_groups) = vizgroups.add_region_data(region_data) {
-                    grids.push(completed_groups);
+                //  Clip to regions of interest. Test feature.
+                let keep = run_opts.keep_region_of_interest(&region_data);
+                if keep {
+                    if let Some(completed_groups) = vizgroups.add_region_data(region_data) {
+                       grids.push(completed_groups);
+                    }
                 }
             },
         )?;
@@ -558,7 +563,6 @@ pub struct RunOpts {
 impl RunOpts {
     /// New, from options on command line
     pub fn new_from_options(matches: &getopts::Matches) -> Result<Self, Error> {
-        let outdir_path_opt = matches.opt_str("o");
         let verbose = matches.opt_present("v");
         let grid_opt = matches.opt_str("g");
         let url_prefix_opt = matches.opt_str("p");
@@ -585,7 +589,6 @@ impl RunOpts {
             .iter()
             .map(|c: &String| RectU32::parse(&c)).collect::<Result<Vec<RectU32>, Error>>()?;
         //  In units of regions
-
         let clips_regions: Vec<RectU32> = matches
             .opt_strs("clip")
             .iter()
@@ -610,6 +613,23 @@ impl RunOpts {
             verbose,
         })
     }
+    
+    /// Do we want to keep this region? 
+    /// Checks against command line clip list.
+    /// Mostly for testing.
+    pub fn keep_region_of_interest(&self, region_data: &RegionData) -> bool {
+        if !self.clip_rectangles.is_empty() {
+            let region_rect = RectU32::new(
+                [region_data.region_loc_x, region_data.region_loc_y],
+                [region_data.region_loc_x + region_data.region_size_x, region_data.region_loc_y + region_data.region_size_y]);
+            //  Passes if in any clip rectangle.
+            self.clip_rectangles.iter().find(|r: &&RectU32| r.overlaps(&region_rect)).is_some()
+        } else {
+            //  No clip list, everything passes
+            true
+        }
+    }
+
 }
 
 /// Actually do the work
