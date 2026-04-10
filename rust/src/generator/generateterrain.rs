@@ -564,7 +564,7 @@ impl RunOpts {
         let url_prefix_opt = matches.opt_str("p");
         let generate_mesh = matches.opt_present("m");
         let bonnie_bots_mode = matches.opt_present("b");
-        let clip_rectangles = Vec::new();   // ***MORE***
+        //////let clip_rectangles = Vec::new();   // ***MORE***
         let corners_touch_connects = false;  // ***MORE***
         let grid = if let Some(grid) = grid_opt {
             grid.trim().to_lowercase()
@@ -575,7 +575,14 @@ impl RunOpts {
             Some(PathBuf::from(&s))
         } else {
             None
-        };    
+        };
+        const SL_REGION_SIZE: u32 = 256;  // ***MOVE**
+        let clip_rectangles: Vec<RectU32> = matches
+            .opt_strs("clipm")
+            .iter()
+            .map(|c: &String| RectU32::parse(&c)).collect::<Result<Vec<RectU32>, Error>>()?;
+            //////.extend(matches.opt_strs("clipm").map(|c| RectU32::parse()).collect()?)?);
+        
         Ok(Self {
             outpath_opt,
             grid,
@@ -591,7 +598,6 @@ impl RunOpts {
 
 /// Actually do the work
 fn run(pool: Pool, run_opts: RunOpts) -> Result<(), Error> {
-    let corners_touch_connects = false; // for now, SL only.
     let conn = pool.get_conn()?;
     let mut terrain_generator =
         TerrainGenerator::new(conn, run_opts.clone());
@@ -639,7 +645,7 @@ fn setup() -> Result<(Pool, RunOpts), Error> {
     opts.optflag("m", "mesh", "Generate glTF mesh, not sculpt image");
     opts.optopt("g", "grid", "Only output for this grid", "NAME");
     opts.optopt("p", "prefix", "Asset server URL prefix for validating assets", "NAME");
-    opts.optmulti("c", "clip", "Clip rectangle in regions for area to impostor", "(n,n)-(n,n)");
+    opts.optmulti("k", "clip", "Clip rectangle in regions for area to impostor", "(n,n)-(n,n)");
     opts.optmulti("", "clipm", "Clip rectangle in meters for area to impostor", "(n,n)-(n,n)");
     opts.optflag("b", "bonniebots", "Use Bonniebots data, not manually tested regions.");
     opts.optflag("h", "help", "Print this help menu.");
@@ -662,14 +668,11 @@ fn setup() -> Result<(Pool, RunOpts), Error> {
     let credsfile = credsfile.unwrap();
     let run_opts = RunOpts::new_from_options(&matches)?;
     println!("Options: {:?}", run_opts);
-    let outdir_opt = if let Some(outdir) = matches.opt_str("o") {
+    if let Some(outpath) = &run_opts.outpath_opt {
      // Create the output directory, empty.
-        let outdir = PathBuf::from(&outdir);
-        std::fs::create_dir_all(&outdir)?;
-        Some(outdir)
+        std::fs::create_dir_all(outpath)?;
     } else {
         println!("No output directory, this is a test run and will not write to the database.");
-        None
     };
     // Connect to the database
     let creds = match Envie::load_with_path(&credsfile) {
