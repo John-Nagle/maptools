@@ -32,7 +32,7 @@ use std::path::{Path, PathBuf};
 use vizgroup::{CompletedGroups, VizGroups};
 use sculptmaker::{TerrainSculpt, TerrainSculptTexture};
 use regionorder::{TileLods, homogeneous_group_size};
-use common::{hash_to_hex, AssetUpload, TileAssetType};
+use common::{hash_to_hex, AssetUpload, TileAssetType, RectU32};
 use ureq::{Agent};
 use chrono::Utc;
 
@@ -526,6 +526,52 @@ impl TerrainGenerator {
             self.process_group(group, viz_group_id.try_into().unwrap())?;
         }
         Ok(())
+    }
+}
+
+/// Put the command line parameters into one structure
+pub struct RunOpts {
+    /// Output directory
+    pub outpath_opt: Option<PathBuf>,
+    /// Grid
+    pub grid: String,
+    /// URL prefix opt - for checking UUIDs
+    pub url_prefix_opt: Option<String>,
+    /// Generate mesh? Default is sculpt.
+    pub generate_mesh: bool,
+    /// BonnieBots mode - use BonnieBots data, not our own database
+    pub bonnie_bots_mode: bool,
+    /// Clip rectangles -- only accept regions in these rectangles, if non-null.
+    pub clip_rectangles: Vec<RectU32>,
+}
+
+impl RunOpts {
+    /// New, from options on command line
+    pub fn new_from_options(matches: &getopts::Matches) -> Result<Self, Error> {
+        let outdir_path_opt = matches.opt_str("o");
+        let verbose = matches.opt_present("v");
+        let grid_opt = matches.opt_str("g");
+        let url_prefix_opt = matches.opt_str("p");
+        let generate_mesh = matches.opt_present("m");
+        let bonnie_bots_mode = matches.opt_present("b");
+        let clip_rectangles = Vec::new();   // ***MORE***
+        let grid = if let Some(grid) = grid_opt { grid 
+        } else {
+            return Err(anyhow!("No grid name given."));
+        };
+        let outpath_opt = if let Some(s) = matches.opt_str("o") { 
+            Some(PathBuf::from(&s))
+        } else {
+            None
+        };    
+        Ok(Self {
+            outpath_opt,
+            grid,
+            url_prefix_opt,
+            generate_mesh,
+            bonnie_bots_mode,
+            clip_rectangles,
+        })
     }
 }
 
