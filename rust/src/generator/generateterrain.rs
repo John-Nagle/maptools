@@ -198,8 +198,11 @@ struct TerrainGenerator {
     conn: PooledConn,
     /// Network connection pool (Future)
     _agent: Agent,
+    /// The run options
+    run_opts: RunOpts,
     /// Output directory
     folder_generator_opt: Option<FolderGenerator>,
+/*
     /// Asset server URL prefix (Future)
     _url_prefix_opt: Option<String>,
     /// Are regions with only corners touching adjacent?
@@ -207,6 +210,7 @@ struct TerrainGenerator {
     corners_touch_connects: bool,
     /// Generate glTF mesh if on.
     generate_mesh: bool,
+*/
     /// The height field cache
     height_field_cache: HeightFieldCache,
     /// Statistics
@@ -217,28 +221,29 @@ impl TerrainGenerator {
     /// Usual new.
     pub fn new(
         conn: PooledConn,
+        run_opts: RunOpts,
+/*
         outdir_opt: Option<PathBuf>,
         _url_prefix_opt: Option<String>,
         corners_touch_connects: bool,
         generate_mesh: bool,
+*/
     ) -> Self {
         //  HTTP connection pool, used to validate UUIDs against asset server.
         let config = Agent::config_builder()
             .user_agent(TERRAIN_GENERATOR_USER_AGENT)
             .build();
         let _agent: Agent = config.into();
-        let folder_generator_opt = if let Some(outdir) = outdir_opt {
-            Some(FolderGenerator::new(&outdir, FILES_PER_DIRECTORY))
+        let folder_generator_opt = if let Some(outpath) = &run_opts.outpath_opt {
+            Some(FolderGenerator::new(outpath, FILES_PER_DIRECTORY))
         } else {
             None
         };
         Self {
             conn,
             _agent,
+            run_opts,
             folder_generator_opt,
-            _url_prefix_opt,
-            corners_touch_connects,
-            generate_mesh,
             height_field_cache: HeightFieldCache::new(),
             stats: TerrainGeneratorStats::new(),
         }
@@ -246,7 +251,7 @@ impl TerrainGenerator {
 
     /// Build visibility group info from database
     pub fn transitive_closure(&mut self, grid: &str) -> Result<Vec<CompletedGroups>, Error> {
-        let mut vizgroups = VizGroups::new(self.corners_touch_connects);
+        let mut vizgroups = VizGroups::new(self.run_opts.corners_touch_connects);
         let mut grids = Vec::new();
         log::info!("Build start"); // ***TEMP***
                                    //  The loop here is sequential data processing with control breaks when an index field changes.
@@ -366,7 +371,7 @@ impl TerrainGenerator {
             //  Test mode, not outputting anything
             return Ok(())
          }
-        if self.generate_mesh {
+        if self.run_opts.generate_mesh {
             self.build_impostor_mesh(
                 region,
                 height_field,
@@ -530,6 +535,7 @@ impl TerrainGenerator {
 }
 
 /// Put the command line parameters into one structure
+#[derive(Debug, Clone)]
 pub struct RunOpts {
     /// Output directory
     pub outpath_opt: Option<PathBuf>,
@@ -543,6 +549,10 @@ pub struct RunOpts {
     pub bonnie_bots_mode: bool,
     /// Clip rectangles -- only accept regions in these rectangles, if non-null.
     pub clip_rectangles: Vec<RectU32>,
+    /// Corners_touch -- true for Open Simulator grids, where touching corners means reachable
+    pub corners_touch_connects: bool,
+    /// Verbose mode
+    pub verbose: bool,
 }
 
 impl RunOpts {
@@ -555,7 +565,9 @@ impl RunOpts {
         let generate_mesh = matches.opt_present("m");
         let bonnie_bots_mode = matches.opt_present("b");
         let clip_rectangles = Vec::new();   // ***MORE***
-        let grid = if let Some(grid) = grid_opt { grid 
+        let corners_touch_connects = false;  // ***MORE***
+        let grid = if let Some(grid) = grid_opt {
+            grid.trim().to_lowercase()
         } else {
             return Err(anyhow!("No grid name given."));
         };
@@ -571,19 +583,21 @@ impl RunOpts {
             generate_mesh,
             bonnie_bots_mode,
             clip_rectangles,
+            corners_touch_connects,
+            verbose,
         })
     }
 }
 
 /// Actually do the work
-fn run(pool: Pool, outdir: Option<PathBuf>, grid: String, url_prefix_opt: Option<String>, generate_mesh: bool) -> Result<(), Error> {
+fn run(pool: Pool, run_opts: RunOpts) -> Result<(), Error> {
     let corners_touch_connects = false; // for now, SL only.
     let conn = pool.get_conn()?;
     let mut terrain_generator =
-        TerrainGenerator::new(conn, outdir, url_prefix_opt, generate_mesh, corners_touch_connects);
-    let mut grids = terrain_generator.transitive_closure(&grid)?;
+        TerrainGenerator::new(conn, run_opts.clone());
+    let mut grids = terrain_generator.transitive_closure(&run_opts.grid)?;
     if grids.is_empty() {
-        return Err(anyhow!("Grid \"{}\" not found.", grid));
+        return Err(anyhow!("Grid \"{}\" not found.", &run_opts.grid));
     }
 
     if grids.len() != 1 {
@@ -592,7 +606,10 @@ fn run(pool: Pool, outdir: Option<PathBuf>, grid: String, url_prefix_opt: Option
         ));
     }
     //  Clear old impostors from initial impostors.
-    InitialImpostors::clear_grid(&mut terrain_generator.conn, &grid)?;
+    if run_opts.outpath_opt.is_some() {
+        //  But only in production mode
+        InitialImpostors::clear_grid(&mut terrain_generator.conn, &run_opts.grid)?;
+    }
     let grid_entry = grids.pop().unwrap(); // get the one grid
     terrain_generator.process_grid(grid_entry)?;
     println!("Statistics:\n{}", terrain_generator.stats);
@@ -606,7 +623,7 @@ fn print_usage(program: &str, opts: Options) {
 }
 
 /// Set up options, credentials, and database connection.
-fn setup() -> Result<(Pool, Option<PathBuf>, String, Option<String>, bool), Error> {
+fn setup() -> Result<(Pool, RunOpts), Error> {
     //  Usual options processing
     let args: Vec<String> = std::env::args().collect();
     let program = args[0].clone();
@@ -638,17 +655,13 @@ fn setup() -> Result<(Pool, Option<PathBuf>, String, Option<String>, bool), Erro
         panic!("Help requested, will not run.");
     }
     let credsfile = matches.opt_str("c");
-    let verbose = matches.opt_present("v");
-    let grid = matches.opt_str("g");
-    let url_prefix_opt = matches.opt_str("p");
-    let generate_mesh = matches.opt_present("m");
-    let bonnie_bots_mode = matches.opt_present("b");
-    if credsfile.is_none() || grid.is_none() {
+    if credsfile.is_none() {
         print_usage(&program, opts);
         return Err(anyhow!("Required command line options missing"));
     }
     let credsfile = credsfile.unwrap();
-    let grid = grid.unwrap().trim().to_lowercase();
+    let run_opts = RunOpts::new_from_options(&matches)?;
+    println!("Options: {:?}", run_opts);
     let outdir_opt = if let Some(outdir) = matches.opt_str("o") {
      // Create the output directory, empty.
         let outdir = PathBuf::from(&outdir);
@@ -688,12 +701,12 @@ fn setup() -> Result<(Pool, Option<PathBuf>, String, Option<String>, bool), Erro
     drop(creds);
     log::info!("Opts: {:?}", opts);
     let pool = Pool::new(opts)?;
-    if verbose {
+    if run_opts.verbose {
         println!("Connected to database.");
     }
     log::info!("Connected to database.");
     //  Setup complete. Return what's needed to run.
-    Ok((pool, outdir_opt, grid, url_prefix_opt, generate_mesh))
+    Ok((pool, run_opts))
 }
 
 /// Main program.
@@ -701,7 +714,7 @@ fn setup() -> Result<(Pool, Option<PathBuf>, String, Option<String>, bool), Erro
 fn main() {
     logger();
     match setup() {
-        Ok((pool, outdir, grid, url_prefix_opt, mesh)) => match run(pool, outdir, grid, url_prefix_opt, mesh) {
+        Ok((pool, run_opts)) => match run(pool, run_opts) {
             Ok(_) => {}
             Err(e) => {
                 panic!("Failed: {:?}", e);
