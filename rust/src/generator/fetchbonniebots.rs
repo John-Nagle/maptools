@@ -21,9 +21,11 @@ use serde::{Deserialize};
 use ureq::Agent;
 use uuid::Uuid;
 use common::{RegionData, HeightField};
+use array2d::Array2D;
 
 /// Size of region elev data, SL only.
-const TERRAIN_DATA_SIZE: usize = 256 * 256;
+const TERRAIN_DATA_DIM: usize = 256;
+const TERRAIN_DATA_SIZE: usize = TERRAIN_DATA_DIM * TERRAIN_DATA_DIM;
 /// User agent for talking to asset server
 const USER_AGENT: &str = "animats.info impostor asset system";
 /// Region size, Second Life only.
@@ -31,12 +33,18 @@ const SL_REGION_SIZE: u32 = 256;
 /// Grid name, the only one supported
 pub const SL_GRID: &str = "agni";
 
+/// Convert flattened elevs array to 2D array.
+/// SL only, 256x256 samples.
+/// ***NOT SURE ABOUT AXIS ORDER*** CHECK
+fn convert_to_2d_array(heights: Vec<f32>) -> Array2D<f32> {
+    Array2D::from_iter_row_major(heights.into_iter(), TERRAIN_DATA_DIM, TERRAIN_DATA_DIM).unwrap()
+}
 /// Fetch elevation data from Bonniebots. 256x256.
 pub fn fetch_elevs(
     agent: &mut Agent,
     region_num_x: u32,
     region_num_y: u32,
-) -> Result<Option<Vec<f32>>, Error> {
+) -> Result<Option<Array2D<f32>>, Error> {
     // Build URL
     let url = format!(
         "https://www.bonniebots.com/static-api/terrain/{}-{}.bin",
@@ -61,7 +69,7 @@ pub fn fetch_elevs(
                     .collect();
                 log::info!("HTTP success reading elev data from {}", url);
                 log::debug!("Elevs: {:?}", &elevs[0..4]); // ***TEMP***
-                Ok(Some(elevs)) // ***TEMP***
+                Ok(Some(convert_to_2d_array(elevs))) // ***TEMP***
             }
         }
         Err(ureq::Error::StatusCode(code)) => {

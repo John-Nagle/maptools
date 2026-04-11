@@ -178,6 +178,16 @@ impl std::fmt::Display for HeightField {
 }
 
 impl HeightField {
+
+    /// New from raw elevs array. Usually from BonnieBots
+    pub fn new(heights: Array2D<f32>, size_x: u32, size_y: u32, water_height: f32) -> Self {
+        Self {
+            heights,
+            size_x,
+            size_y,
+            water_height
+        }
+    }
     /// New from elevs blob, the form used in SQL. One big blob, a flattened 2D array.
     /// size_x and size_y are size of the region, not the elevs data.
     /// In the elevs blob, the Y subscript goes fastest.
