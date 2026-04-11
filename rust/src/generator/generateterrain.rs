@@ -33,7 +33,7 @@ use vizgroup::{CompletedGroups, VizGroups};
 use sculptmaker::{TerrainSculpt, TerrainSculptTexture};
 use regionorder::{TileLods, homogeneous_group_size};
 use common::{hash_to_hex, AssetUpload, TileAssetType, RectU32};
-use fetchbonniebots::{BonnieBotsBasicRegion};
+use fetchbonniebots::{BonnieBotsBasicRegion, SL_GRID};
 use ureq::{Agent};
 use chrono::Utc;
 
@@ -242,7 +242,7 @@ impl TerrainGenerator {
     }
 
     /// Build visibility group info from database
-    pub fn transitive_closure(&mut self, grid: &str) -> Result<Vec<CompletedGroups>, Error> {
+    pub fn transitive_closure_orig(&mut self, grid: &str) -> Result<Vec<CompletedGroups>, Error> {
         let mut vizgroups = VizGroups::new(self.run_opts.corners_touch_connects);
         let mut grids = Vec::new();
         log::info!("Build start"); // ***TEMP***
@@ -277,8 +277,11 @@ impl TerrainGenerator {
     
     /// Build list of region groups using BonnieBots input. One grid.
     pub fn transitive_closure_bb(&mut self, grid: &str) -> Result<CompletedGroups, Error> {
+        if grid != SL_GRID {
+            return Err(anyhow!("BonnieBots mode only works for grid {}", SL_GRID));
+        }
         let regions = BonnieBotsBasicRegion::fetch_region_list_json(&mut self.agent)?;
-        let mut initial_region_list =
+        let initial_region_list =
             BonnieBotsBasicRegion::from_json(&regions)?;
         //  Filter regions based on clip filter.
         let mut region_list: Vec<_> = initial_region_list.iter().filter(|r| self.run_opts.keep_region_of_interest(r)).collect();
@@ -601,7 +604,6 @@ impl RunOpts {
         let url_prefix_opt = matches.opt_str("p");
         let generate_mesh = matches.opt_present("m");
         let bonnie_bots_mode = matches.opt_present("b");
-        //////let clip_rectangles = Vec::new();   // ***MORE***
         let corners_touch_connects = false;  // ***MORE***
         let grid = if let Some(grid) = grid_opt {
             grid.trim().to_lowercase()
@@ -670,22 +672,28 @@ fn run(pool: Pool, run_opts: RunOpts) -> Result<(), Error> {
     let conn = pool.get_conn()?;
     let mut terrain_generator =
         TerrainGenerator::new(conn, run_opts.clone());
-    let mut grids = terrain_generator.transitive_closure(&run_opts.grid)?;
-    if grids.is_empty() {
-        return Err(anyhow!("Grid \"{}\" not found.", &run_opts.grid));
-    }
+    let grid_entry = if run_opts.bonnie_bots_mode {
+        terrain_generator.transitive_closure_bb(&run_opts.grid)?
+    } else {
+        let mut grids = terrain_generator.transitive_closure_orig(&run_opts.grid)?;
+        if grids.is_empty() {
+            return Err(anyhow!("Grid \"{}\" not found.", &run_opts.grid));
+        }
 
-    if grids.len() != 1 {
-        return Err(anyhow!(
-            "More than one grid found but SQL should return only one grid."
-        ));
-    }
+        if grids.len() != 1 {
+            return Err(anyhow!(
+                "More than one grid found but SQL should return only one grid."
+            ));
+        }
+        grids.pop().unwrap() // get the one grid
+    };
+    //  Log group info
+    terrain_generator.dump_completed_groups(&grid_entry);
     //  Clear old impostors from initial impostors.
     if run_opts.outpath_opt.is_some() {
         //  But only in production mode
         InitialImpostors::clear_grid(&mut terrain_generator.conn, &run_opts.grid)?;
     }
-    let grid_entry = grids.pop().unwrap(); // get the one grid
     terrain_generator.process_grid(grid_entry)?;
     println!("Statistics:\n{}", terrain_generator.stats);
     log::info!("Statistics:\n{}", terrain_generator.stats);
@@ -716,7 +724,7 @@ fn setup() -> Result<(Pool, RunOpts), Error> {
     opts.optopt("p", "prefix", "Asset server URL prefix for validating assets", "NAME");
     opts.optmulti("k", "clip", "Clip rectangle in regions for area to impostor", "(n,n)-(n,n)");
     opts.optmulti("", "clipm", "Clip rectangle in meters for area to impostor", "(n,n)-(n,n)");
-    opts.optflag("b", "bonniebots", "Use Bonniebots data, not manually tested regions.");
+    opts.optflag("b", "bonniebots", "Use Bonniebots region data.");
     opts.optflag("h", "help", "Print this help menu.");
     opts.optflag("v", "verbose", "Verbose mode.");
     let matches = match opts.parse(&args[1..]) {

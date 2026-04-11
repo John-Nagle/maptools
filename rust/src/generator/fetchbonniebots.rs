@@ -29,7 +29,7 @@ const USER_AGENT: &str = "animats.info impostor asset system";
 /// Region size, Second Life only.
 const SL_REGION_SIZE: u32 = 256;
 /// Grid name, the only one supported
-const SL_GRID: &str = "agni";
+pub const SL_GRID: &str = "agni";
 
 /// Fetch elevation data from Bonniebots. 256x256.
 pub fn fetch_elevs(
