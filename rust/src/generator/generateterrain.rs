@@ -687,6 +687,9 @@ fn run(pool: Pool, run_opts: RunOpts) -> Result<(), Error> {
         }
         grids.pop().unwrap() // get the one grid
     };
+    //  Filter out vizgroups too tiny to impostor
+    const MINIMUM_REGIONS_PER_VIZGROUP: usize = 2;
+    let grid_entry: Vec<_> = grid_entry.into_iter().filter(|vg| vg.len() >= MINIMUM_REGIONS_PER_VIZGROUP).collect();
     //  Log group info
     terrain_generator.dump_completed_groups(&grid_entry);
     //  Clear old impostors from initial impostors.

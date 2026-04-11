@@ -193,7 +193,7 @@ impl Drop for VizGroup {
             .completed_groups_weak
             .upgrade()
             .expect("Unable to upgrade vizgroups");
-        log::debug!("Drop of VizGroup: {} regions", self.regions.len());
+        log::trace!("Drop of VizGroup: {} regions", self.regions.len());
         if !self.regions.is_empty() {
             completed_groups.borrow_mut().push(self.regions.clone());
         }

@@ -88,7 +88,7 @@ impl TileLods {
             assert!(!prev.is_empty());
             let prev = &prev[prev.len() - 1];
             let curr: &mut ColumnCursor = &mut curr[0];
-            log::debug!("Scan LOD {}. Prev: {:?}  Curr: {:?}", lod, prev.recent_column_info, curr.recent_column_info); // ***TEMP***
+            log::trace!("Scan LOD {}. Prev: {:?}  Curr: {:?}", lod, prev.recent_column_info, curr.recent_column_info); // ***TEMP***
             if !curr.is_aligned(&prev.recent_column_info) { break };
             let mut new_tiles = curr.scan_lod_n(&prev.recent_column_info);
             //  A lower LOD region has been generated.
@@ -276,7 +276,7 @@ impl RecentColumnInfo {
         self.region_type_info[0] = vec![RecentRegionType::Unknown; self.region_type_info[0].len()];
         //  Advance position. Position is of the current column, not the previous one.
         self.start.0 += self.size.0;
-        log::debug!("Column shift. Next start: {:?}", self.start);
+        log::trace!("Column shift. Next start: {:?}", self.start);
     }
     
     /// Does this tile cover the entire bounds of the viz group?
@@ -441,7 +441,7 @@ impl ColumnCursor {
     fn column_finished(&mut self) {
         assert!(!self.recent_column_info.region_type_info[0].is_empty());
         let fill_last = self.recent_column_info.region_type_info[0].len() -1;
-        log::debug!("Col finished LOD {} start, yix = {}: {:?}", self.lod, self.next_y_index, self.recent_column_info.region_type_info[0]);  // ***TEMP***
+        log::trace!("Col finished LOD {} start, yix = {}: {:?}", self.lod, self.next_y_index, self.recent_column_info.region_type_info[0]);  // ***TEMP***
         if self.recent_column_info.region_type_info[0][fill_last] == RecentRegionType::Unknown {
             //  This column is not full yet, so we have to fill it out to the end.
             for n in self.next_y_index .. fill_last + 1 {
@@ -449,7 +449,7 @@ impl ColumnCursor {
                 self.recent_column_info.region_type_info[0][n] = RecentRegionType::Water;
             }
             //  At this point, all entries in the column should be known.
-            log::debug!("Col finished LOD {} done, yix = {}: {:?}", self.lod, self.next_y_index, self.recent_column_info.region_type_info[0]);  // ***TEMP***
+            log::trace!("Col finished LOD {} done, yix = {}: {:?}", self.lod, self.next_y_index, self.recent_column_info.region_type_info[0]);  // ***TEMP***
             
         }
         //  Column complete. All cells are land or water.
