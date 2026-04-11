@@ -102,7 +102,7 @@ impl TileLods {
         //  LOD 2 gets shifted one in four times, etc.
         for lod in 1..self.cursors.len() {         
             let can_shift = self.cursors[0].recent_column_info.start.0 == self.cursors[lod].recent_column_info.start.0 + self.cursors[lod].recent_column_info.size.0;
-            log::debug!("Scan and shift, LOD {}, lod 0 x at {}, LOD {} x at {}, size {}, can shift: {}",
+            log::trace!("Scan and shift, LOD {}, lod 0 x at {}, LOD {} x at {}, size {}, can shift: {}",
                 lod, self.cursors[0].recent_column_info.start.0, lod, 
                 self.cursors[lod].recent_column_info.start.0, self.cursors[lod].recent_column_info.size.0, can_shift);
             if can_shift {
@@ -168,7 +168,7 @@ impl Iterator for TileLods {
             while self.cursors[self.cursors.len()-1].recent_column_info.start.0 <= self.cursors[self.cursors.len()-1].recent_column_info.lod_bounds.1.0 {
                 log::debug!("Runout at EOF: at {:?}", self.cursors[0].recent_column_info.start);
                 log::debug!("Runout: next y index: {} for length {}", self.cursors[0].next_y_index, self.cursors[0].recent_column_info.region_type_info[0].len());
-                log::debug!("Runout: Col finished LOD 0: {:?}", self.cursors[0].recent_column_info.region_type_info[0]);  // ***TEMP***
+                log::trace!("Runout: Col finished LOD 0: {:?}", self.cursors[0].recent_column_info.region_type_info[0]);  // ***TEMP***
                 //  This fills all with water.
                 self.scan_and_shift();
                 if runaway > 1000 { panic!("EOF runaway"); } else { runaway += 1; } // ***TEMP***
@@ -388,7 +388,7 @@ impl ColumnCursor {
     /// Current column is 0, previous column is 1.
     fn shift(&mut self) {
         self.column_finished();
-        log::debug!("Shift LOD {} column finished: {:?}", self.lod, self.recent_column_info.region_type_info[0]); // ***TEMP***
+        log::trace!("Shift LOD {} column finished: {:?}", self.lod, self.recent_column_info.region_type_info[0]); // ***TEMP***
         self.recent_column_info.shift_inner();
         self.next_y_index = 0;
     }
@@ -414,7 +414,7 @@ impl ColumnCursor {
         assert_eq!(self.lod, 0);    // LOD 0 only.
         assert_eq!(self.recent_column_info.start.0, loc.0); // on correct column
         let yix = self.recent_column_info.calc_y_index(loc.1);
-        log::debug!("Marking cell {} of column {:?}",  yix, self.recent_column_info.region_type_info[0]);
+        log::trace!("Marking cell {} of column {:?}",  yix, self.recent_column_info.region_type_info[0]);
         assert_eq!(loc.1 % self.recent_column_info.size.1, 0);
         //  Duplicates not allowed.
         assert_eq!(
@@ -423,7 +423,7 @@ impl ColumnCursor {
         );
         //  Mark this as a land cell.
         //  Fill as water up to new land cell.
-        log::debug!(
+        log::trace!(
             "Mark {:?}, index {} as land. Size {:?}",
             loc,
             yix,
