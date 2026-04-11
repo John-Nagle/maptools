@@ -33,6 +33,7 @@ use vizgroup::{CompletedGroups, VizGroups};
 use sculptmaker::{TerrainSculpt, TerrainSculptTexture};
 use regionorder::{TileLods, homogeneous_group_size};
 use common::{hash_to_hex, AssetUpload, TileAssetType, RectU32};
+use fetchbonniebots::{BonnieBotsBasicRegion};
 use ureq::{Agent};
 use chrono::Utc;
 
@@ -197,20 +198,11 @@ struct TerrainGenerator {
     /// SQL connection
     conn: PooledConn,
     /// Network connection pool (Future)
-    _agent: Agent,
+    agent: Agent,
     /// The run options
     run_opts: RunOpts,
     /// Output directory
     folder_generator_opt: Option<FolderGenerator>,
-/*
-    /// Asset server URL prefix (Future)
-    _url_prefix_opt: Option<String>,
-    /// Are regions with only corners touching adjacent?
-    /// Set to true for Open Simulator grids
-    corners_touch_connects: bool,
-    /// Generate glTF mesh if on.
-    generate_mesh: bool,
-*/
     /// The height field cache
     height_field_cache: HeightFieldCache,
     /// Statistics
@@ -233,7 +225,7 @@ impl TerrainGenerator {
         let config = Agent::config_builder()
             .user_agent(TERRAIN_GENERATOR_USER_AGENT)
             .build();
-        let _agent: Agent = config.into();
+        let agent: Agent = config.into();
         let folder_generator_opt = if let Some(outpath) = &run_opts.outpath_opt {
             Some(FolderGenerator::new(outpath, FILES_PER_DIRECTORY))
         } else {
@@ -241,7 +233,7 @@ impl TerrainGenerator {
         };
         Self {
             conn,
-            _agent,
+            agent,
             run_opts,
             folder_generator_opt,
             height_field_cache: HeightFieldCache::new(),
@@ -281,6 +273,47 @@ impl TerrainGenerator {
         )?;
         grids.push(vizgroups.end_grid());
         Ok(grids)
+    }
+    
+    /// Build list of region groups using BonnieBots input. One grid.
+    pub fn transitive_closure_bb(&mut self, grid: &str) -> Result<CompletedGroups, Error> {
+        let regions = BonnieBotsBasicRegion::fetch_region_list_json(&mut self.agent)?;
+        let mut initial_region_list =
+            BonnieBotsBasicRegion::from_json(&regions)?;
+        //  Filter regions based on clip filter.
+        let mut region_list: Vec<_> = initial_region_list.iter().filter(|r| self.run_opts.keep_region_of_interest(r)).collect();
+        log::info!("BonnieBots: {} regions before fiter, {} after filter.", initial_region_list.len(), region_list.len());
+        //  Get the visgroups data.
+        log::info!("Vizgroups build start"); 
+        //  Sort by region_data by x, y, grid
+        region_list.sort_by(|a, b| (&a.grid, a.region_loc_x, a.region_loc_y).cmp(&(&b.grid, b.region_loc_x, b.region_loc_y)));
+        let mut viz_groups = VizGroups::new(false);
+        
+        for item in region_list {
+            let grid_break = viz_groups.add_region_data(item.clone());
+            //  BonnieBots only does one grid, so there's no control break.
+            assert_eq!(grid_break, None);
+        }
+        let mut results = viz_groups.end_grid();
+        results.sort_by(|a, b| b.len().partial_cmp(&a.len()).unwrap());
+        log::info!("Vizgroups build end");
+        Ok(results)
+    }
+    
+    /// Dump completed groups to log. One grid.
+    pub fn dump_completed_groups(&self, results: &CompletedGroups) {
+        //  Display results
+        log::info!("Viz groups: {}", results.len());
+        //  Debug print
+        for viz_group in results.iter() {
+            if viz_group.len() <= 1 {
+                continue
+            }
+            log::info!("Reachable group, {} regions, first region: {:?}", viz_group.len(), viz_group[0].name);
+            for n in 0..viz_group.len().min(30) {
+                log::debug!("  {}", viz_group[n]);
+            }
+        }
     }
 
     /// Get elevation data for one region.
