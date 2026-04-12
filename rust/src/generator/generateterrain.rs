@@ -131,6 +131,11 @@ impl HeightFieldCache {
     fn take(&mut self, key: &RegionLodKey) -> Option<HeightField> {
         self.cache.remove(key)
     }
+    
+    /// Clear cache at start of each viz group.
+    fn clear(&mut self) {
+        self.cache.clear();
+    }
 }
 
 /// Statistics for terrain generator
@@ -594,7 +599,8 @@ impl TerrainGenerator {
     
     /// Process group, multi-LOD version
     fn process_group(&mut self, group: Vec<RegionData>, viz_group_id: u32) -> Result<(), Error> {
-        log::info!("Group #{}: {} entries.", viz_group_id, group.len());
+        self.height_field_cache.clear();
+        log::info!("Visibility group #{}: {} entries.", viz_group_id, group.len());
         let region_size_opt = homogeneous_group_size(&group);
         if region_size_opt.is_some() && group.len() > 1 {
             //  Do the LOD thing.
