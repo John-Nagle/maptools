@@ -33,7 +33,7 @@ use vizgroup::{CompletedGroups, VizGroups};
 use sculptmaker::{TerrainSculpt, TerrainSculptTexture};
 use regionorder::{TileLods, homogeneous_group_size};
 use common::{hash_to_hex, AssetUpload, TileAssetType, RectU32};
-use fetchbonniebots::{BonnieBotsBasicRegion, SL_GRID};
+use fetchbonniebots::{BonnieBotsBasicRegion, SL_GRID, SL_REGION_SIZE, TERRAIN_DATA_DIM, fetch_height_field};
 use ureq::{Agent};
 use chrono::Utc;
 
@@ -214,12 +214,6 @@ impl TerrainGenerator {
     pub fn new(
         conn: PooledConn,
         run_opts: RunOpts,
-/*
-        outdir_opt: Option<PathBuf>,
-        _url_prefix_opt: Option<String>,
-        corners_touch_connects: bool,
-        generate_mesh: bool,
-*/
     ) -> Self {
         //  HTTP connection pool, used to validate UUIDs against asset server.
         let config = Agent::config_builder()
@@ -318,9 +312,52 @@ impl TerrainGenerator {
             }
         }
     }
+    
+    /// Switch data source depending on BonnieBots mode.
+    pub fn get_height_field_one_region(&mut self,
+        grid: String,
+        region_loc_x: u32,
+        region_loc_y: u32,
+    ) -> Result<HeightField, Error> {
+        if self.run_opts.bonnie_bots_mode {
+            self.get_height_field_one_region_bb(grid, region_loc_x, region_loc_y)
+        } else {
+            self.get_height_field_one_region_orig(grid, region_loc_x, region_loc_y)
+        }         
+    }
+    
+    /// Get elevation data for one region, BonnieBots mode.
+    pub fn get_height_field_one_region_bb(&mut self,
+        grid: String,
+        region_loc_x: u32,
+        region_loc_y: u32,
+    ) -> Result<HeightField, Error> {
+        if &grid != SL_GRID {
+            return Err(anyhow!("Grid requested is {}. Only allowed grid in Bonniebots mode is {}", grid, SL_GRID));
+        }
+        let height_field_opt = fetch_height_field(&mut self.agent, region_loc_x / SL_REGION_SIZE, region_loc_y / SL_REGION_SIZE)?;
+        if let Some(height_field) = height_field_opt {
+            Ok(height_field)
+        } else {
+            //  TROUBLE - no height field available
+            log::error!("No Bonniebots height field for ({},{})", region_loc_x, region_loc_y);
+            Ok(Self::create_fake_height_field_bb())
+        }
+    }
+    
+    /// Create fake height field for missing data.
+    /// It's flat.
+    /// This is just until BonnieBots gets better coverage.
+    fn create_fake_height_field_bb() -> HeightField {
+        const FAKE_HEIGHT_FIELD_WATER_HEIGHT: f32 = 20.0;   /// Fake water height.
+        const FAKE_HEIGHT_FIELD_HEIGHT: f32 = FAKE_HEIGHT_FIELD_WATER_HEIGHT + 1.0;   // Fake water height.
+        let heights = array2d::Array2D::filled_with(FAKE_HEIGHT_FIELD_HEIGHT, TERRAIN_DATA_DIM, TERRAIN_DATA_DIM);
+        HeightField::new(heights, SL_REGION_SIZE, SL_REGION_SIZE, FAKE_HEIGHT_FIELD_WATER_HEIGHT)      
+    }
 
     /// Get elevation data for one region.
-    pub fn get_height_field_one_region(
+    /// Original mode, from our own database.
+    pub fn get_height_field_one_region_orig(
         &mut self,
         grid: String,
         region_loc_x: u32,

@@ -24,12 +24,12 @@ use common::{RegionData, HeightField};
 use array2d::Array2D;
 
 /// Size of region elev data, SL only.
-const TERRAIN_DATA_DIM: usize = 256;
+pub const TERRAIN_DATA_DIM: usize = 256;
 const TERRAIN_DATA_SIZE: usize = TERRAIN_DATA_DIM * TERRAIN_DATA_DIM;
 /// User agent for talking to asset server
 const USER_AGENT: &str = "animats.info impostor asset system";
 /// Region size, Second Life only.
-const SL_REGION_SIZE: u32 = 256;
+pub const SL_REGION_SIZE: u32 = 256;
 /// Grid name, the only one supported
 pub const SL_GRID: &str = "agni";
 
