@@ -336,13 +336,17 @@ impl TerrainGenerator {
             return Err(anyhow!("Grid requested is {}. Only allowed grid in Bonniebots mode is {}", grid, SL_GRID));
         }
         let height_field_opt = fetch_height_field(&mut self.agent, region_loc_x / SL_REGION_SIZE, region_loc_y / SL_REGION_SIZE)?;
-        if let Some(height_field) = height_field_opt {
-            Ok(height_field)
+        let height_field = if let Some(height_field) = height_field_opt {
+            height_field
         } else {
             //  TROUBLE - no height field available
             log::error!("No Bonniebots height field for ({},{})", region_loc_x, region_loc_y);
-            Ok(Self::create_fake_height_field_bb())
-        }
+            Self::create_fake_height_field_bb()
+        };
+        //  Cache for later generation of lower LODs
+        let key = RegionLodKey { lod: 0, region_loc_x, region_loc_y };
+        self.height_field_cache.insert(key, height_field.clone());
+        Ok(height_field)
     }
     
     /// Create fake height field for missing data.
