@@ -11,6 +11,7 @@ mod auth;
 mod panichook;
 mod tileassetsgc;
 mod rect;
+mod httpretry;
 
 pub use credentials::Credentials;
 pub use fcgisocketsetup::init_fcgi;
@@ -25,3 +26,4 @@ pub use auth::{Authorizer, AuthorizeType};
 pub use panichook::{catch_panic};
 pub use tileassetsgc::{TileGc};
 pub use rect::{Rect, RectU32};
+pub use httpretry::{get_with_retry};

@@ -20,14 +20,12 @@ use std::io::Read;
 use serde::{Deserialize};
 use ureq::Agent;
 use uuid::Uuid;
-use common::{RegionData, HeightField};
+use common::{RegionData, HeightField, get_with_retry};
 use array2d::Array2D;
 
 /// Size of region elev data, SL only.
 pub const TERRAIN_DATA_DIM: usize = 256;
 const TERRAIN_DATA_SIZE: usize = TERRAIN_DATA_DIM * TERRAIN_DATA_DIM;
-/// User agent for talking to asset server
-const USER_AGENT: &str = "animats.info impostor asset system";
 /// Region size, Second Life only.
 pub const SL_REGION_SIZE: u32 = 256;
 /// Grid name, the only one supported
@@ -113,6 +111,7 @@ pub fn find_element_by_id<'a>(nodes: &'a Vec<Node>, id_key: &str) -> Option<&'a 
 /// More detailed info for a BonnieBots region.
 /// Only the fields we are interested in.
 #[derive(Deserialize, Debug, Clone)]
+#[allow(dead_code)]
 pub struct BonnieBotsRegion {
     /// Region name
     region_name: String,
@@ -133,10 +132,12 @@ impl BonnieBotsRegion {
             "https://www.bonniebots.com/static-api/regions/{}/{}/index.json",
             region_x, region_y,
         );
-         match agent
+/*
+        match agent
             .get(&url)
-            //////.header("user-agent", "curl/7.81.0")
             .call()
+*/
+        match get_with_retry(agent, &url)
         {
             Ok(mut response) => {
                 let json_str =  response.body_mut().read_to_string()?;
@@ -215,10 +216,13 @@ impl BonnieBotsBasicRegion {
         const BONNIE_BOTS_BASIC_REGION_URL: &str = "https://www.bonniebots.com/regions";
         let url = BONNIE_BOTS_BASIC_REGION_URL;
         const NEXT_DATA: &str = "__NEXT_DATA__";
+/*
         match agent
             .get(url)
             //////.header("user-agent", "curl/7.81.0")
             .call()
+*/
+        match get_with_retry(agent, url)
         {
             Ok(mut response) => {
                 //////let content = response.body_mut().read_to_string()?;

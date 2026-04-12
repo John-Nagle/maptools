@@ -36,6 +36,7 @@ use common::{hash_to_hex, AssetUpload, TileAssetType, RectU32};
 use fetchbonniebots::{BonnieBotsBasicRegion, SL_GRID, SL_REGION_SIZE, TERRAIN_DATA_DIM, fetch_height_field};
 use ureq::{Agent};
 use chrono::Utc;
+use std::time::Duration;
 
 /// MySQL Credentials for uploading.
 /// This filename will be searched for in parent directories,
@@ -215,8 +216,12 @@ impl TerrainGenerator {
         conn: PooledConn,
         run_opts: RunOpts,
     ) -> Self {
+        const TIMEOUT_CONNECT: Duration = Duration::from_secs(15);
+        const TIMEOUT_GLOBAL: Duration = Duration::from_secs(120);
         //  HTTP connection pool, used to validate UUIDs against asset server.
         let config = Agent::config_builder()
+            .timeout_connect(Some(TIMEOUT_CONNECT))
+            .timeout_global(Some(TIMEOUT_GLOBAL))
             .user_agent(TERRAIN_GENERATOR_USER_AGENT)
             .build();
         let agent: Agent = config.into();
