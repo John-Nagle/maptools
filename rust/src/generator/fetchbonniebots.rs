@@ -110,8 +110,6 @@ pub fn find_element_by_id<'a>(nodes: &'a Vec<Node>, id_key: &str) -> Option<&'a 
     None
 }
 
-/// 
-
 /// More detailed info for a BonnieBots region.
 /// Only the fields we are interested in.
 #[derive(Deserialize, Debug, Clone)]
@@ -130,10 +128,10 @@ pub struct BonnieBotsRegion {
 
 impl BonnieBotsRegion {
     /// Fetch for a given region
-    pub fn fetch(agent: &mut Agent, region_data: &RegionData) -> Result<Option<Self>, Error> {
+    pub fn fetch(agent: &mut Agent, region_x: u32, region_y: u32) -> Result<Option<Self>, Error> {
         let url = format!(
             "https://www.bonniebots.com/static-api/regions/{}/{}/index.json",
-        region_data.region_loc_x / SL_REGION_SIZE, region_data.region_loc_y / SL_REGION_SIZE
+            region_x, region_y,
         );
          match agent
             .get(&url)
@@ -270,6 +268,24 @@ impl BonnieBotsBasicRegion {
             }
             Err(e) => Err(e.into()),
         }
+    }
+}
+/// Fetch height map for one region.
+/// Location is in SL region counts, not meters.
+pub fn fetch_height_field(agent: &mut Agent, region_x: u32, region_y: u32) -> Result<Option<HeightField>, Error> {
+    let elevs_opt = fetch_elevs(agent, region_x, region_y)?;
+    let region_data_opt = BonnieBotsRegion::fetch(agent, region_x, region_y)?;
+    if region_data_opt.is_none() || region_data_opt.as_ref().unwrap().water_height_mm.is_none()  {
+        log::error!("BonnieBots region data is missing for region ({}, {})", region_x, region_y);
+    }
+    if elevs_opt.is_none() {
+        log::error!("BonnieBots elevation data is missing for region ({}, {})", region_x, region_y);
+    }
+    if let Some(elevs) = elevs_opt && let Some(region_data) = region_data_opt && let Some(water_height_mm) = region_data.water_height_mm {
+        Ok(Some(HeightField::new(elevs, SL_REGION_SIZE, SL_REGION_SIZE, (water_height_mm as f32) / 1000.0)))
+    } else {
+        //  No data, but not an abort condition
+        Ok(None)
     }
 }
 
