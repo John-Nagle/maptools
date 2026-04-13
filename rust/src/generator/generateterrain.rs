@@ -326,19 +326,21 @@ impl TerrainGenerator {
     /// Switch data source depending on BonnieBots mode.
     pub fn get_height_field_one_region(&mut self,
         grid: String,
+        name: &str,
         region_loc_x: u32,
         region_loc_y: u32,
     ) -> Result<HeightField, Error> {
         if self.run_opts.bonnie_bots_mode {
-            self.get_height_field_one_region_bb(grid, region_loc_x, region_loc_y)
+            self.get_height_field_one_region_bb(grid, name, region_loc_x, region_loc_y)
         } else {
-            self.get_height_field_one_region_orig(grid, region_loc_x, region_loc_y)
+            self.get_height_field_one_region_orig(grid, name, region_loc_x, region_loc_y)
         }         
     }
     
     /// Get elevation data for one region, BonnieBots mode.
     pub fn get_height_field_one_region_bb(&mut self,
         grid: String,
+        name: &str,
         region_loc_x: u32,
         region_loc_y: u32,
     ) -> Result<HeightField, Error> {
@@ -350,7 +352,7 @@ impl TerrainGenerator {
             height_field
         } else {
             //  TROUBLE - no height field available
-            log::error!("No Bonniebots height field for ({},{})", region_loc_x, region_loc_y);
+            log::error!("No Bonniebots height field for \"{}\" at ({},{})", name, region_loc_x, region_loc_y);
             Self::create_fake_height_field_bb()
         };
         //  Cache for later generation of lower LODs
@@ -374,6 +376,7 @@ impl TerrainGenerator {
     pub fn get_height_field_one_region_orig(
         &mut self,
         grid: String,
+        _name: &str,
         region_loc_x: u32,
         region_loc_y: u32,
     ) -> Result<HeightField, Error> {
@@ -576,6 +579,7 @@ impl TerrainGenerator {
         let height_field = if region.lod == 0 {
             self.get_height_field_one_region(
                 region.grid.clone(),
+                &region.name,            
                 region.region_loc_x,
                 region.region_loc_y,
             )?
