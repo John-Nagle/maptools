@@ -35,7 +35,7 @@ pub const SL_GRID: &str = "agni";
 /// SL only, 256x256 samples.
 /// ***NOT SURE ABOUT AXIS ORDER*** CHECK
 fn convert_to_2d_array(heights: Vec<f32>) -> Array2D<f32> {
-    Array2D::from_iter_row_major(heights.into_iter(), TERRAIN_DATA_DIM, TERRAIN_DATA_DIM).unwrap()
+    Array2D::from_iter_column_major(heights.into_iter(), TERRAIN_DATA_DIM, TERRAIN_DATA_DIM).unwrap()
 }
 /// Fetch elevation data from Bonniebots. 256x256.
 pub fn fetch_elevs(
