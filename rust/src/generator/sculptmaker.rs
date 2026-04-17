@@ -315,7 +315,7 @@ impl TerrainSculptTexture {
     ///
     /// Current SL official API:
     /// https://secondlife-maps-cdn.akamaized.net/map-1-1024-1024-objects.jpg
-    pub fn fetch_terrain_image(
+    pub fn fetch_terrain_image_single(
         url_prefix: &str,
         region_coords_x: u32,
         region_coords_y: u32,
@@ -352,6 +352,44 @@ impl TerrainSculptTexture {
 
         let image: DynamicImage = reader.decode()?;
         Ok((image, last_modified))
+    }
+        
+    /// For LODs beyond 8, the image is not available from the map API, and we have to construct it.
+    fn fetch_terrain_image(
+        url_prefix: &str,
+        region_loc_x: u32,
+        region_loc_y: u32,
+        lod: u8) -> Result<(DynamicImage, String), Error> {
+        assert!(lod < 15);  // sanity
+        if lod <= 8 {
+            Self::fetch_terrain_image_single(url_prefix, region_loc_x, region_loc_y, lod)
+        } else {
+            //  Request four images and combine.
+/*            
+            let mut fetch = |lod, dx, dy| {
+                let key = RegionLodKey { lod, region_loc_x: region_loc_x + dx, region_loc_y: region_loc_y + dy };
+                log::debug!("Multi region image needed for LOD {}: {:?}", key.lod, (key.region_loc_x, key.region_loc_y));  // ***TEMP***
+                Self::fetch_terrain_image(url_prefix, region_coords_x, region_coords_y, lod)
+            };
+            //  Get the four images.
+            //  Region size here is the full sized impostor, so we have to divide by 2 to get the size of the 4 squares that make it up.
+            ////// ***NEED REGION SIZE***
+            let images = [
+                fetch(lod - 1, 0, 0),            
+                fetch(lod - 1, region_size.0 / 2, 0),
+                fetch(lod - 1, 0, region_size.1 / 2),
+                fetch(lod - 1, region_size.0 / 2, region_size.1 / 2)
+                ];
+
+            //  ***MORE*** works like the sculpt LOD system.
+            Self::combine_terrain_images(&images)
+*/
+            todo!();
+        }
+    }
+    
+    fn combine_terrain_images(images: [(DynamicImage, String);4]) -> Result<(DynamicImage, String), Error> {
+        todo!();
     }
 }
 

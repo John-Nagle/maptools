@@ -891,3 +891,15 @@ Fix tomorrow.
 2026-04-12
     Running, but clip regions seem slightly off.
     Sculpt Scale-down is broken.
+    
+2026-04-13
+    Working for Blake Sea and Corsica using BonnieBots data.
+    Aborts on Heterocera due to a 403 error trying to read a
+    LOD 9 texture, which is not supported as too large. Need
+    to work around that.
+    Three regions in Heterocera BonnieBots can't scan at (128,128):
+    "Dierli", "Zeuzera",  and "Ambulyx" 
+    
+2026-04-14
+    get_enclosing_square result is bogus.
+    - Does not consider the size of the rectangle for the viz group at all.
