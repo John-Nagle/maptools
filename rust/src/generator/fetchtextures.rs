@@ -51,7 +51,7 @@ pub struct FetchTextures {
     /// Region size (optional) - size of all regions, if homogeneous.
     /// The LOD system only works for  groups with homogeneous regions.
     region_size_opt: Option<(u32, u32)>,
-    /// Valid regions in this vizgroup
+    /// Valid regions in this vizgroup. Never fetch anything not in this set.
     valid_regions: HashSet<(u32, u32)>,
 }
 
