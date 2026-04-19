@@ -331,6 +331,7 @@ impl TerrainSculptTexture {
         let tile_id_x = self.region_data.region_loc_x / STANDARD_TILE_SIZE;
         let tile_id_y = self.region_data.region_loc_y / STANDARD_TILE_SIZE;
         let lod = self.region_data.lod as u32;
+        assert!(lod <= 7);              // SL limit
         let region_loc_x = self.region_data.region_loc_x;
         let region_loc_y = self.region_data.region_loc_y;
         if region_loc_x % STANDARD_TILE_SIZE * lod.pow(2) != 0
@@ -374,7 +375,7 @@ impl TerrainSculptTexture {
         ) -> Result<(DynamicImage, DateTime<Utc>), Error> {
         const MAX_IMAGE_SIZE_GENERATED: u32 = 1024;   // generate no images bigger than this
         assert!(self.region_data.lod < 15);  // sanity
-        if self.region_data.lod <= 8 {
+        if self.region_data.lod <= 7 {
             self.fetch_terrain_image_single(agent)
         } else {
             //  Request four images and combine.
