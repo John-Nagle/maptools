@@ -302,7 +302,7 @@ fn test_fetchelevs() {
     //  HTTP Agent
     let config = Agent::config_builder().build();
     let mut agent: Agent = config.into();
-    let elevs =
+    let _elevs =
         fetch_elevs(&mut agent, 1000, 1000).expect("Fetch elevations from BonnieBots failed.");
 }
 

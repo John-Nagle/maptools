@@ -366,6 +366,7 @@ impl TerrainSculptTexture {
     fn fetch_terrain_image(
         &self,
         ) -> Result<(DynamicImage, DateTime<Utc>), Error> {
+        const MAX_IMAGE_SIZE_GENERATED: u32 = 1024;   // generate no images bigger than this
         assert!(self.region_data.lod < 15);  // sanity
         if self.region_data.lod <= 8 {
             self.fetch_terrain_image_single()
@@ -374,7 +375,7 @@ impl TerrainSculptTexture {
             let half_size_x = self.region_data.region_size_x / 2;
             let half_size_y = self.region_data.region_size_y / 2;
             let half_lod = self.region_data.lod - 1;            
-            let mut fetch = |lod, dx, dy| {
+            let fetch = |lod, dx, dy| {
                 let mut half_terrain_image = self.clone();
                 half_terrain_image.region_data.region_loc_x = dx;
                 half_terrain_image.region_data.region_loc_y = dy;
@@ -393,9 +394,14 @@ impl TerrainSculptTexture {
                 ];
 
             //  ***MORE*** works like the sculpt LOD system.
-            let (half_image, last_modified) = Self::combine_terrain_images(images);
+            let (mut quad_image, last_modified) = Self::combine_terrain_images(images);
+            if quad_image.width() > MAX_IMAGE_SIZE_GENERATED || quad_image.height() > MAX_IMAGE_SIZE_GENERATED {
+                let half_width = quad_image.width() / 2;
+                let half_height = quad_image.height() / 2;
+                quad_image = quad_image.resize(half_width, half_height, FilterType::Gaussian);
+            }
             //  ***NEED TO DOWNSIZE IMAGE IF TOO BIG***
-            Ok((half_image, last_modified))
+            Ok((quad_image, last_modified))
         }
     }
     
@@ -428,7 +434,6 @@ fn read_terrain_texture() {
             simplelog::TermLogger::new(simplelog::LevelFilter::Debug, simplelog::Config::default(), simplelog::TerminalMode::Stdout, simplelog::ColorChoice::Auto),]
     );
 
-    const URL_PREFIX: &str = "https://secondlife-maps-cdn.akamaized.net/map-";
     let region_data = RegionData {
         region_loc_x: 1000*256,
         region_loc_y: 1000*256,
@@ -439,7 +444,7 @@ fn read_terrain_texture() {
         name: "Da Boom".to_string(),
     };
     //////let img = TerrainSculptTexture::fetch_terrain_image(URL_PREFIX, 1000*256, 1000*256, 0).expect("Terrain fetch failed");
-    let mut terrain_sculpt_texture = TerrainSculptTexture::new(&region_data);
+    let terrain_sculpt_texture = TerrainSculptTexture::new(&region_data);
     let img = terrain_sculpt_texture.fetch_terrain_image().expect("Terrain fetch failed");
     img.0.save("/tmp/testimg.jpg").expect("test image write failed");
 }

@@ -488,7 +488,6 @@ impl TerrainGenerator {
         height_field: &HeightField,
         viz_group_id: u32,
     ) -> Result<(), Error> {
-        let lod = region.lod;
         log::info!("Generating sculpt for \"{}\": {}", region.name, height_field);
         // TerrainSculpt was translated from Python with an LLM. NEEDS WORK
         //  Do sculpt

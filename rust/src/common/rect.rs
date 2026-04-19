@@ -2,9 +2,9 @@
 //!
 //! Part of the Animats impostor system.
 //!
-//!     License: LGPL.
-//!     Animats
-//!     April, 2026.
+//! License: LGPL.
+//! Animats
+//! April, 2026.
 //!
 use std::fmt::Debug;
 use std::str::FromStr;
