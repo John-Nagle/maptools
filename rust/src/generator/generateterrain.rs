@@ -521,7 +521,7 @@ impl TerrainGenerator {
         //  Do texture
         log::info!("Generating texture image for  \"{}\"", &region.name);
         let mut terrain_image = TerrainSculptTexture::new(&region);
-        terrain_image.makeimage(TERRAIN_SCULPT_TEXTURE_SIZE)?;
+        terrain_image.makeimage(&mut self.agent, TERRAIN_SCULPT_TEXTURE_SIZE)?;
         let terrain_image_hash = terrain_image.get_hash()?;
         //  Create an AssetUpload for the one texture.
         let image_asset_upload = AssetUpload::new(TileAssetType::BaseTexture(0), region, &terrain_sculpt, terrain_image_hash)?;    

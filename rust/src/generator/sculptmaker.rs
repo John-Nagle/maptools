@@ -11,7 +11,8 @@ use std::f64;
 use anyhow::{anyhow, Error};
 use std::io::{Cursor};
 use chrono::{DateTime, Utc};
-use common::{RegionData, TerrainGeometry, TileType};
+use common::{RegionData, TerrainGeometry, TileType, get_with_retry};
+use ureq::Agent;
 
 /// Minimum side depth on sculpts to guarantee coverage at edges that don't match perfectly.
 const SKIRT_DEPTH: f64 = 4.0;
@@ -276,9 +277,9 @@ impl TerrainSculptTexture {
     /// Temporary dumb version - just gets what the SL map has.
     /// Need to generate our own larger images.
     /// Need to add ability to adjust resolution.
-    pub fn makeimage(&mut self, _resolution: u32) -> Result<(), Error> {
+    pub fn makeimage(&mut self, agent: &mut Agent, _resolution: u32) -> Result<(), Error> {
         //  ***NEED TO GET OS PREFIX FROM - WHERE? ***
-        let (img, last_modified) = self.fetch_terrain_image()?;
+        let (img, last_modified) = self.fetch_terrain_image(agent)?;
         log::debug!("Image last modified at {:?}", last_modified);
         //  *** WRONG *** Need to add in same proporion as sculpt image has extra pixels.
         //  For SL, active area of UVs is 30/32 pixels.
@@ -324,7 +325,8 @@ impl TerrainSculptTexture {
     /// https://secondlife-maps-cdn.akamaized.net/map-1-1024-1024-objects.jpg
     /// This is currently SL ONLY.
     pub fn fetch_terrain_image_single(
-        &self) -> Result<(DynamicImage, DateTime<Utc>), Error> {
+        &self, 
+        agent: &mut Agent) -> Result<(DynamicImage, DateTime<Utc>), Error> {
         const STANDARD_TILE_SIZE: u32 = 256; // Even on OS
         let tile_id_x = self.region_data.region_loc_x / STANDARD_TILE_SIZE;
         let tile_id_y = self.region_data.region_loc_y / STANDARD_TILE_SIZE;
@@ -339,6 +341,7 @@ impl TerrainSculptTexture {
         const URL_SUFFIX: &str = "-objects.jpg"; // make sure this is the same for OS
         let url = format!("{}{}-{}-{}{}", self.url_prefix, lod + 1, tile_id_x, tile_id_y, URL_SUFFIX);
         log::debug!("Fetching URL: {}", url);  
+/*
         let mut resp = ureq::get(&url)
             //////.set("User-Agent", USERAGENT)
             .header("Content-Type", "image/jpg") // 
@@ -346,6 +349,8 @@ impl TerrainSculptTexture {
             .map_err(anyhow::Error::msg)?;
             //////.with_context(|| format!("Reading map tile  {}", url))?;
         //////let content_type = resp.headers().get("Content-Type").ok_or_else(|| anyhow!("No content type for image fetch"))?;
+*/
+        let mut resp = get_with_retry(agent, &url)?;
         //  Get last_modified time, used to disambiguate problems with cache servers.
         let last_modified_str = resp.headers().get("Last-Modified")
             .ok_or_else(|| anyhow!("No Last-Modified time for image fetch"))?
@@ -365,27 +370,27 @@ impl TerrainSculptTexture {
     /// For LODs beyond 8, the image is not available from the map API, and we have to construct it.
     fn fetch_terrain_image(
         &self,
+        agent: &mut Agent,
         ) -> Result<(DynamicImage, DateTime<Utc>), Error> {
         const MAX_IMAGE_SIZE_GENERATED: u32 = 1024;   // generate no images bigger than this
         assert!(self.region_data.lod < 15);  // sanity
         if self.region_data.lod <= 8 {
-            self.fetch_terrain_image_single()
+            self.fetch_terrain_image_single(agent)
         } else {
             //  Request four images and combine.
             let half_size_x = self.region_data.region_size_x / 2;
             let half_size_y = self.region_data.region_size_y / 2;
             let half_lod = self.region_data.lod - 1;            
-            let fetch = |lod, dx, dy| {
+            let mut fetch = |lod, dx, dy| {
                 let mut half_terrain_image = self.clone();
                 half_terrain_image.region_data.region_loc_x = dx;
                 half_terrain_image.region_data.region_loc_y = dy;
                 half_terrain_image.region_data.lod = half_lod;
                 log::debug!("Multi region image needed for LOD #{}: offset ({},{})", lod, dx, dy);  // ***TEMP***
-                half_terrain_image.fetch_terrain_image()
+                half_terrain_image.fetch_terrain_image(agent)
             };
             //  Get the four images.
             //  Region size here is the full sized impostor, so we have to divide by 2 to get the size of the 4 squares that make it up.
-            ////// ***NEED REGION SIZE***
             let images = [
                 fetch(half_lod, 0, 0)?,            
                 fetch(half_lod, half_size_x, 0)?,
@@ -428,11 +433,22 @@ impl TerrainSculptTexture {
 
 #[test]
 fn read_terrain_texture() {
+    use std::time::Duration;
     //  Want logging, but need to turn off Trace level to avoid too much junk.
     let _ = simplelog::CombinedLogger::init(
         vec![
             simplelog::TermLogger::new(simplelog::LevelFilter::Debug, simplelog::Config::default(), simplelog::TerminalMode::Stdout, simplelog::ColorChoice::Auto),]
     );
+    
+    const TIMEOUT_CONNECT: Duration = Duration::from_secs(15);
+    const TIMEOUT_GLOBAL: Duration = Duration::from_secs(120);
+    //  HTTP connection pool, used to validate UUIDs against asset server.
+    let config = Agent::config_builder()
+        .timeout_connect(Some(TIMEOUT_CONNECT))
+        .timeout_global(Some(TIMEOUT_GLOBAL))
+        .user_agent(crate::TERRAIN_GENERATOR_USER_AGENT)
+        .build();
+    let mut agent: Agent = config.into();
 
     let region_data = RegionData {
         region_loc_x: 1000*256,
@@ -445,6 +461,6 @@ fn read_terrain_texture() {
     };
     //////let img = TerrainSculptTexture::fetch_terrain_image(URL_PREFIX, 1000*256, 1000*256, 0).expect("Terrain fetch failed");
     let terrain_sculpt_texture = TerrainSculptTexture::new(&region_data);
-    let img = terrain_sculpt_texture.fetch_terrain_image().expect("Terrain fetch failed");
+    let img = terrain_sculpt_texture.fetch_terrain_image(&mut agent).expect("Terrain fetch failed");
     img.0.save("/tmp/testimg.jpg").expect("test image write failed");
 }
