@@ -270,8 +270,7 @@ impl TerrainSculptTexture {
     pub fn makeimage(&mut self, _resolution: u32) -> Result<(), Error> {
         //  ***NEED TO GET OS PREFIX FROM - WHERE? ***
         const URL_PREFIX: &str = "https://secondlife-maps-cdn.akamaized.net/map-";
-        let (img, last_modified_str) = Self::fetch_terrain_image(URL_PREFIX, self.region_coords_x, self.region_coords_y, self.lod)?;
-        let last_modified = DateTime::parse_from_rfc2822(&last_modified_str)?.with_timezone(&Utc);
+        let (img, last_modified) = Self::fetch_terrain_image(URL_PREFIX, self.region_coords_x, self.region_coords_y, self.lod)?;
         log::debug!("Image last modified at {:?}", last_modified);
         //  *** WRONG *** Need to add in same proporion as sculpt image has extra pixels.
         //  For SL, active area of UVs is 30/32 pixels.
@@ -319,7 +318,7 @@ impl TerrainSculptTexture {
         url_prefix: &str,
         region_coords_x: u32,
         region_coords_y: u32,
-        lod: u8) -> Result<(DynamicImage, String), Error> {
+        lod: u8) -> Result<(DynamicImage, DateTime<Utc>), Error> {
         const STANDARD_TILE_SIZE: u32 = 256; // Even on OS
         let tile_id_x = region_coords_x / STANDARD_TILE_SIZE;
         let tile_id_y = region_coords_y / STANDARD_TILE_SIZE;
@@ -340,10 +339,11 @@ impl TerrainSculptTexture {
             //////.with_context(|| format!("Reading map tile  {}", url))?;
         //////let content_type = resp.headers().get("Content-Type").ok_or_else(|| anyhow!("No content type for image fetch"))?;
         //  Get last_modified time, used to disambiguate problems with cache servers.
-        let last_modified = resp.headers().get("Last-Modified")
+        let last_modified_str = resp.headers().get("Last-Modified")
             .ok_or_else(|| anyhow!("No Last-Modified time for image fetch"))?
             .to_str()?
             .to_string();
+        let last_modified = DateTime::parse_from_rfc2822(&last_modified_str)?.with_timezone(&Utc);
         let raw_data = resp.body_mut().read_to_vec()?;     
         let reader = ImageReader::new(Cursor::new(raw_data))
             .with_guessed_format()
@@ -359,7 +359,7 @@ impl TerrainSculptTexture {
         url_prefix: &str,
         region_loc_x: u32,
         region_loc_y: u32,
-        lod: u8) -> Result<(DynamicImage, String), Error> {
+        lod: u8) -> Result<(DynamicImage, DateTime<Utc>), Error> {
         assert!(lod < 15);  // sanity
         if lod <= 8 {
             Self::fetch_terrain_image_single(url_prefix, region_loc_x, region_loc_y, lod)
@@ -392,17 +392,17 @@ impl TerrainSculptTexture {
     /// Input order is lower left, lower right, uppler left, upper right.
     /// All images must be the same size.
     /// The output image is twice as big.
-    fn combine_terrain_images(images: [(DynamicImage, String);4]) -> (DynamicImage, String) {
+    fn combine_terrain_images(images: [(DynamicImage, DateTime<Utc>);4]) -> (DynamicImage, DateTime<Utc>) {
         let w = images[0].0.width();
         let h = images[0].0.height();
         const OFFSETS: [(u32, u32);4] = [(0, 0), (1, 0), (0, 1), (1, 1)];
         let mut img = DynamicImage::new_rgb8((w*2).into(), (h*2).into());
-        let mut last_modified = images[0].1.clone();
+        let mut last_modified = images[0].1;
         for n in 0..3 {
             assert_eq!(images[n].0.width(), w);
             assert_eq!(images[n].0.height(), h);
             replace(&mut img, &images[n].0, (OFFSETS[n].0*w).into(), (OFFSETS[n].1*h).into());
-            last_modified = last_modified.max(images[n].1.clone());
+            last_modified = last_modified.max(images[n].1);
         }
         //  Last modified date is latest date
         (img, last_modified)
