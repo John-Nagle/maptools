@@ -13,34 +13,6 @@ use common::{RegionData, get_with_retry};
 use ureq::Agent;
 use std::collections::{HashSet};
 
-/*
-/// Make a texture for a terrain sculpt.
-/// This is, for now, just the ground texture from the map tile server.
-#[derive(Clone)]
-pub struct TerrainSculptTexture {
-    /// The region data
-    region_data: RegionData,
-    /// Last modified timestamp
-    pub last_modified: Option<DateTime<Utc>>,
-    /// Generated image
-    pub image: Option<RgbImage>,
-    
-}
-
-impl TerrainSculptTexture {
-    //  SL only - needs work.
-    const URL_PREFIX: &str = "https://secondlife-maps-cdn.akamaized.net/map-";
-    /// Usual new, doesn't do any real work
-    pub fn new(region_data: &RegionData) -> Self {
-        Self {
-            region_data: region_data.clone(),
-            image: None,
-            last_modified: None,
-        }
-    }
-}
-*/
-
 /// Texture fetching
 pub struct FetchTextures {
     /// URL prefix for server access
@@ -52,6 +24,8 @@ pub struct FetchTextures {
     region_size_opt: Option<(u32, u32)>,
     /// Valid regions in this vizgroup. Never fetch anything not in this set.
     valid_regions: HashSet<(u32, u32)>,
+    /// Water image, used for blank areas
+    water_image: DynamicImage,
 }
 
 impl FetchTextures {
@@ -59,12 +33,17 @@ impl FetchTextures {
     const URL_PREFIX: &str = "https://secondlife-maps-cdn.akamaized.net/map-";
     /// Usual new, doesn't do any real work
     pub fn new(agent: &Agent, regions: &Vec<RegionData>, region_size_opt: Option<(u32, u32)>) -> Self {
+        //  Set of valid regions, used to decide what can be fetched.
         let valid_regions = regions.iter().map(|r| (r.region_loc_x, r.region_loc_y)).collect();
+        //  Fixed water image, for other areas. Loaded at compile time.
+        const WATER_IMAGE: &[u8] = include_bytes!("../assets/basicwater2-256-256.png");
+        let water_image = image::load_from_memory(WATER_IMAGE).expect("Failed to load water image");
         Self {
             url_prefix: Self::URL_PREFIX.to_string(),
             agent: agent.clone(),
             region_size_opt,
             valid_regions,
+            water_image
         }
     }
         
@@ -77,7 +56,7 @@ impl FetchTextures {
     /// Current SL official API:
     /// https://secondlife-maps-cdn.akamaized.net/map-1-1024-1024-objects.jpg
     /// This is currently SL ONLY.
-    pub fn fetch_terrain_image_single(
+    fn fetch_terrain_image_single(
         &self,
         region_data: &RegionData) 
         -> Result<(DynamicImage, DateTime<Utc>), Error> {
@@ -120,8 +99,14 @@ impl FetchTextures {
         -> Result<(DynamicImage, DateTime<Utc>), Error> {
         const MAX_IMAGE_SIZE_GENERATED: u32 = 1024;   // generate no images bigger than this
         assert!(region_data.lod < 15);  // sanity
-        if region_data.lod <= 7 {
-            self.fetch_terrain_image_single(region_data)
+        if region_data.lod == 0 {
+            if self.valid_regions.contains(&(region_data.region_loc_x, region_data.region_loc_y)) {
+                //  OK to fetch
+                self.fetch_terrain_image_single(region_data)
+            } else {
+                //  It's open water, use the standard water image.
+                self.fetch_water_image(region_data)
+            } 
         } else {
             //  Request four images and combine.
             let half_size_x = region_data.region_size_x / 2;
@@ -144,7 +129,6 @@ impl FetchTextures {
                 fetch(half_lod, half_size_x, half_size_y)?
                 ];
 
-            //  ***MORE*** works like the sculpt LOD system.
             let (mut quad_image, last_modified) = Self::combine_terrain_images(images);
             if quad_image.width() > MAX_IMAGE_SIZE_GENERATED || quad_image.height() > MAX_IMAGE_SIZE_GENERATED {
                 let half_width = quad_image.width() / 2;
@@ -174,6 +158,12 @@ impl FetchTextures {
         }
         //  Last modified date is latest date
         (img, last_modified)
+    }
+    
+    /// Not a location in this vizgroup. Fetch a standard water image.
+    fn fetch_water_image(&self, region_data: &RegionData) -> Result<(DynamicImage, DateTime<Utc>), Error> {
+        log::debug!("Using water image for tile {:?}", region_data);
+        Ok((self.water_image.clone(), Utc::now()))
     }
 }
 
