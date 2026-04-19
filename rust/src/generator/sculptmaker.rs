@@ -239,6 +239,7 @@ impl TerrainGeometry for TerrainSculpt {
 
 /// Make a texture for a terrain sculpt.
 /// This is, for now, just the ground texture from the map tile server.
+#[derive(Clone)]
 pub struct TerrainSculptTexture {
 /*
     /// Coords X and Y. Meters.
@@ -302,7 +303,7 @@ impl TerrainSculptTexture {
     /// This has to match what we do to the sculpts, so that
     /// the folded-down edges will work.
     /// Why 3*shrink_pixels? Because 2 isn't enough.
-    /// ***THIS IS STILL OFF***
+    /// This is still slightly off, because we don't really have enough sculpt resolution.
     pub fn add_perimeter_to_image(mut img: DynamicImage, shrink_pixels: u32) -> DynamicImage {
         let inner_img = DynamicImage::resize_exact(&img, img.width() - 3*shrink_pixels, img.height() - 3*shrink_pixels, FilterType::CatmullRom);
         //////replace(&mut img, &inner_img, shrink_pixels.into(), shrink_pixels.into());
@@ -370,27 +371,31 @@ impl TerrainSculptTexture {
             self.fetch_terrain_image_single()
         } else {
             //  Request four images and combine.
-            // ***NEED IMAGE SIZE***
-/*            
+            let half_size_x = self.region_data.region_size_x / 2;
+            let half_size_y = self.region_data.region_size_y / 2;
+            let half_lod = self.region_data.lod - 1;            
             let mut fetch = |lod, dx, dy| {
-                let key = RegionLodKey { lod, region_loc_x: region_loc_x + dx, region_loc_y: region_loc_y + dy };
-                log::debug!("Multi region image needed for LOD {}: {:?}", key.lod, (key.region_loc_x, key.region_loc_y));  // ***TEMP***
-                Self::fetch_terrain_image(url_prefix, region_coords_x, region_coords_y, lod)
+                let mut half_terrain_image = self.clone();
+                half_terrain_image.region_data.region_loc_x = dx;
+                half_terrain_image.region_data.region_loc_y = dy;
+                half_terrain_image.region_data.lod = half_lod;
+                log::debug!("Multi region image needed for LOD #{}: offset ({},{})", lod, dx, dy);  // ***TEMP***
+                half_terrain_image.fetch_terrain_image()
             };
             //  Get the four images.
             //  Region size here is the full sized impostor, so we have to divide by 2 to get the size of the 4 squares that make it up.
             ////// ***NEED REGION SIZE***
             let images = [
-                fetch(lod - 1, 0, 0),            
-                fetch(lod - 1, region_size.0 / 2, 0),
-                fetch(lod - 1, 0, region_size.1 / 2),
-                fetch(lod - 1, region_size.0 / 2, region_size.1 / 2)
+                fetch(half_lod, 0, 0)?,            
+                fetch(half_lod, half_size_x, 0)?,
+                fetch(half_lod, 0, half_size_y)?,
+                fetch(half_lod, half_size_x, half_size_y)?
                 ];
 
             //  ***MORE*** works like the sculpt LOD system.
-            Self::combine_terrain_images(&images)
-*/
-            todo!();
+            let (half_image, last_modified) = Self::combine_terrain_images(images);
+            //  ***NEED TO DOWNSIZE IMAGE IF TOO BIG***
+            Ok((half_image, last_modified))
         }
     }
     
