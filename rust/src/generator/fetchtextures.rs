@@ -184,7 +184,7 @@ fn fetch_terrain_texture() {
         .timeout_global(Some(TIMEOUT_GLOBAL))
         .user_agent(crate::TERRAIN_GENERATOR_USER_AGENT)
         .build();
-    let mut agent: Agent = config.into();
+    let agent: Agent = config.into();
 
     let region_data = RegionData {
         region_loc_x: 1000*256,
