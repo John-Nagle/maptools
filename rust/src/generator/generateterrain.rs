@@ -35,6 +35,7 @@ use sculptmaker::{TerrainSculpt, TerrainSculptTexture};
 use regionorder::{TileLods, homogeneous_group_size};
 use common::{hash_to_hex, AssetUpload, TileAssetType, RectU32};
 use fetchbonniebots::{BonnieBotsBasicRegion, SL_GRID, SL_REGION_SIZE, TERRAIN_DATA_DIM, fetch_height_field};
+use fetchtextures::{FetchTextures};
 use ureq::{Agent};
 use chrono::Utc;
 use std::time::Duration;
@@ -459,6 +460,7 @@ impl TerrainGenerator {
     /// Build the impostor
     pub fn build_impostor(
         &mut self,
+        fetcher: &mut FetchTextures,
         region: &RegionData,
         height_field: &HeightField,
         viz_group_id: u32,
@@ -469,12 +471,14 @@ impl TerrainGenerator {
          }
         if self.run_opts.generate_mesh {
             self.build_impostor_mesh(
+                fetcher,
                 region,
                 height_field,
                 viz_group_id,
             )
         } else {
             self.build_impostor_sculpt(
+                fetcher,
                 region,
                 height_field,
                 viz_group_id,
@@ -485,6 +489,7 @@ impl TerrainGenerator {
     /// Build the impostor as a sculpt.
     pub fn build_impostor_sculpt(
         &mut self,
+        fetcher: &mut FetchTextures,
         region: &RegionData,
         height_field: &HeightField,
         viz_group_id: u32,
@@ -566,6 +571,7 @@ impl TerrainGenerator {
     /// Build the impostor as a glTF mesh.
     pub fn build_impostor_mesh(
         &mut self,
+        _fetcher: &mut FetchTextures,
         _region: &RegionData,
         _height_field: &HeightField,
         _viz_group_id: u32,
@@ -574,7 +580,7 @@ impl TerrainGenerator {
     }
     
     /// Build an impostor for LOD N.
-    fn build_impostor_for_lod(&mut self, region: &RegionData, _region_region_size_opt: Option<(u32, u32)>, viz_group_id: u32) -> Result<(), Error> {
+    fn build_impostor_for_lod(&mut self, fetcher: &mut FetchTextures, region: &RegionData, viz_group_id: u32) -> Result<(), Error> {
         log::info!("Region \"{}\", LOD {} starting.", region.name, region.lod);
         let height_field = if region.lod == 0 {
             self.get_height_field_one_region(
@@ -593,6 +599,7 @@ impl TerrainGenerator {
             )?
         };
         self.build_impostor(
+            fetcher,
             region,
             &height_field,
             viz_group_id,
@@ -608,13 +615,15 @@ impl TerrainGenerator {
         let region_size_opt = homogeneous_group_size(&group);
         if region_size_opt.is_some() && group.len() > 1 {
             //  Do the LOD thing.
+            let mut fetcher = FetchTextures::new(&self.agent, &group, region_size_opt);
             for region in TileLods::new(group) {
-                self.build_impostor_for_lod(&region, region_size_opt, viz_group_id)?;
+                self.build_impostor_for_lod(&mut fetcher, &region, viz_group_id)?;
             }
         } else {
             //  LOD 0 only.
+            let mut fetcher = FetchTextures::new(&self.agent, &group, region_size_opt);
             for region in group {
-                self.build_impostor_for_lod(&region, None, viz_group_id)?;
+                self.build_impostor_for_lod(&mut fetcher, &region, viz_group_id)?;
             }
         }
         Ok(())

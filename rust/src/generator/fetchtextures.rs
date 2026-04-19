@@ -13,6 +13,7 @@ use std::io::{Cursor};
 use chrono::{DateTime, Utc};
 use common::{RegionData, TerrainGeometry, TileType, get_with_retry};
 use ureq::Agent;
+use std::collections::{HashSet};
 
 
 /// Make a texture for a terrain sculpt.
@@ -45,15 +46,26 @@ impl TerrainSculptTexture {
 pub struct FetchTextures {
     /// URL prefix for server access
     url_prefix: String,
+    /// Agent - for HTTP requests
+    agent: Agent,
+    /// Region size (optional) - size of all regions, if homogeneous.
+    /// The LOD system only works for  groups with homogeneous regions.
+    region_size_opt: Option<(u32, u32)>,
+    /// Valid regions in this vizgroup
+    valid_regions: HashSet<(u32, u32)>,
 }
 
 impl FetchTextures {
     //  SL only - needs work.
     const URL_PREFIX: &str = "https://secondlife-maps-cdn.akamaized.net/map-";
     /// Usual new, doesn't do any real work
-    pub fn new() -> Self {
+    pub fn new(agent: &Agent, regions: &Vec<RegionData>, region_size_opt: Option<(u32, u32)>) -> Self {
+        let valid_regions = regions.iter().map(|r| (r.region_loc_x, r.region_loc_y)).collect();
         Self {
             url_prefix: Self::URL_PREFIX.to_string(),
+            agent: agent.clone(),
+            region_size_opt,
+            valid_regions,
         }
     }
         
@@ -196,7 +208,7 @@ fn fetch_terrain_texture() {
         name: "Da Boom".to_string(),
     };
     //////let img = TerrainSculptTexture::fetch_terrain_image(URL_PREFIX, 1000*256, 1000*256, 0).expect("Terrain fetch failed");
-    let fetch_textures = FetchTextures::new();
+    let fetch_textures = FetchTextures::new(&agent, &vec![region_data.clone()], Some((256, 256))  );
     let terrain_sculpt_texture = TerrainSculptTexture::new(&region_data);
     let img = fetch_textures.fetch_terrain_image(&terrain_sculpt_texture, &mut agent).expect("Terrain fetch failed");
     img.0.save("/tmp/testimg.jpg").expect("test image write failed");
