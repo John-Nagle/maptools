@@ -388,8 +388,24 @@ impl TerrainSculptTexture {
         }
     }
     
-    fn combine_terrain_images(images: [(DynamicImage, String);4]) -> Result<(DynamicImage, String), Error> {
-        todo!();
+    /// Combine 4 terrain images.
+    /// Input order is lower left, lower right, uppler left, upper right.
+    /// All images must be the same size.
+    /// The output image is twice as big.
+    fn combine_terrain_images(images: [(DynamicImage, String);4]) -> (DynamicImage, String) {
+        let w = images[0].0.width();
+        let h = images[0].0.height();
+        const OFFSETS: [(u32, u32);4] = [(0, 0), (1, 0), (0, 1), (1, 1)];
+        let mut img = DynamicImage::new_rgb8((w*2).into(), (h*2).into());
+        let mut last_modified = images[0].1.clone();
+        for n in 0..3 {
+            assert_eq!(images[n].0.width(), w);
+            assert_eq!(images[n].0.height(), h);
+            replace(&mut img, &images[n].0, (OFFSETS[n].0*w).into(), (OFFSETS[n].1*h).into());
+            last_modified = last_modified.max(images[n].1.clone());
+        }
+        //  Last modified date is latest date
+        (img, last_modified)
     }
 }
 
