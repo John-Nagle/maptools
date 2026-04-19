@@ -11,7 +11,7 @@ use std::f64;
 use anyhow::{anyhow, Error};
 use std::io::{Cursor};
 use chrono::{DateTime, Utc};
-use common::{TerrainGeometry, TileType};
+use common::{RegionData, TerrainGeometry, TileType};
 
 /// Minimum side depth on sculpts to guarantee coverage at edges that don't match perfectly.
 const SKIRT_DEPTH: f64 = 4.0;
@@ -240,10 +240,17 @@ impl TerrainGeometry for TerrainSculpt {
 /// Make a texture for a terrain sculpt.
 /// This is, for now, just the ground texture from the map tile server.
 pub struct TerrainSculptTexture {
+/*
     /// Coords X and Y. Meters.
     region_coords_x: u32,
     region_coords_y: u32,
+    /// 0 = orig, 1 => 2x2, 2 => 4x4, etc.
     lod: u8,
+*/
+    /// The region data
+    region_data: RegionData,
+    /// URL prefix for server access
+    url_prefix: String,
     /// Last modified timestamp
     pub last_modified: Option<DateTime<Utc>>,
     /// Generated image
@@ -252,12 +259,13 @@ pub struct TerrainSculptTexture {
 }
 
 impl TerrainSculptTexture {
+    //  SL only - needs work.
+    const URL_PREFIX: &str = "https://secondlife-maps-cdn.akamaized.net/map-";
     /// Usual new, doesn't do any real work
-    pub fn new(region_coords_x: u32, region_coords_y: u32, lod: u8, _texture_name: &str) -> Self {
+    pub fn new(region_data: &RegionData) -> Self {
         Self {
-            region_coords_x,
-            region_coords_y,
-            lod,
+            url_prefix: Self::URL_PREFIX.to_string(),
+            region_data: region_data.clone(),
             image: None,
             last_modified: None,
         }
@@ -269,8 +277,7 @@ impl TerrainSculptTexture {
     /// Need to add ability to adjust resolution.
     pub fn makeimage(&mut self, _resolution: u32) -> Result<(), Error> {
         //  ***NEED TO GET OS PREFIX FROM - WHERE? ***
-        const URL_PREFIX: &str = "https://secondlife-maps-cdn.akamaized.net/map-";
-        let (img, last_modified) = Self::fetch_terrain_image(URL_PREFIX, self.region_coords_x, self.region_coords_y, self.lod)?;
+        let (img, last_modified) = self.fetch_terrain_image()?;
         log::debug!("Image last modified at {:?}", last_modified);
         //  *** WRONG *** Need to add in same proporion as sculpt image has extra pixels.
         //  For SL, active area of UVs is 30/32 pixels.
@@ -314,22 +321,22 @@ impl TerrainSculptTexture {
     ///
     /// Current SL official API:
     /// https://secondlife-maps-cdn.akamaized.net/map-1-1024-1024-objects.jpg
+    /// This is currently SL ONLY.
     pub fn fetch_terrain_image_single(
-        url_prefix: &str,
-        region_coords_x: u32,
-        region_coords_y: u32,
-        lod: u8) -> Result<(DynamicImage, DateTime<Utc>), Error> {
+        &self) -> Result<(DynamicImage, DateTime<Utc>), Error> {
         const STANDARD_TILE_SIZE: u32 = 256; // Even on OS
-        let tile_id_x = region_coords_x / STANDARD_TILE_SIZE;
-        let tile_id_y = region_coords_y / STANDARD_TILE_SIZE;
-        let lod = lod as u32;
-        if region_coords_x % STANDARD_TILE_SIZE * lod.pow(2) != 0
-        || region_coords_y % STANDARD_TILE_SIZE * lod.pow(2) != 0 {
+        let tile_id_x = self.region_data.region_loc_x / STANDARD_TILE_SIZE;
+        let tile_id_y = self.region_data.region_loc_y / STANDARD_TILE_SIZE;
+        let lod = self.region_data.lod as u32;
+        let region_loc_x = self.region_data.region_loc_x;
+        let region_loc_y = self.region_data.region_loc_y;
+        if region_loc_x % STANDARD_TILE_SIZE * lod.pow(2) != 0
+        || region_loc_y % STANDARD_TILE_SIZE * lod.pow(2) != 0 {
             return Err(anyhow!("Terrain image location ({},{}) lod {} is invalid.", 
-                region_coords_x, region_coords_y, lod));
+                region_loc_x, region_loc_y, lod));
         }
         const URL_SUFFIX: &str = "-objects.jpg"; // make sure this is the same for OS
-        let url = format!("{}{}-{}-{}{}", url_prefix, lod + 1, tile_id_x, tile_id_y, URL_SUFFIX);
+        let url = format!("{}{}-{}-{}{}", self.url_prefix, lod + 1, tile_id_x, tile_id_y, URL_SUFFIX);
         log::debug!("Fetching URL: {}", url);  
         let mut resp = ureq::get(&url)
             //////.set("User-Agent", USERAGENT)
@@ -356,15 +363,14 @@ impl TerrainSculptTexture {
         
     /// For LODs beyond 8, the image is not available from the map API, and we have to construct it.
     fn fetch_terrain_image(
-        url_prefix: &str,
-        region_loc_x: u32,
-        region_loc_y: u32,
-        lod: u8) -> Result<(DynamicImage, DateTime<Utc>), Error> {
-        assert!(lod < 15);  // sanity
-        if lod <= 8 {
-            Self::fetch_terrain_image_single(url_prefix, region_loc_x, region_loc_y, lod)
+        &self,
+        ) -> Result<(DynamicImage, DateTime<Utc>), Error> {
+        assert!(self.region_data.lod < 15);  // sanity
+        if self.region_data.lod <= 8 {
+            self.fetch_terrain_image_single()
         } else {
             //  Request four images and combine.
+            // ***NEED IMAGE SIZE***
 /*            
             let mut fetch = |lod, dx, dy| {
                 let key = RegionLodKey { lod, region_loc_x: region_loc_x + dx, region_loc_y: region_loc_y + dy };
@@ -418,6 +424,17 @@ fn read_terrain_texture() {
     );
 
     const URL_PREFIX: &str = "https://secondlife-maps-cdn.akamaized.net/map-";
-    let img = TerrainSculptTexture::fetch_terrain_image(URL_PREFIX, 1000*256, 1000*256, 0).expect("Terrain fetch failed");
+    let region_data = RegionData {
+        region_loc_x: 1000*256,
+        region_loc_y: 1000*256,
+        region_size_x: 256,
+        region_size_y: 256,
+        lod: 0,
+        grid: "agni".to_string(),
+        name: "Da Boom".to_string(),
+    };
+    //////let img = TerrainSculptTexture::fetch_terrain_image(URL_PREFIX, 1000*256, 1000*256, 0).expect("Terrain fetch failed");
+    let mut terrain_sculpt_texture = TerrainSculptTexture::new(&region_data);
+    let img = terrain_sculpt_texture.fetch_terrain_image().expect("Terrain fetch failed");
     img.0.save("/tmp/testimg.jpg").expect("test image write failed");
 }
