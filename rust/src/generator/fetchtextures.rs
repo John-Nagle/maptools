@@ -4,7 +4,7 @@
 // Animats, October 2020
 // License: LGPL
 
-use image::{RgbImage, ImageReader, DynamicImage, imageops::{replace, FilterType}};
+use image::{ImageReader, DynamicImage, imageops::{replace, FilterType}};
 //////use std::hash::{Hash, Hasher, DefaultHasher};
 use anyhow::{anyhow, Error};
 use std::io::{Cursor};
@@ -13,7 +13,7 @@ use common::{RegionData, get_with_retry};
 use ureq::Agent;
 use std::collections::{HashSet};
 
-
+/*
 /// Make a texture for a terrain sculpt.
 /// This is, for now, just the ground texture from the map tile server.
 #[derive(Clone)]
@@ -39,6 +39,7 @@ impl TerrainSculptTexture {
         }
     }
 }
+*/
 
 /// Texture fetching
 pub struct FetchTextures {
@@ -78,15 +79,15 @@ impl FetchTextures {
     /// This is currently SL ONLY.
     pub fn fetch_terrain_image_single(
         &self,
-        texture: &TerrainSculptTexture) 
+        region_data: &RegionData) 
         -> Result<(DynamicImage, DateTime<Utc>), Error> {
         const STANDARD_TILE_SIZE: u32 = 256; // Even on OS
-        let tile_id_x = texture.region_data.region_loc_x / STANDARD_TILE_SIZE;
-        let tile_id_y = texture.region_data.region_loc_y / STANDARD_TILE_SIZE;
-        let lod = texture.region_data.lod as u32;
+        let tile_id_x = region_data.region_loc_x / STANDARD_TILE_SIZE;
+        let tile_id_y = region_data.region_loc_y / STANDARD_TILE_SIZE;
+        let lod = region_data.lod as u32;
         assert!(lod <= 7);              // SL limit
-        let region_loc_x = texture.region_data.region_loc_x;
-        let region_loc_y = texture.region_data.region_loc_y;
+        let region_loc_x = region_data.region_loc_x;
+        let region_loc_y = region_data.region_loc_y;
         if region_loc_x % STANDARD_TILE_SIZE * lod.pow(2) != 0
         || region_loc_y % STANDARD_TILE_SIZE * lod.pow(2) != 0 {
             return Err(anyhow!("Terrain image location ({},{}) lod {} is invalid.", 
@@ -115,24 +116,24 @@ impl FetchTextures {
     /// For LODs beyond 8, the image is not available from the map API, and we have to construct it.
     pub fn fetch_terrain_image(
         &self,
-        texture: &TerrainSculptTexture) 
+        region_data: &RegionData) 
         -> Result<(DynamicImage, DateTime<Utc>), Error> {
         const MAX_IMAGE_SIZE_GENERATED: u32 = 1024;   // generate no images bigger than this
-        assert!(texture.region_data.lod < 15);  // sanity
-        if texture.region_data.lod <= 7 {
-            self.fetch_terrain_image_single(texture)
+        assert!(region_data.lod < 15);  // sanity
+        if region_data.lod <= 7 {
+            self.fetch_terrain_image_single(region_data)
         } else {
             //  Request four images and combine.
-            let half_size_x = texture.region_data.region_size_x / 2;
-            let half_size_y = texture.region_data.region_size_y / 2;
-            let half_lod = texture.region_data.lod - 1;            
+            let half_size_x = region_data.region_size_x / 2;
+            let half_size_y = region_data.region_size_y / 2;
+            let half_lod = region_data.lod - 1;            
             let fetch = |lod, dx, dy| {
-                let mut half_terrain_image = texture.clone();
-                half_terrain_image.region_data.region_loc_x = dx;
-                half_terrain_image.region_data.region_loc_y = dy;
-                half_terrain_image.region_data.lod = half_lod;
+                let mut quadrant_region_data = region_data.clone();
+                quadrant_region_data.region_loc_x = dx;
+                quadrant_region_data.region_loc_y = dy;
+                quadrant_region_data.lod = half_lod;
                 log::debug!("Multi region image needed for LOD #{}: offset ({},{})", lod, dx, dy);  // ***TEMP***
-                self.fetch_terrain_image(&mut half_terrain_image)
+                self.fetch_terrain_image(&quadrant_region_data)
             };
             //  Get the four images.
             //  Region size here is the full sized impostor, so we have to divide by 2 to get the size of the 4 squares that make it up.
@@ -206,7 +207,6 @@ fn fetch_terrain_texture() {
     };
     //////let img = TerrainSculptTexture::fetch_terrain_image(URL_PREFIX, 1000*256, 1000*256, 0).expect("Terrain fetch failed");
     let fetch_textures = FetchTextures::new(&agent, &vec![region_data.clone()], Some((256, 256))  );
-    let terrain_sculpt_texture = TerrainSculptTexture::new(&region_data);
-    let img = fetch_textures.fetch_terrain_image(&terrain_sculpt_texture).expect("Terrain fetch failed");
+    let img = fetch_textures.fetch_terrain_image(&region_data).expect("Terrain fetch failed");
     img.0.save("/tmp/testimg.jpg").expect("test image write failed");
 }
