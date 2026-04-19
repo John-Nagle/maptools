@@ -18,6 +18,7 @@
 mod sculptmaker;
 mod regionorder;
 mod vizgroup;
+mod fetchtextures;
 mod fetchbonniebots;
 use anyhow::{anyhow, Error};
 use common::{RegionData, HeightField, RegionImpostorFaceData, InitialImpostors};
