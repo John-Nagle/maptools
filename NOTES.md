@@ -903,3 +903,10 @@ Fix tomorrow.
 2026-04-14
     get_enclosing_square result is bogus.
     - Does not consider the size of the rectangle for the viz group at all.
+    
+2026-04-18
+    Now combining large map tiles when necessary, to get past SL limit.
+    But this is not enough. It can result in requests for unused tiles.
+    If we get a 403 or 404 error for a tile for an LOD > 0, we must
+    make a water tile.
+

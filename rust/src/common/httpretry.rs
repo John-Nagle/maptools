@@ -21,6 +21,7 @@ pub fn get_with_retry(agent: &mut Agent, url: &str) -> Result<Response<Body>, Er
                 log::debug!("HTTP fail, code {}, reading {}", code, url);
                 match code {
                     //  No find is not an error, just a hole in the map.
+                    403 => return Err(ureq::Error::StatusCode(code)),
                     404 => return Err(ureq::Error::StatusCode(code)),
                     _ => {
                         if retries > RETRY_MAX {
