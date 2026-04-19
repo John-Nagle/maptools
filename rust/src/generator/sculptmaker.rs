@@ -4,15 +4,14 @@
 // Animats, October 2020
 // License: GPL
 
-use image::{Rgb, RgbImage, ImageReader, DynamicImage, imageops::{replace, FilterType}};
-use std::cmp::{max};
+use image::{Rgb, RgbImage, DynamicImage, imageops::{replace, FilterType}};
 use std::hash::{Hash, Hasher, DefaultHasher};
+use std::cmp::{max};
 use std::f64;
 use anyhow::{anyhow, Error};
-use std::io::{Cursor};
 use chrono::{DateTime, Utc};
-use common::{RegionData, TerrainGeometry, TileType, get_with_retry};
-use ureq::Agent;
+use common::{RegionData, TerrainGeometry, TileType};
+use crate::FetchTextures;
 
 /// Minimum side depth on sculpts to guarantee coverage at edges that don't match perfectly.
 const SKIRT_DEPTH: f64 = 4.0;
@@ -242,13 +241,6 @@ impl TerrainGeometry for TerrainSculpt {
 /// This is, for now, just the ground texture from the map tile server.
 #[derive(Clone)]
 pub struct TerrainSculptTexture {
-/*
-    /// Coords X and Y. Meters.
-    region_coords_x: u32,
-    region_coords_y: u32,
-    /// 0 = orig, 1 => 2x2, 2 => 4x4, etc.
-    lod: u8,
-*/
     /// The region data
     region_data: RegionData,
     /// URL prefix for server access
@@ -277,9 +269,9 @@ impl TerrainSculptTexture {
     /// Temporary dumb version - just gets what the SL map has.
     /// Need to generate our own larger images.
     /// Need to add ability to adjust resolution.
-    pub fn makeimage(&mut self, agent: &mut Agent, _resolution: u32) -> Result<(), Error> {
-        //  ***NEED TO GET OS PREFIX FROM - WHERE? ***
-        let (img, last_modified) = self.fetch_terrain_image(agent)?;
+    pub fn makeimage(&mut self, fetcher: &mut FetchTextures, _resolution: u32) -> Result<(), Error> {
+        ////let (img, last_modified) = self.fetch_terrain_image(agent)?;
+        let (img, last_modified) = fetcher.fetch_terrain_image(self)?;
         log::debug!("Image last modified at {:?}", last_modified);
         //  *** WRONG *** Need to add in same proporion as sculpt image has extra pixels.
         //  For SL, active area of UVs is 30/32 pixels.
@@ -314,7 +306,7 @@ impl TerrainSculptTexture {
         replace(&mut img, &inner_img, width_offset.into(), height_offset.into());
         img
     }
-    
+/*    
     /// Fetch terrain image.
     /// We can get terrain images from the map servers of SL and OS.
     /// Level 0 LOD items are already in the SL asset store and have a UUID,
@@ -430,6 +422,7 @@ impl TerrainSculptTexture {
         //  Last modified date is latest date
         (img, last_modified)
     }
+*/
 }
 
 #[test]

@@ -8,7 +8,7 @@ use ureq::{Agent, http::Response, Body, Error};
 /// Retry this many times.
 const RETRY_MAX: usize = 5;
 /// HTTP Get with retry
-pub fn get_with_retry(agent: &mut Agent, url: &str) -> Result<Response<Body>, Error> {
+pub fn get_with_retry(agent: &Agent, url: &str) -> Result<Response<Body>, Error> {
     let mut retries: usize = 0;
     loop {
         match agent.get(url).call() {

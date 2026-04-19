@@ -2,16 +2,14 @@
 //
 // Generation of Second Life terrain impostors from elevation data.
 // Animats, October 2020
-// License: GPL
+// License: LGPL
 
-use image::{Rgb, RgbImage, ImageReader, DynamicImage, imageops::{replace, FilterType}};
-use std::cmp::{max};
-use std::hash::{Hash, Hasher, DefaultHasher};
-use std::f64;
+use image::{RgbImage, ImageReader, DynamicImage, imageops::{replace, FilterType}};
+//////use std::hash::{Hash, Hasher, DefaultHasher};
 use anyhow::{anyhow, Error};
 use std::io::{Cursor};
 use chrono::{DateTime, Utc};
-use common::{RegionData, TerrainGeometry, TileType, get_with_retry};
+use common::{RegionData, get_with_retry};
 use ureq::Agent;
 use std::collections::{HashSet};
 
@@ -80,8 +78,8 @@ impl FetchTextures {
     /// This is currently SL ONLY.
     pub fn fetch_terrain_image_single(
         &self,
-        texture: &TerrainSculptTexture,
-        agent: &mut Agent) -> Result<(DynamicImage, DateTime<Utc>), Error> {
+        texture: &TerrainSculptTexture) 
+        -> Result<(DynamicImage, DateTime<Utc>), Error> {
         const STANDARD_TILE_SIZE: u32 = 256; // Even on OS
         let tile_id_x = texture.region_data.region_loc_x / STANDARD_TILE_SIZE;
         let tile_id_y = texture.region_data.region_loc_y / STANDARD_TILE_SIZE;
@@ -97,7 +95,7 @@ impl FetchTextures {
         const URL_SUFFIX: &str = "-objects.jpg"; // make sure this is the same for OS
         let url = format!("{}{}-{}-{}{}", self.url_prefix, lod + 1, tile_id_x, tile_id_y, URL_SUFFIX);
         log::debug!("Fetching URL: {}", url);  
-        let mut resp = get_with_retry(agent, &url)?;
+        let mut resp = get_with_retry(&self.agent, &url)?;
         //  Get last_modified time, used to disambiguate problems with cache servers.
         let last_modified_str = resp.headers().get("Last-Modified")
             .ok_or_else(|| anyhow!("No Last-Modified time for image fetch"))?
@@ -117,25 +115,24 @@ impl FetchTextures {
     /// For LODs beyond 8, the image is not available from the map API, and we have to construct it.
     pub fn fetch_terrain_image(
         &self,
-        texture: &TerrainSculptTexture,
-        agent: &mut Agent,
-        ) -> Result<(DynamicImage, DateTime<Utc>), Error> {
+        texture: &TerrainSculptTexture) 
+        -> Result<(DynamicImage, DateTime<Utc>), Error> {
         const MAX_IMAGE_SIZE_GENERATED: u32 = 1024;   // generate no images bigger than this
         assert!(texture.region_data.lod < 15);  // sanity
         if texture.region_data.lod <= 7 {
-            self.fetch_terrain_image_single(texture, agent)
+            self.fetch_terrain_image_single(texture)
         } else {
             //  Request four images and combine.
             let half_size_x = texture.region_data.region_size_x / 2;
             let half_size_y = texture.region_data.region_size_y / 2;
             let half_lod = texture.region_data.lod - 1;            
-            let mut fetch = |lod, dx, dy| {
+            let fetch = |lod, dx, dy| {
                 let mut half_terrain_image = texture.clone();
                 half_terrain_image.region_data.region_loc_x = dx;
                 half_terrain_image.region_data.region_loc_y = dy;
                 half_terrain_image.region_data.lod = half_lod;
                 log::debug!("Multi region image needed for LOD #{}: offset ({},{})", lod, dx, dy);  // ***TEMP***
-                self.fetch_terrain_image(&half_terrain_image, agent)
+                self.fetch_terrain_image(&mut half_terrain_image)
             };
             //  Get the four images.
             //  Region size here is the full sized impostor, so we have to divide by 2 to get the size of the 4 squares that make it up.
@@ -210,6 +207,6 @@ fn fetch_terrain_texture() {
     //////let img = TerrainSculptTexture::fetch_terrain_image(URL_PREFIX, 1000*256, 1000*256, 0).expect("Terrain fetch failed");
     let fetch_textures = FetchTextures::new(&agent, &vec![region_data.clone()], Some((256, 256))  );
     let terrain_sculpt_texture = TerrainSculptTexture::new(&region_data);
-    let img = fetch_textures.fetch_terrain_image(&terrain_sculpt_texture, &mut agent).expect("Terrain fetch failed");
+    let img = fetch_textures.fetch_terrain_image(&terrain_sculpt_texture).expect("Terrain fetch failed");
     img.0.save("/tmp/testimg.jpg").expect("test image write failed");
 }
