@@ -127,8 +127,10 @@ impl FetchTextures {
             let half_lod = region_data.lod - 1;            
             let mut fetch = |lod, dx, dy| {
                 let mut quadrant_region_data = region_data.clone();
-                quadrant_region_data.region_loc_x = dx;
-                quadrant_region_data.region_loc_y = dy;
+                quadrant_region_data.region_loc_x += dx;
+                quadrant_region_data.region_loc_y += dy;
+                quadrant_region_data.region_size_x = half_size_x;
+                quadrant_region_data.region_size_y = half_size_y;
                 quadrant_region_data.lod = half_lod;
                 log::debug!("Multi region image needed for LOD #{}: offset ({},{})", lod, dx, dy);  // ***TEMP***
                 self.fetch_terrain_image(&quadrant_region_data)
