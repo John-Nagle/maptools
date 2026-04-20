@@ -8,6 +8,7 @@ use image::{Rgb, RgbImage, DynamicImage, imageops::{replace, FilterType}};
 use std::hash::{Hash, Hasher, DefaultHasher};
 use std::cmp::{max};
 use std::f64;
+use std::rc::Rc;
 use anyhow::{anyhow, Error};
 use chrono::{DateTime, Utc};
 use common::{RegionData, TerrainGeometry, TileType};
@@ -292,14 +293,15 @@ impl TerrainSculptTexture {
     /// the folded-down edges will work.
     /// Why 3*shrink_pixels? Because 2 isn't enough.
     /// This is still slightly off, because we don't really have enough sculpt resolution.
-    pub fn add_perimeter_to_image(mut img: DynamicImage, shrink_pixels: u32) -> DynamicImage {
+    pub fn add_perimeter_to_image(img_in: Rc<DynamicImage>, shrink_pixels: u32) -> DynamicImage {
+        let mut img: DynamicImage = Rc::unwrap_or_clone(img_in);  // clone if needed
         let inner_img = DynamicImage::resize_exact(&img, img.width() - 3*shrink_pixels, img.height() - 3*shrink_pixels, FilterType::CatmullRom);
         //////replace(&mut img, &inner_img, shrink_pixels.into(), shrink_pixels.into());
         //  Insert shrunk image, centered.
         let width_offset = (img.width() - inner_img.width())/2;
         let height_offset = (img.height() - inner_img.height())/2;
         replace(&mut img, &inner_img, width_offset.into(), height_offset.into());
-        img
+        img.clone()
     }
 
 }

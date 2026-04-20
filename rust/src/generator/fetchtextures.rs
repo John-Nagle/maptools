@@ -8,11 +8,15 @@ use image::{ImageReader, DynamicImage, imageops::{replace, FilterType}};
 //////use std::hash::{Hash, Hasher, DefaultHasher};
 use anyhow::{anyhow, Error};
 use std::io::{Cursor};
+use std::rc::{Rc};
 use chrono::{DateTime, Utc};
 use common::{RegionData, get_with_retry};
 use ureq::Agent;
 use std::collections::{HashSet};
 use cached::{Cached, SizedCache};
+
+/// Put DynamicImage inside an Rc to reduce copies.
+pub type RcDynamicImage = Rc<DynamicImage>;
 
 /// Texture fetching
 pub struct FetchTextures {
@@ -26,10 +30,10 @@ pub struct FetchTextures {
     /// Valid regions in this vizgroup. Never fetch anything not in this set.
     valid_regions: HashSet<(u32, u32)>,
     /// Water image, used for blank areas
-    water_image: DynamicImage,
+    water_image: RcDynamicImage,
     /// Cache of already computed tiles.
     /// Without this it takes hours.
-    cache: SizedCache<(u32, u32, u8), (DynamicImage, DateTime<Utc>)>,
+    cache: SizedCache<(u32, u32, u8), (RcDynamicImage, DateTime<Utc>)>,
 }
 
 impl FetchTextures {
@@ -43,7 +47,7 @@ impl FetchTextures {
         let valid_regions = regions.iter().map(|r| (r.region_loc_x, r.region_loc_y)).collect();
         //  Fixed water image, for other areas. Loaded at compile time.
         const WATER_IMAGE: &[u8] = include_bytes!("../assets/basicwater2-256-256.png");
-        let water_image = image::load_from_memory(WATER_IMAGE).expect("Failed to load water image");
+        let water_image = Rc::new(image::load_from_memory(WATER_IMAGE).expect("Failed to load water image"));
         Self {
             url_prefix: Self::URL_PREFIX.to_string(),
             agent: agent.clone(),
@@ -66,7 +70,7 @@ impl FetchTextures {
     fn fetch_terrain_image_single(
         &self,
         region_data: &RegionData) 
-        -> Result<(DynamicImage, DateTime<Utc>), Error> {
+        -> Result<(RcDynamicImage, DateTime<Utc>), Error> {
         const STANDARD_TILE_SIZE: u32 = 256; // Even on OS
         let tile_id_x = region_data.region_loc_x / STANDARD_TILE_SIZE;
         let tile_id_y = region_data.region_loc_y / STANDARD_TILE_SIZE;
@@ -95,7 +99,7 @@ impl FetchTextures {
             .expect("Cursor io never fails");
         //////assert_eq!(reader.format(), Some(ImageFormat::Pnm));
 
-        let image: DynamicImage = reader.decode()?;
+        let image: RcDynamicImage = Rc::new(reader.decode()?);
         Ok((image, last_modified))
     }
         
@@ -103,7 +107,7 @@ impl FetchTextures {
     pub fn fetch_terrain_image(
         &mut self,
         region_data: &RegionData) 
-        -> Result<(DynamicImage, DateTime<Utc>), Error> {
+        -> Result<(RcDynamicImage, DateTime<Utc>), Error> {
         const MAX_IMAGE_SIZE_GENERATED: u32 = 1024;   // generate no images bigger than this
         assert!(region_data.lod < 15);  // sanity
         if region_data.lod == 0 {
@@ -149,7 +153,7 @@ impl FetchTextures {
             if quad_image.width() > MAX_IMAGE_SIZE_GENERATED || quad_image.height() > MAX_IMAGE_SIZE_GENERATED {
                 let half_width = quad_image.width() / 2;
                 let half_height = quad_image.height() / 2;
-                quad_image = quad_image.resize(half_width, half_height, FilterType::Gaussian);
+                quad_image = Rc::new(quad_image.resize(half_width, half_height, FilterType::Triangle));
             }
             //  Save a cached copy
             let _ = self.cache.cache_set(cache_key, (quad_image.clone(), last_modified.clone()));
@@ -161,7 +165,7 @@ impl FetchTextures {
     /// Input order is lower left, lower right, uppler left, upper right.
     /// All images must be the same size.
     /// The output image is twice as big.
-    fn combine_terrain_images(images: [(DynamicImage, DateTime<Utc>);4]) -> (DynamicImage, DateTime<Utc>) {
+    fn combine_terrain_images(images: [(RcDynamicImage, DateTime<Utc>);4]) -> (RcDynamicImage, DateTime<Utc>) {
         let w = images[0].0.width();
         let h = images[0].0.height();
         //  Offsets for insertion into the new larger image.
@@ -172,15 +176,15 @@ impl FetchTextures {
         for n in 0..4 {
             assert_eq!(images[n].0.width(), w);
             assert_eq!(images[n].0.height(), h);
-            replace(&mut img, &images[n].0, (OFFSETS[n].0*w).into(), (OFFSETS[n].1*h).into());
+            replace(&mut img, &(*images[n].0), (OFFSETS[n].0*w).into(), (OFFSETS[n].1*h).into());
             last_modified = last_modified.max(images[n].1);
         }
         //  Last modified date is latest date
-        (img, last_modified)
+        (Rc::new(img), last_modified)
     }
     
     /// Not a location in this vizgroup. Fetch a standard water image.
-    fn fetch_water_image(&self, region_data: &RegionData) -> Result<(DynamicImage, DateTime<Utc>), Error> {
+    fn fetch_water_image(&self, region_data: &RegionData) -> Result<(RcDynamicImage, DateTime<Utc>), Error> {
         log::debug!("Using water image for tile {:?}", region_data);
         Ok((self.water_image.clone(), Utc::now()))
     }

@@ -909,4 +909,15 @@ Fix tomorrow.
     But this is not enough. It can result in requests for unused tiles.
     If we get a 403 or 404 error for a tile for an LOD > 0, we must
     make a water tile.
+    
+2026-04-20
+
+    Insanely slow generating large water areas.
+    - The recursive descent process for big areas of water is way too slow.
+    - First fix, RC everything and use a cheaper resize algorithm.
+
+    thread 'main' (390796) panicked at src/generator/generateterrain.rs:868:17:
+    Failed: CodecError { Packets out of sync }
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
 
