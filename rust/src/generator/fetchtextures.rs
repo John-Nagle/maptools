@@ -12,6 +12,7 @@ use chrono::{DateTime, Utc};
 use common::{RegionData, get_with_retry};
 use ureq::Agent;
 use std::collections::{HashSet};
+use cached::{Cached, SizedCache};
 
 /// Texture fetching
 pub struct FetchTextures {
@@ -26,11 +27,16 @@ pub struct FetchTextures {
     valid_regions: HashSet<(u32, u32)>,
     /// Water image, used for blank areas
     water_image: DynamicImage,
+    /// Cache of already computed tiles.
+    /// Without this it takes hours.
+    cache: SizedCache<(u32, u32, u8), (DynamicImage, DateTime<Utc>)>,
 }
 
 impl FetchTextures {
     //  SL only - needs work.
     const URL_PREFIX: &str = "https://secondlife-maps-cdn.akamaized.net/map-";
+    //  Cache size.
+    const CACHE_SIZE: usize = 1000;
     /// Usual new, doesn't do any real work
     pub fn new(agent: &Agent, regions: &Vec<RegionData>, region_size_opt: Option<(u32, u32)>) -> Self {
         //  Set of valid regions, used to decide what can be fetched.
@@ -43,7 +49,8 @@ impl FetchTextures {
             agent: agent.clone(),
             region_size_opt,
             valid_regions,
-            water_image
+            water_image,
+            cache: SizedCache::with_size(Self::CACHE_SIZE),
         }
     }
         
@@ -94,7 +101,7 @@ impl FetchTextures {
         
     /// For LODs beyond 8, the image is not available from the map API, and we have to construct it.
     pub fn fetch_terrain_image(
-        &self,
+        &mut self,
         region_data: &RegionData) 
         -> Result<(DynamicImage, DateTime<Utc>), Error> {
         const MAX_IMAGE_SIZE_GENERATED: u32 = 1024;   // generate no images bigger than this
@@ -108,11 +115,17 @@ impl FetchTextures {
                 self.fetch_water_image(region_data)
             } 
         } else {
-            //  Request four images and combine.
+            let cache_key = (region_data.region_loc_x, region_data.region_loc_y, region_data.lod);
+            if let Some((cached_image, last_modified)) = self.cache.cache_get(&cache_key) {
+                log::debug!("Terrain cache hit: {:?}", cache_key);
+                return Ok((cached_image.clone(), last_modified.clone()))
+            }
+            log::debug!("Terrain cache miss: {:?}", cache_key);
+            //  Request four images and combine
             let half_size_x = region_data.region_size_x / 2;
             let half_size_y = region_data.region_size_y / 2;
             let half_lod = region_data.lod - 1;            
-            let fetch = |lod, dx, dy| {
+            let mut fetch = |lod, dx, dy| {
                 let mut quadrant_region_data = region_data.clone();
                 quadrant_region_data.region_loc_x = dx;
                 quadrant_region_data.region_loc_y = dy;
@@ -130,12 +143,14 @@ impl FetchTextures {
                 ];
 
             let (mut quad_image, last_modified) = Self::combine_terrain_images(images);
+            //  Downsize image if too big.
             if quad_image.width() > MAX_IMAGE_SIZE_GENERATED || quad_image.height() > MAX_IMAGE_SIZE_GENERATED {
                 let half_width = quad_image.width() / 2;
                 let half_height = quad_image.height() / 2;
                 quad_image = quad_image.resize(half_width, half_height, FilterType::Gaussian);
             }
-            //  ***NEED TO DOWNSIZE IMAGE IF TOO BIG***
+            //  Save a cached copy
+            let _ = self.cache.cache_set(cache_key, (quad_image.clone(), last_modified.clone()));
             Ok((quad_image, last_modified))
         }
     }
