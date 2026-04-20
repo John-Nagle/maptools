@@ -147,10 +147,12 @@ impl FetchTextures {
     fn combine_terrain_images(images: [(DynamicImage, DateTime<Utc>);4]) -> (DynamicImage, DateTime<Utc>) {
         let w = images[0].0.width();
         let h = images[0].0.height();
-        const OFFSETS: [(u32, u32);4] = [(0, 0), (1, 0), (0, 1), (1, 1)];
+        //  Offsets for insertion into the new larger image.
+        //  Note that Y is flipped. That's because image coords go down from the top, while tile coordinates go up from the bottom.
+        const OFFSETS: [(u32, u32);4] = [(0, 1), (1, 1), (0, 0), (1, 0)];
         let mut img = DynamicImage::new_rgb8((w*2).into(), (h*2).into());
         let mut last_modified = images[0].1;
-        for n in 0..3 {
+        for n in 0..4 {
             assert_eq!(images[n].0.width(), w);
             assert_eq!(images[n].0.height(), h);
             replace(&mut img, &images[n].0, (OFFSETS[n].0*w).into(), (OFFSETS[n].1*h).into());
