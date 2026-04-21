@@ -48,8 +48,8 @@ impl FetchTextures {
     /// Usual new, doesn't do any real work
     pub fn new(agent: &Agent, regions: &Vec<RegionData>, region_size_opt: Option<(u32, u32)>) -> Self {
         //  Set of valid regions, used to decide what can be fetched.
-        let tiles_with_land = regions.iter().map(|r| ((r.region_loc_x, r.region_loc_y), 0)).collect();
-        let _tiles_with_land = Self::build_tiles_with_land(regions, region_size_opt.unwrap());
+        //////let tiles_with_land = regions.iter().map(|r| ((r.region_loc_x, r.region_loc_y), 0)).collect();
+        let tiles_with_land = Self::build_tiles_with_land(regions, region_size_opt.unwrap());
         //  Fixed water image, for other areas. Loaded at compile time.
         const WATER_IMAGE: &[u8] = include_bytes!("../assets/basicwater2-256-256.png");
         let water_image = Rc::new(image::load_from_memory(WATER_IMAGE).expect("Failed to load water image"));
