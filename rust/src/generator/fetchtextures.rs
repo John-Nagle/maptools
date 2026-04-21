@@ -17,6 +17,10 @@ use cached::{Cached, SizedCache};
 
 /// Put DynamicImage inside an Rc to reduce copies.
 pub type RcDynamicImage = Rc<DynamicImage>;
+/// Local short key for sets of tiles that have land. ((X, Y), LOD)
+type TileKey = ((u32, u32), u8);
+/// Largest possible LOD before things overflow. Never gets this big.
+const MAX_LOD: u32 = 24;    
 
 /// Texture fetching
 pub struct FetchTextures {
@@ -28,12 +32,12 @@ pub struct FetchTextures {
     /// The LOD system only works for  groups with homogeneous regions.
     region_size_opt: Option<(u32, u32)>,
     /// Valid regions in this vizgroup. Never fetch anything not in this set.
-    valid_regions: HashSet<(u32, u32)>,
+    tiles_with_land: HashSet<TileKey>,
     /// Water image, used for blank areas
     water_image: RcDynamicImage,
     /// Cache of already computed tiles.
     /// Without this it takes hours.
-    cache: SizedCache<(u32, u32, u8), (RcDynamicImage, DateTime<Utc>)>,
+    cache: SizedCache<TileKey, (RcDynamicImage, DateTime<Utc>)>,
 }
 
 impl FetchTextures {
@@ -44,7 +48,7 @@ impl FetchTextures {
     /// Usual new, doesn't do any real work
     pub fn new(agent: &Agent, regions: &Vec<RegionData>, region_size_opt: Option<(u32, u32)>) -> Self {
         //  Set of valid regions, used to decide what can be fetched.
-        let valid_regions = regions.iter().map(|r| (r.region_loc_x, r.region_loc_y)).collect();
+        let tiles_with_land = regions.iter().map(|r| ((r.region_loc_x, r.region_loc_y), 0)).collect();
         //  Fixed water image, for other areas. Loaded at compile time.
         const WATER_IMAGE: &[u8] = include_bytes!("../assets/basicwater2-256-256.png");
         let water_image = Rc::new(image::load_from_memory(WATER_IMAGE).expect("Failed to load water image"));
@@ -52,10 +56,27 @@ impl FetchTextures {
             url_prefix: Self::URL_PREFIX.to_string(),
             agent: agent.clone(),
             region_size_opt,
-            valid_regions,
+            tiles_with_land,
             water_image,
             cache: SizedCache::with_size(Self::CACHE_SIZE),
         }
+    }
+    
+    /// Precompute which tiles have some land in them.
+    fn build_tiles_with_land(regions: &Vec<RegionData>, region_size: (u32, u32)) -> HashSet<TileKey> {
+        let all_tiles_with_land: HashSet<TileKey> = regions.iter().map(|r| ((r.region_loc_x, r.region_loc_y), 0)).collect();
+        for lod in 1..MAX_LOD {
+            let size_x = lod.pow(2) * region_size.0;
+            let size_y = lod.pow(2) * region_size.1;
+            //  ***MORE***
+        }
+        todo!()
+    }
+    
+    /// True if tile has some land. 
+    /// Don't have to generate impostors for tiles with no land.
+    pub fn tile_has_land(&self, key: TileKey) -> bool {
+        self.tiles_with_land.contains(&key)
     }
         
     /// Fetch terrain image.
@@ -111,7 +132,7 @@ impl FetchTextures {
         const MAX_IMAGE_SIZE_GENERATED: u32 = 1024;   // generate no images bigger than this
         assert!(region_data.lod < 15);  // sanity
         if region_data.lod == 0 {
-            if self.valid_regions.contains(&(region_data.region_loc_x, region_data.region_loc_y)) {
+            if self.tiles_with_land.contains(&((region_data.region_loc_x, region_data.region_loc_y), region_data.lod)) {
                 //  OK to fetch
                 self.fetch_terrain_image_single(region_data)
             } else {
@@ -119,7 +140,7 @@ impl FetchTextures {
                 self.fetch_water_image(region_data)
             } 
         } else {
-            let cache_key = (region_data.region_loc_x, region_data.region_loc_y, region_data.lod);
+            let cache_key = ((region_data.region_loc_x, region_data.region_loc_y), region_data.lod);
             if let Some((cached_image, last_modified)) = self.cache.cache_get(&cache_key) {
                 log::debug!("Terrain cache hit: {:?}", cache_key);
                 return Ok((cached_image.clone(), last_modified.clone()))

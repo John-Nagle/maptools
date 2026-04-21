@@ -919,5 +919,8 @@ Fix tomorrow.
     thread 'main' (390796) panicked at src/generator/generateterrain.rs:868:17:
     Failed: CodecError { Packets out of sync }
     note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+    
+    It's a MySQL error. Kept the connection open and idle for too long?
+    Bug report sent.
 
 
