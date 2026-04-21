@@ -20,7 +20,7 @@ pub type RcDynamicImage = Rc<DynamicImage>;
 /// Local short key for sets of tiles that have land. ((X, Y), LOD)
 type TileKey = ((u32, u32), u8);
 /// Largest possible LOD before things overflow. Never gets this big.
-const MAX_LOD: u32 = 24;    
+const MAX_LOD: u8 = 24;    
 
 /// Texture fetching
 pub struct FetchTextures {
@@ -49,6 +49,7 @@ impl FetchTextures {
     pub fn new(agent: &Agent, regions: &Vec<RegionData>, region_size_opt: Option<(u32, u32)>) -> Self {
         //  Set of valid regions, used to decide what can be fetched.
         let tiles_with_land = regions.iter().map(|r| ((r.region_loc_x, r.region_loc_y), 0)).collect();
+        let _tiles_with_land = Self::build_tiles_with_land(regions, region_size_opt.unwrap());
         //  Fixed water image, for other areas. Loaded at compile time.
         const WATER_IMAGE: &[u8] = include_bytes!("../assets/basicwater2-256-256.png");
         let water_image = Rc::new(image::load_from_memory(WATER_IMAGE).expect("Failed to load water image"));
@@ -64,13 +65,29 @@ impl FetchTextures {
     
     /// Precompute which tiles have some land in them.
     fn build_tiles_with_land(regions: &Vec<RegionData>, region_size: (u32, u32)) -> HashSet<TileKey> {
-        let all_tiles_with_land: HashSet<TileKey> = regions.iter().map(|r| ((r.region_loc_x, r.region_loc_y), 0)).collect();
+        log::debug!("Building set of tiles with land start.  {} regions.", regions.len());
+        let mut all_tiles_with_land: HashSet<TileKey> = regions.iter().map(|r| ((r.region_loc_x, r.region_loc_y), 0)).collect();
+        let mut working_tiles = all_tiles_with_land.clone();
         for lod in 1..MAX_LOD {
-            let size_x = lod.pow(2) * region_size.0;
-            let size_y = lod.pow(2) * region_size.1;
-            //  ***MORE***
+            let mut new_working_tiles:  HashSet<TileKey> = HashSet::new();
+            let size_x = (lod as u32).pow(2) * region_size.0;
+            let size_y = (lod as u32).pow(2) * region_size.1;
+            for ((x, y), working_lod) in working_tiles {
+                assert_eq!(lod, working_lod + 1);
+                let new_tile_key = ((previous_multiple_of(x, size_x), previous_multiple_of(y, size_y)), lod);
+                new_working_tiles.insert(new_tile_key);
+                all_tiles_with_land.insert(new_tile_key);
+            }
+            working_tiles = new_working_tiles;
+            //  We are done when there is one big tile.
+            log::debug!("Building set of tiles with land: LOD #{}, {} tiles.", lod, working_tiles.len());
+            if working_tiles.len() <= 1 {
+                break;
+            }
         }
-        todo!()
+        log::debug!("Building set of tiles with land done, {} tiles total.", all_tiles_with_land.len());
+        println!("Total land tiles, all LODS: {}.", all_tiles_with_land.len());
+        all_tiles_with_land
     }
     
     /// True if tile has some land. 
@@ -209,6 +226,11 @@ impl FetchTextures {
         log::debug!("Using water image for tile {:?}", region_data);
         Ok((self.water_image.clone(), Utc::now()))
     }
+}
+
+/// Calculates the largest value less than or equal to n that is a multiple of rhs
+fn previous_multiple_of(n: u32, rhs: u32) -> u32 {
+    (n / rhs) * rhs
 }
 
 #[test]
