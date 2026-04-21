@@ -495,6 +495,10 @@ impl TerrainGenerator {
         viz_group_id: u32,
     ) -> Result<(), Error> {
         log::info!("Generating sculpt for \"{}\": {}", region.name, height_field);
+        if !fetcher.tile_has_land(((region.region_loc_x, region.region_loc_y), region.lod)) {
+            log::debug!("All water, not generated.");
+            return Ok(());
+        }
         // TerrainSculpt was translated from Python with an LLM. NEEDS WORK
         //  Do sculpt
         let mut terrain_sculpt = TerrainSculpt::new(height_field.water_height);
