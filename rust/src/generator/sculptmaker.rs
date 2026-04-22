@@ -269,7 +269,6 @@ impl TerrainSculptTexture {
         ////let (img, last_modified) = self.fetch_terrain_image(agent)?;
         let (img, last_modified) = fetcher.fetch_terrain_image(&self.region_data)?;
         log::debug!("Image last modified at {:?}", last_modified);
-        //  *** WRONG *** Need to add in same proporion as sculpt image has extra pixels.
         //  For SL, active area of UVs is 30/32 pixels.
         //  So we need to reduce size by 30/32.
         //  Reduced size is 256*(30/32), or 240 pixels.
