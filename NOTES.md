@@ -922,5 +922,11 @@ Fix tomorrow.
     
     It's a MySQL error. Kept the connection open and idle for too long?
     Bug report sent.
+    
+2026-04-21
+
+    Fixed performance problem. Ran to completion in about 10 mins.
+    Edges of sculpts are not behing handled right for large tiles. Check.
+    Probably because they are 1024x1024.
 
 

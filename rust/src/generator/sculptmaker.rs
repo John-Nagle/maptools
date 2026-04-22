@@ -290,13 +290,15 @@ impl TerrainSculptTexture {
     
     /// Shrink image by specified amount on each edge.
     /// This has to match what we do to the sculpts, so that
-    /// the folded-down edges will work.
+    /// the folded-down skirt edges will work.
     /// Why 3*shrink_pixels? Because 2 isn't enough.
     /// This is still slightly off, because we don't really have enough sculpt resolution.
+    /// Pixel shink is based on a 256x256 image, and is adjusted for other sizes
     pub fn add_perimeter_to_image(img_in: Rc<DynamicImage>, shrink_pixels: u32) -> DynamicImage {
+        let h_shrink = (3*shrink_pixels * img_in.width()) / 256;
+        let v_shrink = (3*shrink_pixels * img_in.height()) / 256;
         let mut img: DynamicImage = Rc::unwrap_or_clone(img_in);  // clone if needed
-        let inner_img = DynamicImage::resize_exact(&img, img.width() - 3*shrink_pixels, img.height() - 3*shrink_pixels, FilterType::CatmullRom);
-        //////replace(&mut img, &inner_img, shrink_pixels.into(), shrink_pixels.into());
+        let inner_img = DynamicImage::resize_exact(&img, img.width() - h_shrink, img.height() - v_shrink, FilterType::CatmullRom);
         //  Insert shrunk image, centered.
         let width_offset = (img.width() - inner_img.width())/2;
         let height_offset = (img.height() - inner_img.height())/2;
