@@ -65,27 +65,31 @@ impl FetchTextures {
     
     /// Precompute which tiles have some land in them.
     fn build_tiles_with_land(regions: &Vec<RegionData>, region_size: (u32, u32)) -> HashSet<TileKey> {
-        log::debug!("Building set of tiles with land start.  {} regions.", regions.len());
+        log::info!("Building set of tiles with land start.  {} regions.", regions.len());
         let mut all_tiles_with_land: HashSet<TileKey> = regions.iter().map(|r| ((r.region_loc_x, r.region_loc_y), 0)).collect();
         let mut working_tiles = all_tiles_with_land.clone();
+        //  Iterate over the LODs. 
+        //  Generate the next lower LOD by marking every tile with a land tile at a higher LOD.
         for lod in 1..MAX_LOD {
             let mut new_working_tiles:  HashSet<TileKey> = HashSet::new();
-            let size_x = (lod as u32).pow(2) * region_size.0;
-            let size_y = (lod as u32).pow(2) * region_size.1;
+            let size_x = 2_u32.pow(lod.into()) * region_size.0;
+            let size_y = 2_u32.pow(lod.into()) * region_size.1;
             for ((x, y), working_lod) in working_tiles {
                 assert_eq!(lod, working_lod + 1);
                 let new_tile_key = ((previous_multiple_of(x, size_x), previous_multiple_of(y, size_y)), lod);
+                log::debug!("  Land tile: ({},{}), LOD #{}", new_tile_key.0.0, new_tile_key.0.1, new_tile_key.1);
                 new_working_tiles.insert(new_tile_key);
                 all_tiles_with_land.insert(new_tile_key);
             }
             working_tiles = new_working_tiles;
             //  We are done when there is one big tile.
-            log::debug!("Building set of tiles with land: LOD #{}, {} tiles.", lod, working_tiles.len());
+            log::debug!("Built set of tiles with land: LOD #{}, size ({},{}), {} tiles.",
+                lod, size_x, size_y, working_tiles.len());
             if working_tiles.len() <= 1 {
                 break;
             }
         }
-        log::debug!("Building set of tiles with land done, {} tiles total.", all_tiles_with_land.len());
+        log::info!("Building set of tiles with land done, {} tiles total.", all_tiles_with_land.len());
         println!("Total land tiles, all LODS: {}.", all_tiles_with_land.len());
         all_tiles_with_land
     }
@@ -116,8 +120,8 @@ impl FetchTextures {
         assert!(lod <= 7);              // SL limit
         let region_loc_x = region_data.region_loc_x;
         let region_loc_y = region_data.region_loc_y;
-        if region_loc_x % STANDARD_TILE_SIZE * lod.pow(2) != 0
-        || region_loc_y % STANDARD_TILE_SIZE * lod.pow(2) != 0 {
+        if region_loc_x % STANDARD_TILE_SIZE * 2_u32.pow(lod.into()) != 0
+        || region_loc_y % STANDARD_TILE_SIZE * 2_u32.pow(lod.into()) != 0 {
             return Err(anyhow!("Terrain image location ({},{}) lod {} is invalid.", 
                 region_loc_x, region_loc_y, lod));
         }

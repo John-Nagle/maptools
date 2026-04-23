@@ -495,8 +495,9 @@ impl TerrainGenerator {
         viz_group_id: u32,
     ) -> Result<(), Error> {
         log::info!("Generating sculpt for \"{}\": {}", region.name, height_field);
-        if !fetcher.tile_has_land(((region.region_loc_x, region.region_loc_y), region.lod)) {
-            log::debug!("All water, not generated.");
+        let tile_key = ((region.region_loc_x, region.region_loc_y), region.lod);
+        if !fetcher.tile_has_land(tile_key) {
+            log::debug!("All water, tile not generated, at {:?}", tile_key);
             return Ok(());
         }
         // TerrainSculpt was translated from Python with an LLM. NEEDS WORK

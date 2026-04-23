@@ -928,5 +928,23 @@ Fix tomorrow.
     Fixed performance problem. Ran to completion in about 10 mins.
     Edges of sculpts are not behing handled right for large tiles. Check.
     Probably because they are 1024x1024.
+    
+2026-04-22
+
+    Need new matching algorithm in Sharpview.
+    - Get appropriate viz group (called estate ID in Sharpview; fix.)
+    - Find largest tile. 
+      - There should only be one, if generateterrain generated this info. But allow for multiple.
+      - If current pos is in largest tile, 
+        - Generate tiles below that tile.
+        - Otherwise, log as no impostors available.
+    - This is equivalent to "generate entire viz group". So why isn't the existing code working?
+    
+2026-04-23
+
+    Problem is in generator.
+    - 8K and above tiles are never generated.
+    - Handled incorrectly as "all water".
+    - build_tiles_with_land does not seem to be marking some tiles.
 
 
