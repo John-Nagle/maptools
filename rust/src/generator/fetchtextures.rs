@@ -20,7 +20,7 @@ pub type RcDynamicImage = Rc<DynamicImage>;
 /// Local short key for sets of tiles that have land. ((X, Y), LOD)
 type TileKey = ((u32, u32), u8);
 /// Largest possible LOD before things overflow. Never gets this big.
-const MAX_LOD: u8 = 24;    
+const MAX_LOD: u8 = 12;    
 
 /// Texture fetching
 pub struct FetchTextures {
@@ -34,7 +34,7 @@ pub struct FetchTextures {
     /// Valid regions in this vizgroup. Never fetch anything not in this set.
     tiles_with_land: HashSet<TileKey>,
     /// Water image, used for blank areas
-    water_image: RcDynamicImage,
+    water_images: Vec<RcDynamicImage>,
     /// Cache of already computed tiles.
     /// Without this it takes hours.
     cache: SizedCache<TileKey, (RcDynamicImage, DateTime<Utc>)>,
@@ -45,22 +45,46 @@ impl FetchTextures {
     const URL_PREFIX: &str = "https://secondlife-maps-cdn.akamaized.net/map-";
     //  Cache size.
     const CACHE_SIZE: usize = 1000;
+    //  Generate no images bigger than this
+    const MAX_IMAGE_SIZE_GENERATED: u32 = 1024;   
     /// Usual new, doesn't do any real work
     pub fn new(agent: &Agent, regions: &Vec<RegionData>, region_size_opt: Option<(u32, u32)>) -> Self {
         //  Set of valid regions, used to decide what can be fetched.
-        //////let tiles_with_land = regions.iter().map(|r| ((r.region_loc_x, r.region_loc_y), 0)).collect();
         let tiles_with_land = Self::build_tiles_with_land(regions, region_size_opt.unwrap());
         //  Fixed water image, for other areas. Loaded at compile time.
-        const WATER_IMAGE: &[u8] = include_bytes!("../assets/basicwater2-256-256.png");
-        let water_image = Rc::new(image::load_from_memory(WATER_IMAGE).expect("Failed to load water image"));
+        let water_images = Self::build_water_images(region_size_opt.unwrap(), MAX_LOD);
         Self {
             url_prefix: Self::URL_PREFIX.to_string(),
             agent: agent.clone(),
             region_size_opt,
             tiles_with_land,
-            water_image,
+            water_images,
             cache: SizedCache::with_size(Self::CACHE_SIZE),
         }
+    }
+    
+    /// Build all the water images.
+    /// These are tiles used where there is no land.
+    /// One for each LOD.
+    fn build_water_images(region_size: (u32,u32), max_lod: u8) -> Vec<RcDynamicImage> {
+        const WATER_IMAGE: &[u8] = include_bytes!("../assets/basicwater2-256-256.png");        
+        let water_image = Rc::new(image::load_from_memory(WATER_IMAGE).expect("Failed to load water image"));
+        //  Resize water to region size. Really ought to duplicate.
+        let water_image = Rc::new(water_image.resize(region_size.0, region_size.1, FilterType::Triangle));
+        let mut water_images = vec![water_image];
+        for _lod in 1..max_lod {
+            let prev_image = (water_images[water_images.len()-1].clone(), Utc::now());
+            let (mut quad_image, _timestamp) = Self::combine_terrain_images(
+                [prev_image.clone(), prev_image.clone(), prev_image.clone(), prev_image.clone()]);
+            if quad_image.width() > Self::MAX_IMAGE_SIZE_GENERATED || quad_image.height() > Self::MAX_IMAGE_SIZE_GENERATED {
+                let half_width = quad_image.width() / 2;
+                let half_height = quad_image.height() / 2;
+                quad_image = Rc::new(quad_image.resize(half_width, half_height, FilterType::Triangle));
+            }
+            drop(prev_image);
+            water_images.push(quad_image);
+        }
+        water_images
     }
     
     /// Precompute which tiles have some land in them.
@@ -149,17 +173,15 @@ impl FetchTextures {
     pub fn fetch_terrain_image(
         &mut self,
         region_data: &RegionData) 
-        -> Result<(RcDynamicImage, DateTime<Utc>), Error> {
-        const MAX_IMAGE_SIZE_GENERATED: u32 = 1024;   // generate no images bigger than this
-        assert!(region_data.lod < 15);  // sanity
+        -> Result<(RcDynamicImage, DateTime<Utc>), Error> {        
+        assert!(region_data.lod < MAX_LOD);  // sanity
+        //  If region is all water, use a canned water image.
+        if !self.tile_has_land(((region_data.region_loc_x, region_data.region_loc_y), region_data.lod)) {
+            return self.fetch_water_image(region_data);
+        }
         if region_data.lod == 0 {
-            if self.tiles_with_land.contains(&((region_data.region_loc_x, region_data.region_loc_y), region_data.lod)) {
-                //  OK to fetch
-                self.fetch_terrain_image_single(region_data)
-            } else {
-                //  It's open water, use the standard water image.
-                self.fetch_water_image(region_data)
-            } 
+            //  OK to fetch
+            self.fetch_terrain_image_single(region_data)
         } else {
             let cache_key = ((region_data.region_loc_x, region_data.region_loc_y), region_data.lod);
             if let Some((cached_image, last_modified)) = self.cache.cache_get(&cache_key) {
@@ -192,7 +214,7 @@ impl FetchTextures {
 
             let (mut quad_image, last_modified) = Self::combine_terrain_images(images);
             //  Downsize image if too big.
-            if quad_image.width() > MAX_IMAGE_SIZE_GENERATED || quad_image.height() > MAX_IMAGE_SIZE_GENERATED {
+            if quad_image.width() > Self::MAX_IMAGE_SIZE_GENERATED || quad_image.height() > Self::MAX_IMAGE_SIZE_GENERATED {
                 let half_width = quad_image.width() / 2;
                 let half_height = quad_image.height() / 2;
                 quad_image = Rc::new(quad_image.resize(half_width, half_height, FilterType::Triangle));
@@ -228,7 +250,7 @@ impl FetchTextures {
     /// Not a location in this vizgroup. Fetch a standard water image.
     fn fetch_water_image(&self, region_data: &RegionData) -> Result<(RcDynamicImage, DateTime<Utc>), Error> {
         log::debug!("Using water image for tile {:?}", region_data);
-        Ok((self.water_image.clone(), Utc::now()))
+        Ok((self.water_images[region_data.lod as usize].clone(), Utc::now()))
     }
 }
 
