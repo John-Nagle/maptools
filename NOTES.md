@@ -946,5 +946,13 @@ Fix tomorrow.
     - 8K and above tiles are never generated.
     - Handled incorrectly as "all water".
     - build_tiles_with_land does not seem to be marking some tiles.
+    
+2026-04-24.
+
+    Success! Can show Heterocera.
+    
+    Problems:
+    - Generateterrain generates LOD 11, but viewer rejects the file as having an excessive LOD. Fix in viewer or generator?
+    - Water texture scaling is wrong.
 
 
