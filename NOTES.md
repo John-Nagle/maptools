@@ -952,7 +952,12 @@ Fix tomorrow.
     Success! Can show Heterocera.
     
     Problems:
-    - Generateterrain generates LOD 11, but viewer rejects the file as having an excessive LOD. Fix in viewer or generator?
-    - Water texture scaling is wrong.
+    - Generateterrain generates LOD 11, but viewer rejects the file as having an excessive LOD. Fix in viewer or generator? [FIXED IN VIEWER]
+    - Water texture scaling is wrong. [FIXED IN VIEWER]
+    
+2026-05-05
+
+    Viewer is now ready for entries with water only, no terrain. Need to generate them.
+    Crashes when BonnieBots data lacks a map tile.
 
 

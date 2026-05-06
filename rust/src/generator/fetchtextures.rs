@@ -30,6 +30,7 @@ pub struct FetchTextures {
     agent: Agent,
     /// Region size (optional) - size of all regions, if homogeneous.
     /// The LOD system only works for  groups with homogeneous regions.
+    #[allow(dead_code)]
     region_size_opt: Option<(u32, u32)>,
     /// Valid regions in this vizgroup. Never fetch anything not in this set.
     tiles_with_land: HashSet<TileKey>,

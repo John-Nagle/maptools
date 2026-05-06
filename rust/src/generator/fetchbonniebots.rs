@@ -116,7 +116,7 @@ pub struct BonnieBotsRegion {
     /// Region name
     region_name: String,
     /// UUID of region
-    region_map_image: Uuid,
+    region_map_image: Option<Uuid>,
     ///  Region loc, in region counts, not meters.
     region_x: u32,
     ///  Region loc, in region counts, not meters.
