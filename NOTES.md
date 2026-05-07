@@ -958,6 +958,17 @@ Fix tomorrow.
 2026-05-05
 
     Viewer is now ready for entries with water only, no terrain. Need to generate them.
-    Crashes when BonnieBots data lacks a map tile.
+    Crashes when BonnieBots data lacks a map tile. [FIXED]
+    
+2026-05-06
+
+    What's the water height for a water-only tile?
+    - No real data source for this.
+    - Want adjacent land tile water level, probably.
+      - How to get that efficiently?
+      - Adjacent tiles might be all water, too.
+        - How to find relevant land?
+        - Construct index of all LOD0 tiles. Find nearest.
+          - https://crates.io/crates/kd-tree
 
 
