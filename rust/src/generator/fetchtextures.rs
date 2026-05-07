@@ -13,7 +13,7 @@ use common::{RegionData, get_with_retry};
 use ureq::Agent;
 use std::collections::{HashSet};
 use cached::{Cached, SizedCache};
-use kd_tree::{KdTree2};
+//////use kd_tree::{KdTree2};
 
 /// Put DynamicImage inside an Rc to reduce copies.
 pub type RcDynamicImage = Rc<DynamicImage>;
@@ -21,7 +21,7 @@ pub type RcDynamicImage = Rc<DynamicImage>;
 type TileKey = ((u32, u32), u8);
 /// Largest possible LOD before things overflow. Never gets this big.
 const MAX_LOD: u8 = 12;
-
+/*
 /// WaterPoint - water level for LOD 0 tiles.
 /// Used to set water level for filler all-water tiles.
 #[derive(Clone, Copy, PartialEq, PartialOrd)]
@@ -29,8 +29,9 @@ struct WaterPoint {
     /// Location of center of region.
     point: [u32; 2],
     /// Water level of tile.
-    water_level: f32,
+    water_height: f32,
 }
+*/
 
 /// Texture fetching
 pub struct FetchTextures {
@@ -44,8 +45,8 @@ pub struct FetchTextures {
     region_size_opt: Option<(u32, u32)>,
     /// Valid regions in this vizgroup. Never fetch anything not in this set.
     tiles_with_land: HashSet<TileKey>,
-    /// Tile water heights, for assigning height to all-water areas
-    tile_water_heights: KdTree2<WaterPoint>,
+    ///////// Tile water heights, for assigning height to all-water areas
+    //////tile_water_heights: KdTree2<WaterPoint>,
     /// Water image, used for blank areas
     water_images: Vec<RcDynamicImage>,
     /// Cache of already computed tiles.
@@ -65,9 +66,12 @@ impl FetchTextures {
         //  Set of valid regions, used to decide what can be fetched.
         let tiles_with_land = Self::build_tiles_with_land(regions, region_size_opt.unwrap());
         //  Water heights for all LOD0 tiles.
+/*
+        let water_height_items: Vec<_> = regions.iter().map(|r| WaterPoint { point: [r.region_loc_x, r.region_loc_y], water_height: r.water_height}).collect();
         let water_height_items = vec![];    // ***TEMP***
         let tile_water_heights = KdTree2::<WaterPoint>::build_by(water_height_items, 
             |item1, item2, k| item1.point[k].cmp(&item2.point[k]));
+*/
         //  Fixed water image, for other areas. Loaded at compile time.
         let water_images = Self::build_water_images(region_size_opt.unwrap(), MAX_LOD);
         Self {
@@ -75,7 +79,7 @@ impl FetchTextures {
             agent: agent.clone(),
             region_size_opt,
             tiles_with_land,
-            tile_water_heights,
+            //////tile_water_heights,
             water_images,
             cache: SizedCache::with_size(Self::CACHE_SIZE),
         }
