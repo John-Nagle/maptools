@@ -40,6 +40,7 @@ use ureq::{Agent};
 use chrono::Utc;
 use std::time::Duration;
 use kdtree::{KdTree};
+use kdtree::distance::squared_euclidean;
 
 /// MySQL Credentials for uploading.
 /// This filename will be searched for in parent directories,
@@ -650,8 +651,24 @@ impl TerrainGenerator {
     }
     
     /// Process queued water-only tiles.
+    /// These fill empty space.
+    /// Now we have info for all the non-water tiles and can find a non-water tile to get a water depth.
     fn process_water_only_tiles(&mut self) -> Result<(), Error> {
-        //  Convert water height tile list to a K-D tree so we can look up by distance.
+        //  Process all the water tiles.
+        log::info!("Water-only tiles to generate: {}", self.water_only_tiles.len());
+        if self.water_only_tiles.is_empty() {
+            return Ok(())
+        }
+        for (region_data, viz_group) in &self.water_only_tiles {
+            let loc = [region_data.region_loc_x as f32, region_data.region_loc_y as f32];
+            let nearest_vec = self.tile_water_heights.nearest(&loc, 1, &squared_euclidean)?;
+            assert!(!nearest_vec.is_empty());   // had better find something
+            let (distance, water_height) = nearest_vec[0];  // distance to nearest, and water height
+            log::debug!("Nearest land tile to {:?} is {:.2}m away, water height {:.2}m.", loc, distance, water_height);
+            //  Now we finally have water height and can construct the result
+            
+            //  ***MORE***
+        }
         //  ***MORE***
         Ok(())
     }
@@ -756,7 +773,6 @@ impl RunOpts {
             true
         }
     }
-
 }
 
 /// Actually do the work
