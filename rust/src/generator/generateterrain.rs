@@ -227,7 +227,7 @@ struct TerrainGenerator {
     /// Water only regions - region data and viz group
     water_only_tiles: Vec<(RegionData, u32)>,
     /// Tile water heights, for assigning height to all-water areas
-    tile_water_heights: Vec<WaterPoint>,
+    tile_water_heights: KdTree<f32, f32, [f32;2],>,
     /// Statistics
     stats: TerrainGeneratorStats,
 }
@@ -260,7 +260,7 @@ impl TerrainGenerator {
             height_field_cache: HeightFieldCache::new(),
             water_only_tiles: Vec::new(),
             //////tile_water_heights: KdTree2::new(),
-            tile_water_heights: Vec::new(),
+            tile_water_heights: KdTree::new(2),
             stats: TerrainGeneratorStats::new(),
         }
     }
@@ -657,6 +657,7 @@ impl TerrainGenerator {
     
     /// Process queued water-only tiles.
     fn process_water_only_tiles(&mut self) -> Result<(), Error> {
+        //  Convert water height tile list to a K-D tree so we can look up by distance.
         //  ***MORE***
         Ok(())
     }
