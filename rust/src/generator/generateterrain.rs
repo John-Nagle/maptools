@@ -98,16 +98,6 @@ struct RegionLodKey {
     lod: u8,
 }
 
-/// WaterPoint - water level for LOD 0 tiles.
-/// Used to set water level for filler all-water tiles.
-#[derive(Clone, Copy, PartialEq, PartialOrd)]
-struct WaterPoint {
-    /// Location of center of region.
-    point: [u32; 2],
-    /// Water level of tile.
-    water_height: f32,
-}
-
 /// Height field cache.
 /// Height fields for LOD 0 come from the database.
 /// Height fields for lower LODs are computed by
@@ -227,6 +217,7 @@ struct TerrainGenerator {
     /// Water only regions - region data and viz group
     water_only_tiles: Vec<(RegionData, u32)>,
     /// Tile water heights, for assigning height to all-water areas
+    /// ([x, y], water_height)
     tile_water_heights: KdTree<f32, f32, [f32;2],>,
     /// Statistics
     stats: TerrainGeneratorStats,
@@ -350,11 +341,14 @@ impl TerrainGenerator {
         region_loc_x: u32,
         region_loc_y: u32,
     ) -> Result<HeightField, Error> {
-        if self.run_opts.bonnie_bots_mode {
-            self.get_height_field_one_region_bb(grid, name, region_loc_x, region_loc_y)
+        let height_field = if self.run_opts.bonnie_bots_mode {
+            self.get_height_field_one_region_bb(grid, name, region_loc_x, region_loc_y)?
         } else {
-            self.get_height_field_one_region_orig(grid, name, region_loc_x, region_loc_y)
-        }         
+            self.get_height_field_one_region_orig(grid, name, region_loc_x, region_loc_y)?
+        };
+        //  Record height so we can set height for all-water tiles we create to fill out the grid.
+        let _ = self.tile_water_heights.add([region_loc_x as f32, region_loc_y as f32], height_field.water_height); 
+        Ok(height_field)     
     }
     
     /// Get elevation data for one region, BonnieBots mode.
