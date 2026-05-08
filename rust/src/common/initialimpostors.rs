@@ -28,7 +28,9 @@ pub enum TileType {
     /// As a sculpt
     Sculpt,
     /// As a mesh
-    Mesh
+    Mesh,
+    /// Water only
+    Water
 }
 
 /// These values uniquely identify an impostor record.
@@ -543,7 +545,8 @@ impl InitialImpostors {
         let tile_type = terrain_geometry.get_tile_type();
         let (sculpt_hash, sculpt_uuid, mesh_hash, mesh_uuid) = match tile_type {
             TileType::Sculpt => (Some(asset_hash), asset_uuid_opt, None, None),
-            TileType::Mesh => (None, None, Some(asset_hash), asset_uuid_opt)
+            TileType::Mesh => (None, None, Some(asset_hash), asset_uuid_opt),
+            TileType::Water => (None, None, None, None),
         };
         //  This is valid but inefficient.
         let (scale, offset) = terrain_geometry.get_adjusted_scale_offset().expect("Height field invalid, should be caught by caller.");

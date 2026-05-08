@@ -16,6 +16,7 @@
 //
 #![forbid(unsafe_code)]
 mod sculptmaker;
+mod watermaker;
 mod regionorder;
 mod vizgroup;
 mod fetchtextures;
@@ -32,6 +33,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use vizgroup::{CompletedGroups, VizGroups};
 use sculptmaker::{TerrainSculpt, TerrainSculptTexture};
+use watermaker::{TerrainWater};
 use regionorder::{TileLods, homogeneous_group_size};
 use common::{hash_to_hex, AssetUpload, TileAssetType, RectU32};
 use fetchbonniebots::{BonnieBotsBasicRegion, SL_GRID, SL_REGION_SIZE, TERRAIN_DATA_DIM, fetch_height_field};
@@ -659,7 +661,7 @@ impl TerrainGenerator {
         if self.water_only_tiles.is_empty() {
             return Ok(())
         }
-        for (region_data, viz_group) in &self.water_only_tiles {
+        for (region_data, viz_group_id) in &self.water_only_tiles {
             let loc = [region_data.region_loc_x as f32, region_data.region_loc_y as f32];
             let nearest_vec = self.tile_water_heights.nearest(&loc, 1, &squared_euclidean)?;
             assert!(!nearest_vec.is_empty());   // had better find something
@@ -667,7 +669,11 @@ impl TerrainGenerator {
             log::debug!("Nearest land tile to {:?} is {:.2}m away, water height {:.2}m.", loc, distance, water_height);
             //  Now we finally have water height and can construct the result
             
-            //  ***MORE***
+            let terrain_water = TerrainWater::new(*water_height);
+            let impostor_data =  InitialImpostors::assemble_region_impostor_data(&terrain_water, region_data,
+                *viz_group_id, "", None, &[]);
+            log::debug!("Water Region impostor data: {:?}", impostor_data);
+            InitialImpostors::add_impostor(&mut self.conn, impostor_data)?;
         }
         //  ***MORE***
         Ok(())
