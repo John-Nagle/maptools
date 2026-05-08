@@ -970,5 +970,7 @@ Fix tomorrow.
         - How to find relevant land?
         - Construct index of all LOD0 tiles. Find nearest.
           - https://crates.io/crates/kd-tree
+        - Height info is expensive to get. HTTP request for each one, if done separately.
+          - Collect height while generating tiles, queue up water-only tile items to do at end.
 
 

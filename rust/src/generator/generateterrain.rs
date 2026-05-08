@@ -39,6 +39,7 @@ use fetchtextures::{FetchTextures};
 use ureq::{Agent};
 use chrono::Utc;
 use std::time::Duration;
+use kdtree::{KdTree};
 
 /// MySQL Credentials for uploading.
 /// This filename will be searched for in parent directories,
@@ -95,6 +96,16 @@ struct RegionLodKey {
     region_loc_y: u32, 
     /// Level of detail.
     lod: u8,
+}
+
+/// WaterPoint - water level for LOD 0 tiles.
+/// Used to set water level for filler all-water tiles.
+#[derive(Clone, Copy, PartialEq, PartialOrd)]
+struct WaterPoint {
+    /// Location of center of region.
+    point: [u32; 2],
+    /// Water level of tile.
+    water_height: f32,
 }
 
 /// Height field cache.
@@ -213,6 +224,10 @@ struct TerrainGenerator {
     folder_generator_opt: Option<FolderGenerator>,
     /// The height field cache
     height_field_cache: HeightFieldCache,
+    /// Water only regions - region data and viz group
+    water_only_tiles: Vec<(RegionData, u32)>,
+    /// Tile water heights, for assigning height to all-water areas
+    tile_water_heights: Vec<WaterPoint>,
     /// Statistics
     stats: TerrainGeneratorStats,
 }
@@ -243,6 +258,9 @@ impl TerrainGenerator {
             run_opts,
             folder_generator_opt,
             height_field_cache: HeightFieldCache::new(),
+            water_only_tiles: Vec::new(),
+            //////tile_water_heights: KdTree2::new(),
+            tile_water_heights: Vec::new(),
             stats: TerrainGeneratorStats::new(),
         }
     }
@@ -497,7 +515,8 @@ impl TerrainGenerator {
         log::info!("Generating sculpt for \"{}\": {}", region.name, height_field);
         let tile_key = ((region.region_loc_x, region.region_loc_y), region.lod);
         if !fetcher.tile_has_land(tile_key) {
-            log::debug!("All water, tile not generated, at {:?}", tile_key);
+            log::debug!("All water, tile generation deferred, at {:?}", tile_key);
+            self.water_only_tiles.push((region.clone(), viz_group_id));
             return Ok(());
         }
         // TerrainSculpt was translated from Python with an LLM. NEEDS WORK
@@ -631,6 +650,14 @@ impl TerrainGenerator {
                 self.build_impostor_for_lod(&mut fetcher, &region, viz_group_id)?;
             }
         }
+        // Process water only tiles
+        self.process_water_only_tiles()?;
+        Ok(())
+    }
+    
+    /// Process queued water-only tiles.
+    fn process_water_only_tiles(&mut self) -> Result<(), Error> {
+        //  ***MORE***
         Ok(())
     }
 
