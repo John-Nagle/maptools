@@ -60,12 +60,14 @@ impl TileAssetType {
     }
     
     /// Access to texture index
-    pub fn get_texture_index(&self) -> Option<u8> {
+    /// Sculpts and meshes have a zero texture index.
+    /// Not null, because NULL = NULL is false in SQL and the unique index won't work
+    pub fn get_texture_index(&self) -> u8 {
         match self {
-            Self::SculptTexture => None,
-            Self::Mesh => None,
-            Self::BaseTexture(n) => Some(*n),
-            Self::EmissiveTexture(n) => Some(*n)
+            Self::SculptTexture => 0,
+            Self::Mesh => 0,
+            Self::BaseTexture(n) => *n,
+            Self::EmissiveTexture(n) => *n
         }
     }
     
@@ -308,7 +310,7 @@ impl AssetUpload {
             AND region_size_x = :region_size_x
             AND region_size_y = :region_size_y
             AND impostor_lod = :impostor_lod 
-            AND (texture_index = :texture_index OR (texture_index IS NULL AND :texture_index IS NULL))
+            AND (texture_index = :texture_index
             AND asset_type = :asset_type";
         let params = params! {
             "grid" => self.grid.to_lowercase(),

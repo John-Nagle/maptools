@@ -972,5 +972,11 @@ Fix tomorrow.
           - https://crates.io/crates/kd-tree
         - Height info is expensive to get. HTTP request for each one, if done separately.
           - Collect height while generating tiles, queue up water-only tile items to do at end.
-
+          
+2026-05-08
+   Water only tile code is in but no water only tiles are being found for Heterocera.
+   - Too many new texture tiles are generated
+   - 00:54:07 [WARN] Duplicate hashes for grid agni looking up SculptTexture asset at [290304, 268544] size [256, 256] 
+     - There are duplicate tile assets because NULL != NULL, so this doesn't work:
+       UNIQUE INDEX (grid, region_loc_x, region_loc_y, impostor_lod, asset_hash, texture_index, asset_type)
 
