@@ -90,7 +90,6 @@ num-traits = "0.2"
 num-derive = "0.4"
 array2d = "0.3"
 cached = "0.59"
-kdtree = "0.8"
 
 #   Debug logging
 simplelog = "0.12"

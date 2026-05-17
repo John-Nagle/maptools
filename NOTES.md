@@ -979,4 +979,15 @@ Fix tomorrow.
    - 00:54:07 [WARN] Duplicate hashes for grid agni looking up SculptTexture asset at [290304, 268544] size [256, 256] 
      - There are duplicate tile assets because NULL != NULL, so this doesn't work:
        UNIQUE INDEX (grid, region_loc_x, region_loc_y, impostor_lod, asset_hash, texture_index, asset_type)
+       
+2026-05-14
+    Fixed duplicate hashes.
+    Still not finding water-only tiles to be generated as water-only, no texture file.
+    - Does regionorder.rs actually generate them?
+      - No. They are filtered out at line 478, and not pushed to output.
+        - Should they be?
+        - This thing is way too complicated.
 
+
+2026-05-16
+   Moved water only tile generation to viewer. Simpler. Less data in database.

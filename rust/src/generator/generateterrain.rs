@@ -16,7 +16,6 @@
 //
 #![forbid(unsafe_code)]
 mod sculptmaker;
-mod watermaker;
 mod regionorder;
 mod vizgroup;
 mod fetchtextures;
@@ -33,7 +32,6 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use vizgroup::{CompletedGroups, VizGroups};
 use sculptmaker::{TerrainSculpt, TerrainSculptTexture};
-use watermaker::{TerrainWater};
 use regionorder::{TileLods, homogeneous_group_size};
 use common::{hash_to_hex, AssetUpload, TileAssetType, RectU32};
 use fetchbonniebots::{BonnieBotsBasicRegion, SL_GRID, SL_REGION_SIZE, TERRAIN_DATA_DIM, fetch_height_field};
@@ -41,8 +39,6 @@ use fetchtextures::{FetchTextures};
 use ureq::{Agent};
 use chrono::Utc;
 use std::time::Duration;
-use kdtree::{KdTree};
-use kdtree::distance::squared_euclidean;
 
 /// MySQL Credentials for uploading.
 /// This filename will be searched for in parent directories,
@@ -219,9 +215,6 @@ struct TerrainGenerator {
     height_field_cache: HeightFieldCache,
     /// Water only regions - region data and viz group
     water_only_tiles: Vec<(RegionData, u32)>,
-    /// Tile water heights, for assigning height to all-water areas
-    /// ([x, y], water_height)
-    tile_water_heights: KdTree<f32, f32, [f32;2],>,
     /// Statistics
     stats: TerrainGeneratorStats,
 }
@@ -253,8 +246,6 @@ impl TerrainGenerator {
             folder_generator_opt,
             height_field_cache: HeightFieldCache::new(),
             water_only_tiles: Vec::new(),
-            //////tile_water_heights: KdTree2::new(),
-            tile_water_heights: KdTree::new(2),
             stats: TerrainGeneratorStats::new(),
         }
     }
@@ -349,8 +340,6 @@ impl TerrainGenerator {
         } else {
             self.get_height_field_one_region_orig(grid, name, region_loc_x, region_loc_y)?
         };
-        //  Record height so we can set height for all-water tiles we create to fill out the grid.
-        let _ = self.tile_water_heights.add([region_loc_x as f32, region_loc_y as f32], height_field.water_height); 
         Ok(height_field)     
     }
     
@@ -647,35 +636,6 @@ impl TerrainGenerator {
                 self.build_impostor_for_lod(&mut fetcher, &region, viz_group_id)?;
             }
         }
-        // Process water only tiles
-        self.process_water_only_tiles()?;
-        Ok(())
-    }
-    
-    /// Process queued water-only tiles.
-    /// These fill empty space.
-    /// Now we have info for all the non-water tiles and can find a non-water tile to get a water depth.
-    fn process_water_only_tiles(&mut self) -> Result<(), Error> {
-        //  Process all the water tiles.
-        log::info!("Water-only tiles to generate: {}", self.water_only_tiles.len());
-        if self.water_only_tiles.is_empty() {
-            return Ok(())
-        }
-        for (region_data, viz_group_id) in &self.water_only_tiles {
-            let loc = [region_data.region_loc_x as f32, region_data.region_loc_y as f32];
-            let nearest_vec = self.tile_water_heights.nearest(&loc, 1, &squared_euclidean)?;
-            assert!(!nearest_vec.is_empty());   // had better find something
-            let (distance, water_height) = nearest_vec[0];  // distance to nearest, and water height
-            log::debug!("Nearest land tile to {:?} is {:.2}m away, water height {:.2}m.", loc, distance, water_height);
-            //  Now we finally have water height and can construct the result
-            
-            let terrain_water = TerrainWater::new(*water_height);
-            let impostor_data =  InitialImpostors::assemble_region_impostor_data(&terrain_water, region_data,
-                *viz_group_id, "", None, &[]);
-            log::debug!("Water Region impostor data: {:?}", impostor_data);
-            InitialImpostors::add_impostor(&mut self.conn, impostor_data)?;
-        }
-        //  ***MORE***
         Ok(())
     }
 
